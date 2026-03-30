@@ -4,6 +4,7 @@ import api from '../services/api';
 import { Event } from '../types';
 import { Plus, Search, Calendar as CalendarIcon, MapPin, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import CoverImage from '../components/CoverImage';
 
 const Events: React.FC = () => {
   const { user } = useAuth();
@@ -101,16 +102,16 @@ const Events: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {events?.map((event) => (
+          {events?.map((event, index) => (
             <div key={event.id} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col group hover:shadow-2xl transition-all duration-500 hover:-translate-y-1">
-              <div className="relative h-48 overflow-hidden">
-                {event.image ? (
-                  <img src={event.image} alt={event.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                ) : (
-                  <div className="w-full h-full bg-brand-pale/10 flex items-center justify-center">
-                    <CalendarIcon size={48} className="text-brand-medium/20" />
-                  </div>
-                )}
+              <div className="relative h-48 overflow-hidden min-h-[12rem]">
+                <CoverImage
+                  stored={event.image}
+                  slotIndex={index}
+                  variant="event"
+                  alt={event.title}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                />
                 {isAdmin && (
                   <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button title='admin validation' onClick={() => openModal(event)} className="p-2 bg-white/90 backdrop-blur-md rounded-xl shadow-lg hover:text-brand-medium transition-colors"><Edit2 size={16} /></button>

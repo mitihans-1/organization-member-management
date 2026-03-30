@@ -1,58 +1,103 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, LogIn, UserPlus } from 'lucide-react';
+import { defaultPathForRole } from '../lib/roleRoutes';
+import { LayoutDashboard, Menu, X } from 'lucide-react';
+
+const navLinkClass =
+  'text-gray-800 hover:text-[#3d5a2b] font-semibold text-sm transition-colors whitespace-nowrap';
 
 const GuestNavbar: React.FC = () => {
   const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+
+  const links = (
+    <>
+      <Link to="/" className={navLinkClass} onClick={() => setOpen(false)}>
+        Home
+      </Link>
+      <Link to="/about" className={navLinkClass} onClick={() => setOpen(false)}>
+        About
+      </Link>
+      <Link to="/#features" className={navLinkClass} onClick={() => setOpen(false)}>
+        Features
+      </Link>
+      <Link to="/#pricing" className={navLinkClass} onClick={() => setOpen(false)}>
+        Pricing
+      </Link>
+      <Link to="/blogs" className={navLinkClass} onClick={() => setOpen(false)}>
+        Blog
+      </Link>
+      <Link to="/contact" className={navLinkClass} onClick={() => setOpen(false)}>
+        Contact
+      </Link>
+    </>
+  );
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50 h-20 flex items-center font-poppins">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <img src="/asset/image.png" alt="logo" className="h-12 w-auto" />
-              <span className="text-2xl font-black text-brand-dark tracking-tight">
-                MemberShip<span className="text-brand-medium">Pro</span>
-              </span>
-            </Link>
-          </div>
-          <div className="hidden md:flex items-center space-x-10">
-            <Link to="/" className="text-gray-900 hover:text-brand-medium font-bold transition-all hover:-translate-y-0.5">Home</Link>
-            <Link to="/about" className="text-gray-900 hover:text-brand-medium font-bold transition-all hover:-translate-y-0.5">About</Link>
-            <Link to="/services" className="text-gray-900 hover:text-brand-medium font-bold transition-all hover:-translate-y-0.5">Services</Link>
-            <Link to="/events" className="text-gray-900 hover:text-brand-medium font-bold transition-all hover:-translate-y-0.5">Events</Link>
-            <Link to="/blogs" className="text-gray-900 hover:text-brand-medium font-bold transition-all hover:-translate-y-0.5">Blogs</Link>
-            <Link to="/contact" className="text-gray-900 hover:text-brand-medium font-bold transition-all hover:-translate-y-0.5">Contact</Link>
-          </div>
-          <div className="flex items-center space-x-4">
+    <nav className="bg-white shadow-sm sticky top-0 z-50 font-poppins border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-20">
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <img src="/asset/image.png" alt="" className="h-11 w-auto" />
+            <span className="text-xl sm:text-2xl font-black text-[#1a2e0a] tracking-tight">
+              OMMS
+            </span>
+          </Link>
+
+          <div className="hidden lg:flex items-center gap-8 xl:gap-10">{links}</div>
+
+          <div className="flex items-center gap-3">
             {user ? (
               <Link
-                to="/dashboard"
-                className="bg-brand-medium text-white px-6 py-2.5 rounded-full font-bold hover:bg-brand-light transition-all shadow-lg shadow-brand-medium/20 flex items-center space-x-2"
+                to={defaultPathForRole(user.role)}
+                className="inline-flex items-center gap-2 rounded-full bg-[#3d5a2b] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-[#4f772d] transition-colors"
               >
                 <LayoutDashboard size={18} />
-                <span>Dashboard</span>
+                Dashboard
               </Link>
             ) : (
               <>
                 <Link
                   to="/login"
-                  className="text-gray-900 font-bold hover:text-brand-medium transition-colors"
+                  className="hidden sm:inline-flex rounded-full border-2 border-[#3d5a2b] px-5 py-2 text-sm font-bold text-[#3d5a2b] hover:bg-[#3d5a2b]/5 transition-colors"
                 >
-                  Log in
+                  Log In
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-brand-medium text-white px-6 py-2.5 rounded-full font-bold hover:bg-brand-light transition-all shadow-lg shadow-brand-medium/20"
+                  className="inline-flex rounded-full bg-[#3d5a2b] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-[#4f772d] transition-colors"
                 >
                   Get Started
                 </Link>
               </>
             )}
+
+            <button
+              type="button"
+              className="lg:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? <X size={24} /> : <Menu size={24} />}
+            </button>
           </div>
         </div>
+
+        {open && (
+          <div className="lg:hidden border-t border-gray-100 py-4 flex flex-col gap-3 pb-6">
+            {links}
+            {!user && (
+              <Link
+                to="/login"
+                className="sm:hidden inline-flex justify-center rounded-full border-2 border-[#3d5a2b] px-5 py-2.5 text-sm font-bold text-[#3d5a2b]"
+                onClick={() => setOpen(false)}
+              >
+                Log In
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

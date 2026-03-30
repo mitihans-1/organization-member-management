@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { defaultPathForRole } from '../lib/roleRoutes';
 import { Mail, Lock, LogIn } from 'lucide-react';
 
 const Login: React.FC = () => {
@@ -20,7 +21,7 @@ const Login: React.FC = () => {
     try {
       const response = await api.post('/auth/login', { email, password });
       login(response.data.token, response.data.user);
-      navigate('/dashboard');
+      navigate(defaultPathForRole(response.data.user?.role), { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to login');
     } finally {

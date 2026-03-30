@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { Users, Calendar, BookOpen, CreditCard, TrendingUp, AlertCircle } from 'lucide-react';
@@ -59,7 +60,12 @@ const Dashboard: React.FC = () => {
               </p>
             </div>
           </div>
-          <button className="bg-brand-medium text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-brand-light transition-all">Upgrade Plan</button>
+          <Link
+            to="/org/upgrade"
+            className="bg-brand-medium text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-brand-light transition-all inline-block"
+          >
+            Upgrade Plan
+          </Link>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { defaultPathForRole } from '../lib/roleRoutes';
 import { User, Mail, Lock, Building, Briefcase, UserPlus } from 'lucide-react';
 
 const Register: React.FC = () => {
@@ -29,7 +30,7 @@ const Register: React.FC = () => {
     try {
       const response = await api.post('/auth/register', formData);
       login(response.data.token, response.data.user);
-      navigate('/dashboard');
+      navigate(defaultPathForRole(response.data.user?.role), { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to register');
     } finally {
@@ -44,6 +45,11 @@ const Register: React.FC = () => {
           <img src="/asset/image.png" alt="logo" className="h-16 w-auto mx-auto" />
         </Link>
         <h2 className="text-4xl font-black text-brand-dark tracking-tight">Join OMMS</h2>
+        <p className="mt-3 text-center text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+          This form registers you as an <span className="font-semibold text-gray-700">organization administrator</span> for your org.
+          You&apos;ll be signed in and taken to the <span className="font-semibold text-gray-700">org admin dashboard</span>.
+          <span className="block mt-1">Member and super-admin accounts are issued by an admin—not via this page.</span>
+        </p>
         <p className="mt-4 text-center text-sm text-brand-deep font-medium">
           Already have an account?{' '}
           <Link to="/login" className="font-bold text-brand-medium hover:text-brand-light transition-colors">
