@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { User } from '../types';
@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import { relativeTime } from '../lib/relativeTime';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 
 const PAGE_SIZE = 7;
 
@@ -25,7 +26,10 @@ const Members: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [editingMember, setEditingMember] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -34,8 +38,10 @@ const Members: React.FC = () => {
     role: 'member',
     status: 'active',
   });
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const queryClient = useQueryClient();
+  useBodyScrollLock(isModalOpen);
 
   const { data: members, isLoading } = useQuery<User[]>({
     queryKey: ['members'],
@@ -90,6 +96,98 @@ const Members: React.FC = () => {
     }
   };
 
+  const exportMembers = () => {
+    if (filteredMembers.length === 0) return;
+    const rows = filteredMembers.map((m) => ({
+      Name: m.name || '',
+      Email: m.email || '',
+      Role: m.role || '',
+      JoinDate: m.join_date ? new Date(m.join_date).toISOString() : '',
+      Organization: m.organization_name || '',
+    }));
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) =>
+        headers
+          .map((h) => `"${String((row as Record<string, string>)[h]).replace(/"/g, '""')}"`)
+          .join(',')
+      ),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `members-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const applyBulkDelete = () => {
+    if (selected.size === 0) return;
+    const confirmed = window.confirm(`Delete ${selected.size} selected member(s)?`);
+    if (!confirmed) return;
+    setIsBulkDeleting(true);
+    Promise.all(Array.from(selected).map((id) => api.delete(`/members/${id}`)))
+      .then(() => {
+        setSelected(new Set());
+        setOpenActionMenuId(null);
+        queryClient.invalidateQueries({ queryKey: ['members'] });
+      })
+      .finally(() => setIsBulkDeleting(false));
+  };
+
+  const importMembersFromCsv = async (file: File | null) => {
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (lines.length < 2) return;
+
+      const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+      const nameIndex = header.indexOf('name');
+      const emailIndex = header.indexOf('email');
+      const passwordIndex = header.indexOf('password');
+      if (nameIndex === -1 || emailIndex === -1) {
+        alert('CSV must include at least "name" and "email" headers.');
+        return;
+      }
+
+      const rows = lines.slice(1);
+      for (const row of rows) {
+        const cols = row.split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+        const name = cols[nameIndex];
+        const email = cols[emailIndex];
+        const password = passwordIndex > -1 ? cols[passwordIndex] : 'password123';
+        if (!name || !email) continue;
+        await api.post('/members', { name, email, password, role: 'member', status: 'active' });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+      setSelected(new Set());
+    } finally {
+      setIsImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+
+  useEffect(() => {
+    const onDocClick = () => setOpenActionMenuId(null);
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenActionMenuId(null);
+    };
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, []);
+
   const openModal = (member?: User) => {
     if (member) {
       setEditingMember(member);
@@ -143,7 +241,7 @@ const Members: React.FC = () => {
       : '—';
 
   const tableSection = (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-hidden overflow-y-visible">
       {isOrgAdmin && (
         <div className="p-4 md:p-5 border-b border-gray-100 flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
           <div className="relative flex-1 min-w-0 max-w-xl">
@@ -165,24 +263,37 @@ const Members: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
+              onClick={exportMembers}
+              disabled={filteredMembers.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
             >
               <Download size={16} />
               Export
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
+              onClick={() => importInputRef.current?.click()}
+              disabled={isImporting}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
             >
               <Upload size={16} />
-              Import
+              {isImporting ? 'Importing...' : 'Import'}
             </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => importMembersFromCsv(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
+              onClick={applyBulkDelete}
+              disabled={selected.size === 0 || isBulkDeleting}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
             >
               <List size={16} />
-              Bulk Actions
+              {isBulkDeleting ? 'Deleting...' : 'Bulk Delete'}
             </button>
           </div>
         </div>
@@ -291,7 +402,7 @@ const Members: React.FC = () => {
                     <td className="px-4 py-4 text-gray-600">{lastActive(member as User & { updatedAt?: string })}</td>
                   )}
                   <td className="px-4 py-4 text-right">
-                    <div className="inline-flex items-center gap-1 justify-end">
+                    <div className="inline-flex items-center gap-1 justify-end relative">
                       <button
                         type="button"
                         title="Edit"
@@ -309,9 +420,43 @@ const Members: React.FC = () => {
                         <Trash2 size={16} />
                       </button>
                       {isOrgAdmin && (
-                        <button type="button" className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuId((prev) => (prev === member.id ? null : member.id));
+                          }}
+                          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
+                        >
                           <MoreVertical size={16} />
                         </button>
+                      )}
+                      {isOrgAdmin && openActionMenuId === member.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white shadow-lg py-1"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionMenuId(null);
+                              openModal(member);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            Edit Member
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionMenuId(null);
+                              deleteMutation.mutate(member.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            Delete Member
+                          </button>
+                        </div>
                       )}
                     </div>
                   </td>
@@ -407,7 +552,7 @@ const Members: React.FC = () => {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
               <h3 className="text-lg font-black text-gray-900">

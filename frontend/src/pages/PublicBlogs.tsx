@@ -39,6 +39,7 @@ function tagForBlog(id: number): { label: string; urgent?: boolean } {
 const PublicBlogs: React.FC = () => {
   const [q, setQ] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
     queryKey: ['public-blogs'],
@@ -117,7 +118,7 @@ const PublicBlogs: React.FC = () => {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-gray-100 animate-pulse h-[420px]"
+                className="rounded-2xl bg-gray-100 animate-pulse h-[500px]"
               />
             ))}
           </div>
@@ -139,9 +140,9 @@ const PublicBlogs: React.FC = () => {
                 return (
                   <article
                     key={blog.id}
-                    className="bg-white rounded-2xl shadow-md shadow-gray-200/80 overflow-hidden border border-gray-100 flex flex-col"
+                    className="bg-white rounded-2xl shadow-md shadow-gray-200/80 overflow-hidden border border-gray-100 flex flex-col min-h-[500px]"
                   >
-                    <div className="relative h-48 sm:h-52 bg-gray-100 min-h-[12rem]">
+                    <div className="relative h-56 sm:h-64 bg-gray-100 min-h-[14rem]">
                       <CoverImage
                         stored={blog.image}
                         slotIndex={index}
@@ -172,9 +173,9 @@ const PublicBlogs: React.FC = () => {
                         {blog.title}
                       </h3>
                       <p className="text-gray-600 text-sm leading-relaxed mb-5 flex-1">
-                        {excerpt(blog.content)}
+                        {expanded[blog.id] ? blog.content : excerpt(blog.content)}
                       </p>
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-100 gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-100 gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <div
                             className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold"
@@ -186,17 +187,21 @@ const PublicBlogs: React.FC = () => {
                             Author
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 shrink-0 text-sm text-gray-600">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shrink-0 text-sm text-gray-600 w-full sm:w-auto">
                           <span className="inline-flex items-center gap-1">
                             <Eye size={16} className="text-gray-400" />
                             {stableViews(blog.id)}
                           </span>
-                          <span
-                            className="font-semibold inline-flex items-center gap-0.5"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpanded((prev) => ({ ...prev, [blog.id]: !prev[blog.id] }))
+                            }
+                            className="font-semibold inline-flex items-center justify-center gap-0.5 w-full sm:w-auto rounded-lg px-3 py-2 bg-brand-pale/20 hover:bg-brand-pale/40 transition-colors"
                             style={{ color: FOREST }}
                           >
-                            Read More →
-                          </span>
+                            {expanded[blog.id] ? 'Show Less' : 'Read More'}
+                          </button>
                         </div>
                       </div>
                     </div>

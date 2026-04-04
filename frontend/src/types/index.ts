@@ -54,7 +54,10 @@ export interface Blog {
   title: string;
   content: string;
   image?: string;
+  status?: string;
+  category?: string;
   author_id: number;
+  author?: { id: number; name: string; email: string };
   createdAt: string;
 }
 
@@ -65,4 +68,5 @@ export interface Event {
   date: string;
   location?: string;
   image?: string;
+  status?: string;
 }

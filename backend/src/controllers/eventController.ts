@@ -14,7 +14,7 @@ export const getEvents = async (req: Request, res: Response) => {
 
 export const createEvent = async (req: any, res: Response) => {
   try {
-    const { title, description, date, location, image } = req.body;
+    const { title, description, date, location, image, status } = req.body;
     const event = await prisma.event.create({
       data: {
         title,
@@ -22,6 +22,7 @@ export const createEvent = async (req: any, res: Response) => {
         date: new Date(date),
         location,
         image,
+        status: status || 'draft',
       },
     });
     res.status(201).json(event);
@@ -33,7 +34,7 @@ export const createEvent = async (req: any, res: Response) => {
 export const updateEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, date, location, image } = req.body;
+    const { title, description, date, location, image, status } = req.body;
     const event = await prisma.event.update({
       where: { id: parseInt(id) },
       data: {
@@ -42,6 +43,7 @@ export const updateEvent = async (req: any, res: Response) => {
         date: new Date(date),
         location,
         image,
+        status: status || 'draft',
       },
     });
     res.status(200).json(event);

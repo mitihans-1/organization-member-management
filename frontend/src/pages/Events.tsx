@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 
 const PAGE_SIZE = 6;
 
@@ -24,6 +25,11 @@ const Events: React.FC = () => {
   const isAdmin = user?.role === 'orgAdmin' || user?.role === 'SuperAdmin';
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -33,9 +39,11 @@ const Events: React.FC = () => {
     date: '',
     location: '',
     image: '',
+    status: 'draft',
   });
 
   const queryClient = useQueryClient();
+  useBodyScrollLock(isModalOpen);
 
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['events'],
@@ -66,14 +74,23 @@ const Events: React.FC = () => {
   const filtered = useMemo(() => {
     const list = events ?? [];
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (e) =>
+    const locationQ = locationFilter.trim().toLowerCase();
+    return list.filter((e) => {
+      const textMatch =
+        !q ||
         e.title.toLowerCase().includes(q) ||
         (e.description && e.description.toLowerCase().includes(q)) ||
-        (e.location && e.location.toLowerCase().includes(q))
-    );
-  }, [events, searchTerm]);
+        (e.location && e.location.toLowerCase().includes(q));
+
+      const locationMatch = !locationQ || (e.location || '').toLowerCase().includes(locationQ);
+
+      const eventDate = new Date(e.date);
+      const startMatch = !startDateFilter || eventDate >= new Date(`${startDateFilter}T00:00:00`);
+      const endMatch = !endDateFilter || eventDate <= new Date(`${endDateFilter}T23:59:59`);
+
+      return textMatch && locationMatch && startMatch && endMatch;
+    });
+  }, [events, searchTerm, locationFilter, startDateFilter, endDateFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -91,10 +108,11 @@ const Events: React.FC = () => {
         date: new Date(event.date).toISOString().split('T')[0],
         location: event.location || '',
         image: event.image || '',
+        status: event.status || 'draft',
       });
     } else {
       setEditingEvent(null);
-      setFormData({ title: '', description: '', date: '', location: '', image: '' });
+      setFormData({ title: '', description: '', date: '', location: '', image: '', status: 'draft' });
     }
     setIsModalOpen(true);
   };
@@ -102,7 +120,7 @@ const Events: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingEvent(null);
-    setFormData({ title: '', description: '', date: '', location: '', image: '' });
+    setFormData({ title: '', description: '', date: '', location: '', image: '', status: 'draft' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -114,11 +132,42 @@ const Events: React.FC = () => {
     }
   };
 
-  /** Placeholder attendees — API has no capacity field yet */
-  const attendeesRatio = (_: Event, index: number) => {
-    const cur = 25;
-    const max = 50;
-    return { cur, max, pct: 50 + (index % 2) * 10 };
+  const handleImageFileChange = (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({ ...prev, image: String(reader.result || '') }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const exportToCsv = () => {
+    const rows = filtered.map((event) => ({
+      Title: event.title,
+      Description: event.description || '',
+      Date: new Date(event.date).toISOString(),
+      Location: event.location || '',
+      Image: event.image || '',
+    }));
+    if (rows.length === 0) return;
+
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) =>
+        headers
+          .map((h) => `"${String((row as Record<string, string>)[h]).replace(/"/g, '""')}"`)
+          .join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `events-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const listBody = (
@@ -162,17 +211,20 @@ const Events: React.FC = () => {
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700"
+              onClick={exportToCsv}
+              disabled={filtered.length === 0}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 w-full sm:w-auto justify-center"
             >
               <Download size={16} />
               Export
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700"
+              onClick={() => setIsFilterOpen((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 w-full sm:w-auto justify-center"
             >
               <Filter size={16} />
               Filter
@@ -180,6 +232,52 @@ const Events: React.FC = () => {
           </div>
         </div>
       </div>
+      {isFilterOpen && (
+        <div className="px-4 md:px-5 pb-4 border-b border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input
+              type="text"
+              placeholder="Filter by location"
+              value={locationFilter}
+              onChange={(e) => {
+                setLocationFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+            />
+            <input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => {
+                setStartDateFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+            />
+            <input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => {
+                setEndDateFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setLocationFilter('');
+                setStartDateFilter('');
+                setEndDateFilter('');
+                setPage(1);
+              }}
+              className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {view === 'calendar' ? (
         <div className="p-10 text-center text-gray-500 text-sm">
@@ -198,20 +296,18 @@ const Events: React.FC = () => {
                   <th className="px-4 py-3 whitespace-nowrap">Date &amp; Time</th>
                   <th className="px-4 py-3">Location</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 min-w-[140px]">Attendees</th>
                   <th className="px-4 py-3 w-12">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                    <td colSpan={5} className="px-4 py-12 text-center text-gray-400">
                       No events found
                     </td>
                   </tr>
                 ) : (
-                  paged.map((event, idx) => {
-                    const { cur, max, pct } = attendeesRatio(event, idx);
+                  paged.map((event) => {
                     return (
                       <tr key={event.id} className="hover:bg-gray-50/80">
                         <td className="px-4 py-4">
@@ -225,23 +321,12 @@ const Events: React.FC = () => {
                         </td>
                         <td className="px-4 py-4 text-gray-700">{event.location || '—'}</td>
                         <td className="px-4 py-4">
-                          <span className="inline-flex rounded-full bg-sky-50 px-3 py-0.5 text-xs font-semibold text-sky-700 border border-sky-100">
-                            draft
+                          <span className="inline-flex rounded-full bg-sky-50 px-3 py-0.5 text-xs font-semibold text-sky-700 border border-sky-100 capitalize">
+                            {event.status || '—'}
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-1">
-                            <div
-                              className="h-full rounded-full bg-indigo-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            {cur}/{max}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 justify-end relative">
                             {isAdmin && (
                               <>
                                 <button
@@ -262,9 +347,39 @@ const Events: React.FC = () => {
                                 </button>
                               </>
                             )}
-                            <button type="button" className="p-2 rounded-lg hover:bg-gray-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenActionMenuId((prev) => (prev === event.id ? null : event.id))
+                              }
+                              className="p-2 rounded-lg hover:bg-gray-100"
+                            >
                               <MoreVertical size={16} />
                             </button>
+                            {openActionMenuId === event.id && (
+                              <div className="absolute right-0 top-10 z-10 w-40 rounded-xl border border-gray-100 bg-white shadow-lg py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    openModal(event);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  Edit Event
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null);
+                                    deleteMutation.mutate(event.id);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                >
+                                  Delete Event
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -339,15 +454,15 @@ const Events: React.FC = () => {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">{listBody}</div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 overflow-hidden">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h3 className="text-lg font-black text-gray-900">{editingEvent ? 'Edit Event' : 'Create Event'}</h3>
               <button type="button" onClick={closeModal} className="p-2 rounded-lg hover:bg-gray-100">
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Title</label>
                 <input
@@ -368,7 +483,7 @@ const Events: React.FC = () => {
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
                   <input
@@ -390,13 +505,34 @@ const Events: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image URL</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image File</label>
                 <input
-                  type="text"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageFileChange(e.target.files?.[0] ?? null)}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
+                {formData.image ? (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, image: '' })}
+                    className="mt-2 text-xs font-semibold text-gray-500 hover:text-gray-700"
+                  >
+                    Remove selected image
+                  </button>
+                ) : null}
               </div>
               <div className="flex gap-3 pt-2">
                 <button

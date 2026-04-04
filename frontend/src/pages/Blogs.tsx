@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Blog } from '../types';
@@ -7,18 +7,45 @@ import { useAuth } from '../context/AuthContext';
 import CoverImage from '../components/CoverImage';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import { relativeTime } from '../lib/relativeTime';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
+
+/** Allowed categories — stored on the server; user picks one when creating/editing. */
+const BLOG_CATEGORIES = [
+  'general',
+  'announcement',
+  'news',
+  'update',
+  'tutorial',
+  'event',
+  'policy',
+  'hr',
+  'finance',
+  'technical',
+  'community',
+  'other',
+] as const;
+
+const BLOG_STATUSES = ['draft', 'published', 'archived'] as const;
 
 const Blogs: React.FC = () => {
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBlog, setEditingBlog] = useState<Blog | null>(null);
-  const [formData, setFormData] = useState({ title: '', content: '', image: '' });
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    image: '',
+    status: 'draft',
+    category: 'general',
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
 
   const queryClient = useQueryClient();
   const isAdmin = user?.role === 'orgAdmin' || user?.role === 'SuperAdmin';
+  useBodyScrollLock(isModalOpen);
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
     queryKey: ['blogs'],
@@ -26,7 +53,7 @@ const Blogs: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (newBlog: any) => api.post('/blogs', newBlog),
+    mutationFn: (newBlog: Record<string, unknown>) => api.post('/blogs', newBlog),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
       closeModal();
@@ -34,7 +61,8 @@ const Blogs: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (updatedBlog: any) => api.put(`/blogs/${updatedBlog.id}`, updatedBlog),
+    mutationFn: (updatedBlog: Record<string, unknown> & { id: number }) =>
+      api.put(`/blogs/${updatedBlog.id}`, updatedBlog),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
       closeModal();
@@ -46,6 +74,15 @@ const Blogs: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blogs'] }),
   });
 
+  const categoryOptionsForFilter = useMemo(() => {
+    const fromDb = new Set<string>();
+    (blogs ?? []).forEach((b) => {
+      if (b.category?.trim()) fromDb.add(b.category.trim());
+    });
+    BLOG_CATEGORIES.forEach((c) => fromDb.add(c));
+    return Array.from(fromDb).sort((a, b) => a.localeCompare(b));
+  }, [blogs]);
+
   const filtered = useMemo(() => {
     let list = blogs ?? [];
     const q = searchTerm.trim().toLowerCase();
@@ -55,16 +92,47 @@ const Blogs: React.FC = () => {
           b.title.toLowerCase().includes(q) || b.content.toLowerCase().includes(q)
       );
     }
+    if (statusFilter !== 'All') {
+      list = list.filter((b) => (b.status || 'draft') === statusFilter);
+    }
+    if (categoryFilter !== 'All') {
+      list = list.filter((b) => (b.category || 'general') === categoryFilter);
+    }
     return list;
-  }, [blogs, searchTerm]);
+  }, [blogs, searchTerm, statusFilter, categoryFilter]);
+
+  useEffect(() => {
+    const onDoc = () => setOpenActionMenuId(null);
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenActionMenuId(null);
+    };
+    document.addEventListener('click', onDoc);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('click', onDoc);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, []);
 
   const openModal = (blog?: Blog) => {
     if (blog) {
       setEditingBlog(blog);
-      setFormData({ title: blog.title, content: blog.content, image: blog.image || '' });
+      setFormData({
+        title: blog.title,
+        content: blog.content,
+        image: blog.image || '',
+        status: blog.status || 'draft',
+        category: blog.category || 'general',
+      });
     } else {
       setEditingBlog(null);
-      setFormData({ title: '', content: '', image: '' });
+      setFormData({
+        title: '',
+        content: '',
+        image: '',
+        status: 'draft',
+        category: 'general',
+      });
     }
     setIsModalOpen(true);
   };
@@ -72,7 +140,13 @@ const Blogs: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingBlog(null);
-    setFormData({ title: '', content: '', image: '' });
+    setFormData({
+      title: '',
+      content: '',
+      image: '',
+      status: 'draft',
+      category: 'general',
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -82,6 +156,15 @@ const Blogs: React.FC = () => {
     } else {
       createMutation.mutate(formData);
     }
+  };
+
+  const handleImageFileChange = (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({ ...prev, image: String(reader.result || '') }));
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -115,29 +198,36 @@ const Blogs: React.FC = () => {
           />
         </div>
         <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 font-medium">Status:</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-gray-600 font-medium shrink-0">Status:</span>
             <select
             title='status'
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium bg-white"
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium bg-white min-w-0 max-w-full"
             >
-              <option>All</option>
-              <option>draft</option>
-              <option>published</option>
+              <option value="All">All</option>
+              {BLOG_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 font-medium">Category:</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-gray-600 font-medium shrink-0">Category:</span>
             <select
             title='category'
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium bg-white"
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium bg-white min-w-0 max-w-full"
             >
-              <option>All</option>
-              <option>general</option>
+              <option value="All">All</option>
+              {categoryOptionsForFilter.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -158,7 +248,7 @@ const Blogs: React.FC = () => {
           {filtered.map((blog, index) => (
             <article
               key={blog.id}
-              className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col sm:flex-row"
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row"
             >
               <div className="relative w-full sm:w-48 h-44 sm:h-auto shrink-0 bg-gray-100">
                 <CoverImage
@@ -169,28 +259,71 @@ const Blogs: React.FC = () => {
                   className="absolute inset-0 w-full h-full object-cover"
                 />
               </div>
-              <div className="flex-1 p-5 md:p-6 flex flex-col min-w-0">
+              <div className="flex-1 p-5 md:p-6 flex flex-col min-w-0 overflow-visible">
                 <div className="flex justify-between gap-4 items-start">
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-lg font-bold text-gray-900">{blog.title}</h3>
                     <p className="text-xs text-gray-500 mt-1">
-                      {user?.name ?? 'Author'}
-                      {blog.createdAt ? ` · ${relativeTime(blog.createdAt)}` : ''}
+                      {blog.author?.name ? (
+                        <span>{blog.author.name}</span>
+                      ) : null}
+                      {blog.createdAt ? (
+                        <span>
+                          {blog.author?.name ? ' · ' : ''}
+                          {relativeTime(blog.createdAt)}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   {isAdmin && (
-                    <button type="button" className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                      <MoreVertical size={18} />
-                    </button>
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionMenuId((prev) => (prev === blog.id ? null : blog.id));
+                        }}
+                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                      {openActionMenuId === blog.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white shadow-lg py-1"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionMenuId(null);
+                              openModal(blog);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            Edit post
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionMenuId(null);
+                              deleteMutation.mutate(blog.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            Delete post
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
                 <p className="text-sm text-gray-600 mt-3 line-clamp-2 flex-1">{blog.content}</p>
                 <div className="flex flex-wrap items-center gap-2 mt-4">
-                  <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800 border border-sky-100">
-                    general
+                  <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800 border border-sky-100 capitalize">
+                    {blog.category || 'general'}
                   </span>
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-100">
-                    draft
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-100 capitalize">
+                    {blog.status || 'draft'}
                   </span>
                   {isAdmin && (
                     <div className="ml-auto flex gap-2">
@@ -220,7 +353,7 @@ const Blogs: React.FC = () => {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-gray-100 flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
               <h3 className="text-lg font-black text-gray-900">
@@ -241,6 +374,36 @@ const Blogs: React.FC = () => {
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm capitalize"
+                  >
+                    {BLOG_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm capitalize"
+                  >
+                    {BLOG_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Content</label>
                 <textarea
@@ -253,14 +416,23 @@ const Blogs: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Featured Image URL
+                  Featured Image File
                 </label>
                 <input
-                  type="text"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageFileChange(e.target.files?.[0] ?? null)}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
+                {formData.image ? (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, image: '' })}
+                    className="mt-2 text-xs font-semibold text-gray-500 hover:text-gray-700"
+                  >
+                    Remove selected image
+                  </button>
+                ) : null}
               </div>
               <div className="flex gap-3 pt-2">
                 <button

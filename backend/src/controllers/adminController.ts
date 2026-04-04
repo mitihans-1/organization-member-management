@@ -28,14 +28,24 @@ export const createOrganization = async (req: any, res: Response) => {
   try {
     const { name, email, password, organization_name, organization_type, plan_id } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
+    const orgName = String(organization_name || '').trim();
+    const orgType = String(organization_type || 'business').trim() || 'business';
+
+    const organizationRow = await prisma.organization.create({
+      data: {
+        name: orgName,
+        type: orgType,
+      },
+    });
 
     const organization = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
-        organization_name,
-        organization_type,
+        organization_name: orgName,
+        organization_type: orgType,
+        organizationId: organizationRow.id,
         role: 'orgAdmin',
         plan_id: plan_id ? parseInt(plan_id) : undefined,
       },
@@ -55,14 +65,38 @@ export const updateOrganization = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const { name, email, organization_name, organization_type, plan_id } = req.body;
+    const orgName = String(organization_name || '').trim();
+    const orgType = String(organization_type || 'business').trim() || 'business';
+    const userId = parseInt(id);
+
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true },
+    });
+
+    let organizationId = current?.organizationId || null;
+
+    if (organizationId) {
+      await prisma.organization.update({
+        where: { id: organizationId },
+        data: { name: orgName, type: orgType },
+      });
+    } else if (orgName) {
+      const created = await prisma.organization.create({
+        data: { name: orgName, type: orgType },
+        select: { id: true },
+      });
+      organizationId = created.id;
+    }
 
     const organization = await prisma.user.update({
-      where: { id: parseInt(id) },
+      where: { id: userId },
       data: {
         name,
         email,
-        organization_name,
-        organization_type,
+        organization_name: orgName,
+        organization_type: orgType,
+        organizationId: organizationId || undefined,
         plan_id: plan_id ? parseInt(plan_id) : undefined,
       },
     });

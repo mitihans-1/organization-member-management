@@ -26,16 +26,52 @@ const MemberEvents: React.FC = () => {
     );
   }, [events, filter]);
 
+  const handleRsvp = (eventId: number, value: Exclude<RSVP, null>) => {
+    setRsvp((prev) => ({
+      ...prev,
+      // Toggle off when user clicks the same RSVP again.
+      [eventId]: prev[eventId] === value ? null : value,
+    }));
+  };
+
+  const downloadTicket = (ev: Event) => {
+    const current = rsvp[ev.id] ?? null;
+    if (current !== 'yes') {
+      alert('Please RSVP "yes" before downloading a ticket.');
+      return;
+    }
+
+    const ticket = [
+      'Organization Member Management System',
+      'Event Ticket',
+      '------------------------------',
+      `Title: ${ev.title}`,
+      `Date: ${ev.date ? new Date(ev.date).toLocaleString() : '—'}`,
+      `Location: ${ev.location || 'TBA'}`,
+      `RSVP: YES`,
+      '',
+      'Please present this ticket at check-in.',
+    ].join('\n');
+
+    const blob = new Blob([ticket], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ticket-${ev.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="max-w-4xl space-y-6 font-poppins">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div className="max-w-4xl space-y-6 font-poppins px-1 sm:px-0">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             <span aria-hidden>📅</span> Event participation
           </h1>
           <p className="text-sm text-slate-500 mt-1">Browse events, RSVP, and manage your participation.</p>
         </div>
-        <div className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+        <div className="grid grid-cols-2 rounded-lg border border-slate-200 overflow-hidden shrink-0 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setView('list')}
@@ -59,13 +95,13 @@ const MemberEvents: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
         {FILTERS.map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors whitespace-nowrap ${
               filter === f
                 ? 'bg-sky-600 text-white border-sky-600'
                 : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
@@ -99,8 +135,8 @@ const MemberEvents: React.FC = () => {
                 key={ev.id}
                 className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4"
               >
-                <div className="flex justify-between gap-4">
-                  <h2 className="text-lg font-black text-slate-900">{ev.title}</h2>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <h2 className="text-lg font-black text-slate-900 break-words">{ev.title}</h2>
                   <span className="text-xs font-bold px-2 py-1 rounded-full bg-sky-50 text-sky-700 shrink-0">
                     Event
                   </span>
@@ -120,15 +156,15 @@ const MemberEvents: React.FC = () => {
                   </span>
                 </div>
                 {ev.description && <p className="text-sm text-slate-700">{ev.description}</p>}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-2 text-sm">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-2 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-slate-500">RSVP:</span>
                     {(['yes', 'maybe', 'no'] as const).map((k) => (
                       <button
                         key={k}
                         type="button"
-                        onClick={() => setRsvp((s) => ({ ...s, [ev.id]: k }))}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold capitalize ${
+                        onClick={() => handleRsvp(ev.id, k)}
+                        className={`px-3 py-2 rounded-lg text-xs font-bold capitalize min-w-[56px] ${
                           status === k
                             ? k === 'yes'
                               ? 'bg-emerald-100 text-emerald-800'
@@ -141,13 +177,20 @@ const MemberEvents: React.FC = () => {
                         {k}
                       </button>
                     ))}
+                    {status && (
+                      <span className="text-xs text-slate-500 ml-1">
+                        Selected: <span className="font-semibold capitalize">{status}</span>
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 text-sm font-bold text-sky-600"
+                    onClick={() => downloadTicket(ev)}
+                    disabled={status !== 'yes'}
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-100"
                   >
                     <Download size={16} />
-                    Download ticket
+                    {status === 'yes' ? 'Download ticket' : 'RSVP yes to download'}
                   </button>
                 </div>
               </li>

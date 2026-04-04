@@ -46,6 +46,7 @@ const CoverImage: React.FC<Props> = ({
       src={src}
       alt={alt}
       className={className}
+      style={{ objectPosition: 'top' }}
       loading="eager"
       decoding="async"
       onError={() => {

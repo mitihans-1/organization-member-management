@@ -5,12 +5,14 @@ import { Plan } from '../types';
 import { CheckCircle, Plus, X, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 
 const Payments: React.FC = () => {
   const { user } = useAuth();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
+  useBodyScrollLock(isUpgradeModalOpen);
 
   const { data: payments, isLoading: paymentsLoading } = useQuery<any[]>({
     queryKey: ['payments'],
@@ -154,7 +156,7 @@ const Payments: React.FC = () => {
       </div>
 
       {isUpgradeModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="text-xl font-black text-gray-900">Choose Your Plan</h3>

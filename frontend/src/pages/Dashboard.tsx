@@ -78,6 +78,41 @@ const Dashboard: React.FC = () => {
 
   const upcoming = events?.slice(0, 3) ?? [];
   const firstEvent = upcoming[0];
+  const reminders = useMemo(() => {
+    const items: { key: string; title: string; description: string; ctaLabel: string; to: string }[] = [];
+
+    if (blogs?.length) {
+      items.push({
+        key: 'blogs',
+        title: 'Blog Post Review',
+        description: `You have ${blogs.length} blog${blogs.length === 1 ? '' : 's'} that may need review.`,
+        ctaLabel: 'Review Blogs',
+        to: '/org-admin/blogs',
+      });
+    }
+
+    if (events?.length) {
+      items.push({
+        key: 'events',
+        title: 'Event Venue Confirmation',
+        description: `${events.length} upcoming event${events.length === 1 ? '' : 's'} need planning updates.`,
+        ctaLabel: 'Open Events',
+        to: '/org-admin/events',
+      });
+    }
+
+    if (dashboardData?.expiry) {
+      items.push({
+        key: 'plan',
+        title: 'Subscription Check',
+        description: `Plan expiry: ${new Date(dashboardData.expiry).toLocaleDateString()}.`,
+        ctaLabel: 'Manage Plan',
+        to: '/org-admin/upgrade',
+      });
+    }
+
+    return items.slice(0, 3);
+  }, [blogs, events, dashboardData]);
 
   return (
     <div className="space-y-8 font-poppins">
@@ -150,18 +185,18 @@ const Dashboard: React.FC = () => {
                 — <span className="font-bold text-gray-900">{firstEvent.title}</span>
               </p>
               <div className="flex flex-wrap gap-3 mt-5">
-                <button
-                  type="button"
+                <Link
+                  to="/org-admin/events"
                   className="rounded-xl border-2 border-gray-200 bg-white px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
                 >
                   Details
-                </button>
-                <button
-                  type="button"
+                </Link>
+                <Link
+                  to="/org-admin/events"
                   className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
                 >
                   Confirm Venue
-                </button>
+                </Link>
               </div>
             </div>
           ) : (
@@ -173,27 +208,37 @@ const Dashboard: React.FC = () => {
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-lg font-bold text-gray-900">Reminders</h2>
             <span className="rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-0.5">
-              5
+              {reminders.length}
             </span>
           </div>
           <p className="text-xs text-gray-500 mb-6">Items requiring your attention</p>
-          <div className="rounded-xl border border-gray-100 p-4">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                b
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-gray-900">Blog Post Review</p>
-                <p className="text-sm text-gray-500 mt-1">Review and publish quarterly update post</p>
-                <button
-                  type="button"
-                  className="mt-4 w-full sm:w-auto rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
-                >
-                  Review Post
-                </button>
-              </div>
+          {reminders.length ? (
+            <div className="space-y-4">
+              {reminders.map((item) => (
+                <div key={item.key} className="rounded-xl border border-gray-100 p-4">
+                  <div className="flex gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                      {item.title.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900">{item.title}</p>
+                      <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                      <Link
+                        to={item.to}
+                        className="mt-4 inline-flex w-full sm:w-auto justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
+                      >
+                        {item.ctaLabel}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-gray-100 p-4">
+              <p className="text-sm text-gray-500">No reminders right now.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
