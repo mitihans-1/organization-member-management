@@ -40,6 +40,8 @@ model User {
   address            String?
   plan_id            Int?
   plan_expiry        DateTime?
+  fayda_id           String?       @unique
+  is_fayda_verified  Boolean       @default(false)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   members            Member[]
