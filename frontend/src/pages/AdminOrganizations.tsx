@@ -3,9 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { User, Plan } from '../types';
 import { Plus, Search, Filter, MoreVertical, Edit2, Trash2, X, Building, Mail, User as UserIcon } from 'lucide-react';
-<<<<<<< HEAD
 import { useSearchParams } from 'react-router-dom';
-
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 
 const AdminOrganizations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -226,13 +225,8 @@ const AdminOrganizations: React.FC = () => {
 
       {/* Modal */}
       {isModalOpen && (
-<<<<<<< HEAD
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-=======
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
->>>>>>> b8b431e54f77f97f2f2f899ff036c1874900ae44
             <div className="p-4 border-b flex justify-between items-center">
               <h3 className="text-lg font-bold">{editingOrg ? 'Edit Organization' : 'Add New Organization'}</h3>
               <button onClick={closeModal} title="Close"><X size={20} /></button>
