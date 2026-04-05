@@ -37,6 +37,7 @@ const Events: React.FC = () => {
     title: '',
     description: '',
     date: '',
+    end_date: '',
     location: '',
     image: '',
     status: 'draft',
@@ -106,13 +107,14 @@ const Events: React.FC = () => {
         title: event.title,
         description: event.description,
         date: new Date(event.date).toISOString().split('T')[0],
+        end_date: event.end_date ? new Date(event.end_date).toISOString().split('T')[0] : '',
         location: event.location || '',
         image: event.image || '',
         status: event.status || 'draft',
       });
     } else {
       setEditingEvent(null);
-      setFormData({ title: '', description: '', date: '', location: '', image: '', status: 'draft' });
+      setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft' });
     }
     setIsModalOpen(true);
   };
@@ -120,7 +122,7 @@ const Events: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingEvent(null);
-    setFormData({ title: '', description: '', date: '', location: '', image: '', status: 'draft' });
+    setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -485,7 +487,7 @@ const Events: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Date</label>
                   <input
                     type="date"
                     required
@@ -495,6 +497,15 @@ const Events: React.FC = () => {
                   />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
                   <input
                     type="text"

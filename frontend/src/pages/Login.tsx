@@ -5,6 +5,7 @@ import api from '../services/api';
 import { defaultPathForRole } from '../lib/roleRoutes';
 import { Mail, Lock, LogIn, Fingerprint } from 'lucide-react';
 import FaydaModal from '../components/FaydaModal';
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -121,8 +122,35 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 flex flex-col gap-4">
+              <div className="w-full flex justify-center">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    setLoading(true);
+                    setError('');
+                    try {
+                      const response = await api.post('/auth/google-login', {
+                        token: credentialResponse.credential,
+                      });
+                      login(response.data.token, response.data.user);
+                      navigate(defaultPathForRole(response.data.user?.role), { replace: true });
+                    } catch (err: any) {
+                      if (err.response?.status === 404) {
+                        navigate('/register');
+                      } else {
+                        setError(err.response?.data?.message || 'Google validation failed');
+                      }
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  onError={() => setError('Google sign-in failed')}
+                  useOneTap
+                />
+              </div>
+
               <button
+                type="button"
                 onClick={() => setIsFaydaModalOpen(true)}
                 className="group relative w-full h-16 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
               >

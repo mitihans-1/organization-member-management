@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { Event } from '../types';
@@ -27,16 +27,18 @@ function formatTime(d: Date) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** Single `date` field: show a plausible time range from start + few hours */
-function timeRangeFromEvent(iso: string, id: number) {
-  const start = new Date(iso);
-  const end = new Date(start.getTime() + (2 + (id % 5)) * 3600000);
-  return `${formatTime(start)} - ${formatTime(end)}`;
+/** Show time range using actual database end_date */
+function timeRangeFromEvent(startIso: string, endIso?: string) {
+  const start = new Date(startIso);
+  if (endIso) {
+    const end = new Date(endIso);
+    return `${formatTime(start)} - ${formatTime(end)}`;
+  }
+  return formatTime(start);
 }
 
-function attendeeLabel(id: number) {
-  const n = 80 + (id * 47) % 420;
-  return `${n} attendees`;
+function attendeeLabel(count?: number) {
+  return `${count || 0} attendees`;
 }
 
 const HOST_CHECKLIST = [
@@ -48,6 +50,7 @@ const HOST_CHECKLIST = [
 ];
 
 const PublicEvents: React.FC = () => {
+  const navigate = useNavigate();
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['public-events'],
     queryFn: () => api.get('/events').then((res) => res.data),
@@ -113,7 +116,7 @@ const PublicEvents: React.FC = () => {
                         className="text-brand-medium shrink-0 mt-0.5"
                       />
                       <span className="leading-tight tabular-nums">
-                        {timeRangeFromEvent(event.date, event.id)}
+                        {timeRangeFromEvent(event.date, event.end_date)}
                       </span>
                     </div>
                     <div className="flex items-start gap-2 min-w-0">
@@ -131,7 +134,7 @@ const PublicEvents: React.FC = () => {
                         className="text-brand-medium shrink-0 mt-0.5"
                       />
                       <span className="leading-tight">
-                        {attendeeLabel(event.id)}
+                        {attendeeLabel(event._count?.attendees)}
                       </span>
                     </div>
                   </div>
@@ -142,6 +145,13 @@ const PublicEvents: React.FC = () => {
 
                   <button
                     type="button"
+                    onClick={() => {
+                      if (event.organizationId) {
+                        navigate(`/register?org=${event.organizationId}`);
+                      } else {
+                        navigate(`/register`);
+                      }
+                    }}
                     className="w-full py-3 rounded-xl bg-brand-medium text-white font-bold text-sm hover:bg-brand-light transition-colors shadow-md shadow-brand-medium/25"
                   >
                     Register Now

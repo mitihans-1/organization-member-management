@@ -49,7 +49,8 @@ model User {
   notifications      Notification[]
   plan               Plan?         @relation(fields: [plan_id], references: [id])
   organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  blogs                Blog[]        @relation("BlogAuthor")
+  blogs              Blog[]        @relation("BlogAuthor")
+  attendedEvents     Event[]       @relation("EventAttendees")
 
   @@map("users")
 }
@@ -147,6 +148,7 @@ model Event {
   title          String
   description    String
   date           DateTime
+  end_date       DateTime?
   location       String?
   image          String?
   status         String        @default("draft")
@@ -154,6 +156,7 @@ model Event {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
+  attendees      User[]        @relation("EventAttendees")
 
   @@map("events")
 }

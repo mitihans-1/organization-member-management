@@ -5,7 +5,13 @@ const prisma = new PrismaClient();
 
 export const getEvents = async (req: Request, res: Response) => {
   try {
-    const events = await prisma.event.findMany();
+    const events = await prisma.event.findMany({
+      include: {
+        _count: {
+          select: { attendees: true },
+        },
+      },
+    });
     res.status(200).json(events);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching events', error });
@@ -14,14 +20,24 @@ export const getEvents = async (req: Request, res: Response) => {
 
 export const createEvent = async (req: any, res: Response) => {
   try {
-    const { title, description, date, location, image, status } = req.body;
+    const { title, description, date, end_date, location, image, status } = req.body;
+    
+    // Fallback: If your token doesn't include organizationId, fetch it
+    let orgId = req.user?.organizationId;
+    if (!orgId && req.user?.userId) {
+      const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+      orgId = user?.organizationId;
+    }
+
     const event = await prisma.event.create({
       data: {
         title,
         description,
         date: new Date(date),
+        end_date: end_date ? new Date(end_date) : undefined,
         location,
         image,
+        organizationId: orgId || null,
         status: status || 'draft',
       },
     });
@@ -34,13 +50,14 @@ export const createEvent = async (req: any, res: Response) => {
 export const updateEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, date, location, image, status } = req.body;
+    const { title, description, date, end_date, location, image, status } = req.body;
     const event = await prisma.event.update({
       where: { id: parseInt(id) },
       data: {
         title,
         description,
         date: new Date(date),
+        end_date: end_date ? new Date(end_date) : undefined,
         location,
         image,
         status: status || 'draft',
