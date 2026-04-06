@@ -1,23 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { defaultPathForRole } from '../lib/roleRoutes';
 import { User, Mail, Lock, Building, Briefcase, UserPlus, Users } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 
 type RegisterRole = 'orgAdmin' | 'member';
 
 type OrgOption = { id: string; name: string };
 
 const Register: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const paramOrg = searchParams.get('org');
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'orgAdmin' as RegisterRole,
+    role: (paramOrg ? 'member' : 'orgAdmin') as RegisterRole,
     organization_name: '',
     organization_type: 'business',
-    organization_id: '',
+    organization_id: paramOrg || '',
   });
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
   const [orgsLoading, setOrgsLoading] = useState(false);
@@ -286,6 +290,42 @@ const Register: React.FC = () => {
               </button>
             </div>
           </form>
+
+          <div className="mt-8">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-100"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-brand-deep/40 font-bold uppercase tracking-widest text-[10px]">Or register with</span>
+              </div>
+            </div>
+
+            <div className="w-full flex justify-center">
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  setLoading(true);
+                  setError('');
+                  try {
+                    const response = await api.post('/auth/google-register', {
+                      token: credentialResponse.credential,
+                      role: formData.role,
+                      organization_name: formData.organization_name,
+                      organization_type: formData.organization_type,
+                      organization_id: formData.organization_id,
+                    });
+                    login(response.data.token, response.data.user);
+                    navigate(defaultPathForRole(response.data.user?.role), { replace: true });
+                  } catch (err: any) {
+                    setError(err.response?.data?.message || 'Google registration failed');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                onError={() => setError('Google sign-up failed')}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

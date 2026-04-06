@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 
 export const register = async (req: Request, res: Response) => {
@@ -203,5 +205,114 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.status(200).json({ message: 'Password reset successful' });
   } catch (error) {
     res.status(500).json({ message: 'Error in reset password', error });
+  }
+};
+
+export const googleLogin = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) return res.status(400).json({ message: 'Invalid google token payload' });
+
+    const user = await prisma.user.findUnique({ where: { email: payload.email } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not registered. Please sign up first.' });
+    }
+
+    const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    res.status(200).json({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (error) {
+    res.status(500).json({ message: 'Error verifying Google authentication', error });
+  }
+};
+
+export const googleRegister = async (req: Request, res: Response) => {
+  try {
+    const {
+      token,
+      role: roleRaw,
+      organization_name,
+      organization_type,
+      organization_id,
+    } = req.body;
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) return res.status(400).json({ message: 'Invalid google token payload' });
+
+    const email = payload.email;
+    const name = payload.name || 'Google User';
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    const role =
+      roleRaw === 'member' ? 'member' : roleRaw === 'orgAdmin' || roleRaw === 'organAdmin' ? 'orgAdmin' : null;
+    if (!role || roleRaw === 'SuperAdmin') {
+      return res.status(400).json({ message: 'Invalid role. Register as Organization Admin or Member.' });
+    }
+
+    // Assigning a random password since google auth doesn't use standard passwords
+    const randomPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    let user;
+
+    if (role === 'orgAdmin') {
+      if (!organization_name?.trim() || !organization_type?.trim()) {
+        return res.status(400).json({ message: 'Organization name and type are required' });
+      }
+      const org = await prisma.organization.create({
+        data: { name: organization_name.trim(), type: organization_type.trim() },
+      });
+      user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          google_id: payload.sub,
+          role: 'orgAdmin',
+          organizationId: org.id,
+          organization_name: org.name,
+          organization_type: org.type,
+        },
+      });
+    } else {
+      const orgId = organization_id as string | undefined;
+      if (!orgId?.trim()) {
+        return res.status(400).json({ message: 'Please select an organization' });
+      }
+      const org = await prisma.organization.findUnique({ where: { id: orgId.trim() } });
+      if (!org) {
+        return res.status(400).json({ message: 'Organization not found' });
+      }
+      user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          google_id: payload.sub,
+          role: 'member',
+          organizationId: org.id,
+          organization_name: org.name,
+          organization_type: org.type,
+        },
+      });
+    }
+
+    const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    res.status(201).json({
+      token: jwtToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error registering via Google', error });
   }
 };

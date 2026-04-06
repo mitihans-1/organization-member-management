@@ -3,13 +3,16 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { defaultPathForRole } from '../lib/roleRoutes';
-import { Mail, Lock, LogIn } from 'lucide-react';
+import { Mail, Lock, LogIn, Fingerprint } from 'lucide-react';
+import FaydaModal from '../components/FaydaModal';
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isFaydaModalOpen, setIsFaydaModalOpen] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -27,6 +30,12 @@ const Login: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFaydaSuccess = (data: any) => {
+    setIsFaydaModalOpen(false);
+    login(data.token, data.user);
+    navigate(defaultPathForRole(data.user?.role), { replace: true });
   };
 
   return (
@@ -102,8 +111,72 @@ const Login: React.FC = () => {
               </button>
             </div>
           </form>
+
+          <div className="mt-8">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-100"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-brand-deep/40 font-bold uppercase tracking-widest text-[10px]">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4">
+              <div className="w-full flex justify-center">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    setLoading(true);
+                    setError('');
+                    try {
+                      const response = await api.post('/auth/google-login', {
+                        token: credentialResponse.credential,
+                      });
+                      login(response.data.token, response.data.user);
+                      navigate(defaultPathForRole(response.data.user?.role), { replace: true });
+                    } catch (err: any) {
+                      if (err.response?.status === 404) {
+                        navigate('/register');
+                      } else {
+                        setError(err.response?.data?.message || 'Google validation failed');
+                      }
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  onError={() => setError('Google sign-in failed')}
+                  useOneTap
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsFaydaModalOpen(true)}
+                className="group relative w-full h-16 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+              >
+                {/* Background Image with Overlay */}
+                <div 
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                  style={{ backgroundImage: 'url("/asset/fayda-btn-bg.png")' }}
+                ></div>
+                <div className="absolute inset-0 bg-brand-dark/60 backdrop-blur-[2px] transition-colors group-hover:bg-brand-dark/40"></div>
+                
+                {/* Button Content */}
+                <div className="relative flex items-center justify-center h-full text-white">
+                  <Fingerprint className="mr-3 h-6 w-6 text-brand-medium brightness-150" />
+                  <span className="font-black text-lg tracking-wide uppercase">Sign in with Fayda ID</span>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <FaydaModal 
+        isOpen={isFaydaModalOpen} 
+        onClose={() => setIsFaydaModalOpen(false)} 
+        onSuccess={handleFaydaSuccess}
+      />
     </div>
   );
 };

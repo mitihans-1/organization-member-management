@@ -18,6 +18,8 @@ import {
   User as UserIcon,
   Inbox,
   Loader2,
+  Menu,
+  X as CloseIcon,
 } from 'lucide-react';
 
 const nav = [
@@ -38,9 +40,13 @@ const SuperAdminLayout: React.FC = () => {
   type Panel = 'notifications' | 'user' | null;
 
   const [open, setOpen] = useState<Panel>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const baseId = useId();
   const queryClient = useQueryClient();
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   const { data: notifications = [], isLoading: notifsLoading, isError: notifsError } = useQuery({
     queryKey: ['superadmin-notifications'],
@@ -99,17 +105,38 @@ const SuperAdminLayout: React.FC = () => {
   const notifId = `${baseId}-notifications`;
   const userId = `${baseId}-user`;
   return (
-    <div className="min-h-screen bg-slate-50 flex font-poppins">
-      <aside className="w-64 shrink-0 bg-slate-900 text-white flex flex-col border-r border-slate-800">
-        <div className="p-6 border-b border-slate-800">
-          <Link
-            to="/"
-            title="Back to public home"
-            className="text-lg font-black tracking-tight text-white hover:text-sky-300 transition-colors block"
+    <div className="min-h-screen bg-slate-50 flex font-poppins relative">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[40] lg:hidden animate-in fade-in duration-300"
+          onClick={closeSidebar}
+        ></div>
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-[50] w-64 bg-slate-900 text-white flex flex-col border-r border-slate-800 transition-transform duration-300 transform
+        lg:translate-x-0 lg:static lg:inset-auto lg:shrink-0
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <Link
+              to="/"
+              title="Back to public home"
+              className="text-lg font-black tracking-tight text-white hover:text-sky-300 transition-colors block"
+            >
+              OMMS
+            </Link>
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Super Admin</p>
+          </div>
+          <button 
+            onClick={closeSidebar}
+            className="lg:hidden p-2 rounded-lg hover:bg-slate-800 text-slate-400"
           >
-            OMMS
-          </Link>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Super Admin Dashboard</p>
+            <CloseIcon size={20} />
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {nav.map((item) => {
@@ -121,8 +148,9 @@ const SuperAdminLayout: React.FC = () => {
               <Link
                 key={item.to}
                 to={item.to}
+                onClick={closeSidebar}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                  active ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  active ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
                 <Icon size={18} />
@@ -131,14 +159,14 @@ const SuperAdminLayout: React.FC = () => {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
           <button
             type="button"
             onClick={() => {
               logout();
               navigate('/login');
             }}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white w-full px-2 py-2"
+            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white w-full px-2 py-2 transition-colors"
           >
             <LogOut size={18} />
             Sign out
@@ -146,13 +174,20 @@ const SuperAdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-20">
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-[30]">
+          <button 
+            onClick={toggleSidebar}
+            className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+          >
+            <Menu size={24} />
+          </button>
+          
           <div className="flex-1 max-w-xl relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="search"
-              placeholder="Search…"
+              placeholder="Search data, organizations, members..."
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 outline-none"
             />
           </div>

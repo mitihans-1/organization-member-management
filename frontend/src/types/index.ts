@@ -66,7 +66,10 @@ export interface Event {
   title: string;
   description: string;
   date: string;
+  end_date?: string;
   location?: string;
   image?: string;
   status?: string;
+  organizationId?: string;
+  _count?: { attendees: number };
 }
