@@ -41,6 +41,7 @@ import Services from './pages/Services';
 import Contact from './pages/Contact';
 import PublicEvents from './pages/PublicEvents';
 import PublicBlogs from './pages/PublicBlogs';
+import BlogDetail from './pages/BlogDetail';
 import { OrgLegacyRedirect, OrganAdminLegacyRedirect } from './components/OrgPathRedirects';
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App: React.FC = () => {
             <Route path="/contact" element={<Contact />} />
             <Route path="/events" element={<PublicEvents />} />
             <Route path="/blogs" element={<PublicBlogs />} />
+            <Route path="/blogs/:id" element={<BlogDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

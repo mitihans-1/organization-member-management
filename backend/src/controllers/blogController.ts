@@ -73,3 +73,23 @@ export const deleteBlog = async (req: any, res: Response) => {
     res.status(500).json({ message: 'Error deleting blog', error });
   }
 };
+
+export const getBlogById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const blog = await prisma.blog.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog not found' });
+    }
+
+    res.status(200).json(blog);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching blog details', error });
+  }
+};

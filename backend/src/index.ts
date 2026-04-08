@@ -13,6 +13,7 @@ import organizationRoutes from './routes/organizationRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import helpRoutes from './routes/helpRoutes';
 import faydaRoutes from './routes/faydaRoutes';
+import subscriptionRoutes from './routes/subscriptionRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +34,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 app.get('/', (req, res) => {
   res.send('Organization Membership Management API');
