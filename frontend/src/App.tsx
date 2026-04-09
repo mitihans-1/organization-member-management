@@ -42,6 +42,7 @@ import Contact from './pages/Contact';
 import PublicEvents from './pages/PublicEvents';
 import PublicBlogs from './pages/PublicBlogs';
 import BlogDetail from './pages/BlogDetail';
+import PaymentVerify from './pages/PaymentVerify';
 import { OrgLegacyRedirect, OrganAdminLegacyRedirect } from './components/OrgPathRedirects';
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ const App: React.FC = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/payment/verify/:tx_ref" element={<PaymentVerify />} />
 
             <Route
               path="/dashboard/*"

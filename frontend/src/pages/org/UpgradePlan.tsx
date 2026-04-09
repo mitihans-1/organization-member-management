@@ -1,16 +1,35 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Users, Zap, Lock } from 'lucide-react';
+import { Users, Zap, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import OrgAdminPageHeader from '../../components/org-admin/OrgAdminPageHeader';
 
 const UpgradePlan: React.FC = () => {
   const { user } = useAuth();
+  const [loadingPlan, setLoadingPlan] = React.useState<number | null>(null);
+
   const { data: plans } = useQuery({
     queryKey: ['plans'],
     queryFn: () => api.get('/plans').then((r) => r.data),
   });
+
+  const handleUpgrade = async (planId: number) => {
+    setLoadingPlan(planId);
+    try {
+      const response = await api.post('/payments/initialize', { planId });
+      if (response.data.status === 'success' && response.data.checkout_url) {
+        window.location.href = response.data.checkout_url;
+      } else {
+        alert('Failed to initialize payment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Upgrade error:', error);
+      alert('An error occurred. Please check your connection.');
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
 
   const list = plans?.length
     ? plans
@@ -80,9 +99,18 @@ const UpgradePlan: React.FC = () => {
               ) : (
                 <button
                   type="button"
-                  className="mt-8 w-full py-3.5 rounded-full bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors shadow-md"
+                  onClick={() => handleUpgrade(plan.id)}
+                  disabled={loadingPlan !== null}
+                  className="mt-8 w-full py-4 rounded-full bg-indigo-600 text-white font-black hover:bg-indigo-500 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
                 >
-                  {plan.name === 'Enterprise' ? 'Get Enterprise' : plan.name === 'Pro' ? 'Get Pro' : `Get ${plan.name}`}
+                  {loadingPlan === plan.id ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    plan.name === 'Enterprise' ? 'Get Enterprise' : plan.name === 'Pro' ? 'Get Pro' : `Get ${plan.name}`
+                  )}
                 </button>
               )}
             </div>
