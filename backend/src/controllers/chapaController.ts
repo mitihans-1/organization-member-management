@@ -81,9 +81,10 @@ export const initializeChapaPayment = async (req: any, res: Response) => {
 };
 
 export const verifyChapaPayment = async (req: any, res: Response) => {
+  const { tx_ref } = req.params;
   try {
-    const { tx_ref } = req.params;
-
+    console.log(`[Chapa] Verifying transaction: ${tx_ref}`);
+    
     const response = await fetch(`https://api.chapa.co/v1/transaction/verify/${tx_ref}`, {
       method: 'GET',
       headers: {
@@ -92,15 +93,33 @@ export const verifyChapaPayment = async (req: any, res: Response) => {
     });
 
     const result: any = await response.json();
+    console.log(`[Chapa] Verification Response:`, JSON.stringify(result));
 
-    if (result.status === 'success' && result.data.status === 'success') {
+    // Flexible status check: Chapa usually returns { status: 'success', data: { status: 'success', ... } }
+    const isSuccess = result.status === 'success' && 
+                     (result.data?.status === 'success' || result.data?.status === 'completed');
+
+    if (isSuccess) {
       // Find the pending payment
       const payment = await prisma.payment.findFirst({
         where: { transaction_id: tx_ref, status: 'pending' },
       });
 
       if (!payment) {
-        return res.status(404).json({ message: 'Payment record not found or already processed' });
+        console.warn(`[Chapa] Payment record not found or already processed for ref: ${tx_ref}`);
+        // If it was already completed, we can still return success to the frontend
+        const completedPayment = await prisma.payment.findFirst({
+          where: { transaction_id: tx_ref, status: 'completed' },
+        });
+        
+        if (completedPayment) {
+          return res.status(200).json({ 
+            status: 'success', 
+            message: 'Payment already verified' 
+          });
+        }
+        
+        return res.status(404).json({ message: 'Payment record not found' });
       }
 
       // Update payment status
@@ -108,6 +127,8 @@ export const verifyChapaPayment = async (req: any, res: Response) => {
         where: { id: payment.id },
         data: { status: 'completed' },
       });
+
+      console.log(`[Chapa] Payment marked as completed for ref: ${tx_ref}`);
 
       // Upgrade user's plan
       const plan = await prisma.plan.findUnique({ where: { id: payment.plan_id } });
@@ -122,6 +143,7 @@ export const verifyChapaPayment = async (req: any, res: Response) => {
             plan_expiry: expiryDate,
           },
         });
+        console.log(`[Chapa] User ${payment.user_id} upgraded to plan ${plan.name}`);
       }
 
       return res.status(200).json({ 
@@ -129,13 +151,14 @@ export const verifyChapaPayment = async (req: any, res: Response) => {
         message: 'Payment verified and plan upgraded' 
       });
     } else {
+      console.error(`[Chapa] Verification failed for ${tx_ref}. Status: ${result.status}, data.status: ${result.data?.status}`);
       return res.status(400).json({ 
         status: 'error', 
-        message: 'Payment verification failed' 
+        message: result.message || 'Payment verification failed' 
       });
     }
   } catch (error) {
-    console.error('Chapa Verification Error:', error);
-    res.status(500).json({ message: 'Error verifying payment', error });
+    console.error(`[Chapa] Critical Verification Error for ${tx_ref}:`, error);
+    res.status(500).json({ message: 'Error verifying payment', error: String(error) });
   }
 };

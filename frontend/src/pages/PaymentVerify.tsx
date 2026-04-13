@@ -15,15 +15,22 @@ const PaymentVerify: React.FC = () => {
         const response = await api.get(`/payments/verify/${tx_ref}`);
         if (response.data.status === 'success') {
           setStatus('success');
-          setMessage('Welcome to the next level! Your plan has been upgraded successfully.');
+          setMessage(response.data.message || 'Welcome to the next level! Your plan has been upgraded successfully.');
         } else {
           setStatus('error');
-          setMessage('Transaction could not be verified. Please contact support.');
+          setMessage(response.data.message || 'Transaction could not be verified. Please contact support.');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Verification error:', error);
         setStatus('error');
-        setMessage('An error occurred while verifying your payment.');
+        
+        if (error.response?.status === 401) {
+          setMessage('Your session has expired. Please log in again to complete the upgrade.');
+        } else if (error.response?.status === 404) {
+          setMessage('We couldn\'t find a record of this payment. If you were charged, please contact support.');
+        } else {
+          setMessage(error.response?.data?.message || 'An error occurred while verifying your payment with Chapa.');
+        }
       }
     };
 
