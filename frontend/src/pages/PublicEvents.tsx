@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
@@ -9,10 +9,12 @@ import {
   MapPin,
   Users,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import GuestNavbar from '../components/GuestNavbar';
 import GuestFooter from '../components/GuestFooter';
 import CoverImage from '../components/CoverImage';
+import EventDetailsModal from '../components/EventDetailsModal';
 
 function pad(n: number) {
   return String(n).padStart(2, '0');
@@ -51,6 +53,7 @@ const HOST_CHECKLIST = [
 
 const PublicEvents: React.FC = () => {
   const navigate = useNavigate();
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['public-events'],
     queryFn: () => api.get('/events').then((res) => res.data),
@@ -86,17 +89,24 @@ const PublicEvents: React.FC = () => {
                 key={event.id}
                 className="bg-white rounded-2xl shadow-md shadow-gray-200/60 border border-gray-100 overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300"
               >
-                <div className="relative h-52 sm:h-56 bg-brand-pale/20 shrink-0">
+                <div 
+                  className="relative h-52 sm:h-56 bg-brand-pale/20 shrink-0 cursor-pointer overflow-hidden group"
+                  onClick={() => setSelectedEvent(event)}
+                >
                   <CoverImage
                     stored={event.image}
                     slotIndex={index}
                     variant="event"
                     alt=""
-                    className="w-full h-full object-cover min-h-[13rem]"
+                    className="w-full h-full object-cover min-h-[13rem] transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
                 <div className="p-6 flex-1 flex flex-col">
-                  <h2 className="text-xl font-bold text-brand-dark leading-snug mb-4">
+                  <h2 
+                    className="text-xl font-bold text-brand-dark leading-snug mb-4 cursor-pointer hover:text-brand-medium transition-colors"
+                    onClick={() => setSelectedEvent(event)}
+                    title="Click to view full details"
+                  >
                     {event.title}
                   </h2>
 
@@ -139,7 +149,7 @@ const PublicEvents: React.FC = () => {
                     </div>
                   </div>
 
-                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-4 mb-6 flex-1">
+                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 mb-6 flex-1">
                     {event.description}
                   </p>
 
@@ -210,6 +220,15 @@ const PublicEvents: React.FC = () => {
       </section>
 
       <GuestFooter />
+
+      {/* Full Event Information Modal */}
+      {selectedEvent && (
+        <EventDetailsModal
+          event={selectedEvent}
+          events={events}
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
     </div>
   );
 };

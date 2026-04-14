@@ -20,7 +20,7 @@ export const getEvents = async (req: Request, res: Response) => {
 
 export const createEvent = async (req: any, res: Response) => {
   try {
-    const { title, description, date, end_date, location, image, status } = req.body;
+    const { title, description, date, end_date, location, image, status, category, capacity, virtualLink, contactEmail } = req.body;
     
     // Fallback: If your token doesn't include organizationId, fetch it
     let orgId = req.user?.organizationId;
@@ -37,6 +37,10 @@ export const createEvent = async (req: any, res: Response) => {
         end_date: end_date ? new Date(end_date) : undefined,
         location,
         image,
+        category: category || 'general',
+        capacity: capacity ? parseInt(capacity) : null,
+        virtualLink: virtualLink || null,
+        contactEmail: contactEmail || null,
         organizationId: orgId || null,
         status: status || 'draft',
       },
@@ -50,7 +54,7 @@ export const createEvent = async (req: any, res: Response) => {
 export const updateEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, date, end_date, location, image, status } = req.body;
+    const { title, description, date, end_date, location, image, status, category, capacity, virtualLink, contactEmail } = req.body;
     const event = await prisma.event.update({
       where: { id: parseInt(id) },
       data: {
@@ -60,6 +64,10 @@ export const updateEvent = async (req: any, res: Response) => {
         end_date: end_date ? new Date(end_date) : undefined,
         location,
         image,
+        category: category || undefined,
+        capacity: capacity !== undefined ? parseInt(capacity) : null,
+        virtualLink: virtualLink !== undefined ? virtualLink : null,
+        contactEmail: contactEmail !== undefined ? contactEmail : null,
         status: status || 'draft',
       },
     });

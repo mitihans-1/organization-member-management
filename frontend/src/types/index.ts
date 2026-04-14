@@ -56,6 +56,8 @@ export interface Blog {
   image?: string;
   status?: string;
   category?: string;
+  tags?: string;
+  readTime?: number;
   author_id: number;
   author?: { id: number; name: string; email: string };
   createdAt: string;
@@ -70,6 +72,10 @@ export interface Event {
   location?: string;
   image?: string;
   status?: string;
+  category?: string;
+  capacity?: number;
+  virtualLink?: string;
+  contactEmail?: string;
   organizationId?: string;
   _count?: { attendees: number };
 }

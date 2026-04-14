@@ -19,7 +19,7 @@ export const getBlogs = async (req: Request, res: Response) => {
 
 export const createBlog = async (req: any, res: Response) => {
   try {
-    const { title, content, image, status, category } = req.body;
+    const { title, content, image, status, category, tags, readTime } = req.body;
     const blog = await prisma.blog.create({
       data: {
         title,
@@ -27,6 +27,8 @@ export const createBlog = async (req: any, res: Response) => {
         image,
         status: status || 'draft',
         category: category || 'general',
+        tags: tags || null,
+        readTime: readTime ? parseInt(readTime) : null,
         author_id: req.user.userId,
       },
       include: {
@@ -42,15 +44,30 @@ export const createBlog = async (req: any, res: Response) => {
 export const updateBlog = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, content, image, status, category } = req.body;
+    const { title, content, image, status, category, tags, readTime } = req.body;
+
+    const existingBlog = await prisma.blog.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!existingBlog) {
+      return res.status(404).json({ message: 'Blog not found' });
+    }
+    
+    if (existingBlog.author_id !== req.user.userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'orgAdmin') {
+      return res.status(403).json({ message: 'Not authorized to update this blog' });
+    }
+
     const blog = await prisma.blog.update({
-      where: { id: parseInt(id), author_id: req.user.userId },
+      where: { id: parseInt(id) },
       data: {
         title,
         content,
         image,
         status: status ?? 'draft',
         category: category ?? 'general',
+        tags: tags !== undefined ? tags : null,
+        readTime: readTime !== undefined ? parseInt(readTime) : null,
       },
       include: {
         author: { select: { id: true, name: true, email: true } },
@@ -65,8 +82,21 @@ export const updateBlog = async (req: any, res: Response) => {
 export const deleteBlog = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
+
+    const existingBlog = await prisma.blog.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!existingBlog) {
+      return res.status(404).json({ message: 'Blog not found' });
+    }
+    
+    if (existingBlog.author_id !== req.user.userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'orgAdmin') {
+      return res.status(403).json({ message: 'Not authorized to delete this blog' });
+    }
+
     await prisma.blog.delete({
-      where: { id: parseInt(id), author_id: req.user.userId },
+      where: { id: parseInt(id) },
     });
     res.status(204).send();
   } catch (error) {

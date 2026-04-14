@@ -8,6 +8,7 @@ import CoverImage from '../components/CoverImage';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import { relativeTime } from '../lib/relativeTime';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import BlogDetailsModal from '../components/BlogDetailsModal';
 
 /** Allowed categories — stored on the server; user picks one when creating/editing. */
 const BLOG_CATEGORIES = [
@@ -37,7 +38,10 @@ const Blogs: React.FC = () => {
     image: '',
     status: 'draft',
     category: 'general',
+    tags: '',
+    readTime: '',
   });
+  const [viewingBlog, setViewingBlog] = useState<Blog | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -123,6 +127,8 @@ const Blogs: React.FC = () => {
         image: blog.image || '',
         status: blog.status || 'draft',
         category: blog.category || 'general',
+        tags: blog.tags || '',
+        readTime: blog.readTime ? String(blog.readTime) : '',
       });
     } else {
       setEditingBlog(null);
@@ -132,6 +138,8 @@ const Blogs: React.FC = () => {
         image: '',
         status: 'draft',
         category: 'general',
+        tags: '',
+        readTime: '',
       });
     }
     setIsModalOpen(true);
@@ -146,6 +154,8 @@ const Blogs: React.FC = () => {
       image: '',
       status: 'draft',
       category: 'general',
+      tags: '',
+      readTime: '',
     });
   };
 
@@ -262,7 +272,13 @@ const Blogs: React.FC = () => {
               <div className="flex-1 p-5 md:p-6 flex flex-col min-w-0 overflow-visible">
                 <div className="flex justify-between gap-4 items-start">
                   <div className="min-w-0">
-                    <h3 className="text-lg font-bold text-gray-900">{blog.title}</h3>
+                    <h3 
+                      className="text-lg font-bold text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
+                      onClick={() => setViewingBlog(blog)}
+                      title="Click to preview article"
+                    >
+                      {blog.title}
+                    </h3>
                     <p className="text-xs text-gray-500 mt-1">
                       {blog.author?.name ? (
                         <span>{blog.author.name}</span>
@@ -414,6 +430,29 @@ const Blogs: React.FC = () => {
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={formData.tags}
+                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="urgent, news, update"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Read Time (minutes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.readTime}
+                    onChange={(e) => setFormData({ ...formData, readTime: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="5"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                   Featured Image File
@@ -449,6 +488,14 @@ const Blogs: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {viewingBlog && (
+        <BlogDetailsModal
+          blog={viewingBlog}
+          blogs={blogs}
+          onClose={() => setViewingBlog(null)}
+        />
       )}
     </div>
   );

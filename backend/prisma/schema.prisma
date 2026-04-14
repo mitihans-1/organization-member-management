@@ -132,6 +132,8 @@ model Blog {
   image          String?
   status         String        @default("draft")
   category       String        @default("general")
+  tags           String?
+  readTime       Int?
   author_id      Int
   author         User          @relation("BlogAuthor", fields: [author_id], references: [id])
 
@@ -152,6 +154,10 @@ model Event {
   location       String?
   image          String?
   status         String        @default("draft")
+  category       String        @default("general")
+  capacity       Int?
+  virtualLink    String?
+  contactEmail   String?
   organizationId String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
