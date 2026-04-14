@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import EventDetailsModal from '../components/EventDetailsModal';
 
 const PAGE_SIZE = 6;
 
@@ -41,7 +42,12 @@ const Events: React.FC = () => {
     location: '',
     image: '',
     status: 'draft',
+    category: 'general',
+    capacity: '',
+    virtualLink: '',
+    contactEmail: '',
   });
+  const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
 
   const queryClient = useQueryClient();
   useBodyScrollLock(isModalOpen);
@@ -111,10 +117,14 @@ const Events: React.FC = () => {
         location: event.location || '',
         image: event.image || '',
         status: event.status || 'draft',
+        category: event.category || 'general',
+        capacity: event.capacity ? String(event.capacity) : '',
+        virtualLink: event.virtualLink || '',
+        contactEmail: event.contactEmail || '',
       });
     } else {
       setEditingEvent(null);
-      setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft' });
+      setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '' });
     }
     setIsModalOpen(true);
   };
@@ -122,7 +132,7 @@ const Events: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingEvent(null);
-    setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft' });
+    setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -313,7 +323,13 @@ const Events: React.FC = () => {
                     return (
                       <tr key={event.id} className="hover:bg-gray-50/80">
                         <td className="px-4 py-4">
-                          <p className="font-bold text-gray-900">{event.title}</p>
+                          <p 
+                            className="font-bold text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
+                            onClick={() => setViewingEvent(event)}
+                            title="Click to view full details"
+                          >
+                            {event.title}
+                          </p>
                           {event.description ? (
                             <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{event.description}</p>
                           ) : null}
@@ -528,6 +544,53 @@ const Events: React.FC = () => {
                   <option value="cancelled">Cancelled</option>
                 </select>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm capitalize"
+                  >
+                    <option value="general">General</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="seminar">Seminar</option>
+                    <option value="virtual">Virtual</option>
+                    <option value="networking">Networking</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Capacity (Optional)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.capacity}
+                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="Unlimited"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Virtual Link (Optional)</label>
+                  <input
+                    type="url"
+                    value={formData.virtualLink}
+                    onChange={(e) => setFormData({ ...formData, virtualLink: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="https://zoom.us/j/..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact Email (Optional)</label>
+                  <input
+                    type="email"
+                    value={formData.contactEmail}
+                    onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="organizer@example.com"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image File</label>
                 <input
@@ -565,8 +628,18 @@ const Events: React.FC = () => {
           </div>
         </div>
       )}
+
+      {viewingEvent && (
+        <EventDetailsModal
+          event={viewingEvent}
+          events={events}
+          onClose={() => setViewingEvent(null)}
+          showRegisterActions={false}
+        />
+      )}
     </div>
   );
 };
+
 
 export default Events;

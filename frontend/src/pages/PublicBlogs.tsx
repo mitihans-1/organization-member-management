@@ -5,6 +5,7 @@ import { Blog } from '../types';
 import GuestNavbar from '../components/GuestNavbar';
 import GuestFooter from '../components/GuestFooter';
 import CoverImage from '../components/CoverImage';
+import BlogDetailsModal from '../components/BlogDetailsModal';
 import { Eye, Search } from 'lucide-react';
 
 const FOREST = '#2D4A22';
@@ -39,7 +40,7 @@ function tagForBlog(id: number): { label: string; urgent?: boolean } {
 const PublicBlogs: React.FC = () => {
   const [q, setQ] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE);
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const [viewingBlog, setViewingBlog] = useState<Blog | null>(null);
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
     queryKey: ['public-blogs'],
@@ -142,13 +143,16 @@ const PublicBlogs: React.FC = () => {
                     key={blog.id}
                     className="bg-white rounded-2xl shadow-md shadow-gray-200/80 overflow-hidden border border-gray-100 flex flex-col min-h-[500px]"
                   >
-                    <div className="relative h-56 sm:h-64 bg-gray-100 min-h-[14rem]">
+                    <div 
+                      className="relative h-56 sm:h-64 bg-gray-100 min-h-[14rem] cursor-pointer group"
+                      onClick={() => setViewingBlog(blog)}
+                    >
                       <CoverImage
                         stored={blog.image}
                         slotIndex={index}
                         variant="blog"
                         alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     </div>
                     <div className="p-5 sm:p-6 flex-1 flex flex-col">
@@ -169,11 +173,15 @@ const PublicBlogs: React.FC = () => {
                           {formatStamp(blog.createdAt)}
                         </time>
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900 leading-snug mb-2">
+                      <h3 
+                        className="text-lg font-bold text-gray-900 leading-snug mb-2 cursor-pointer hover:text-sky-700 transition-colors"
+                        onClick={() => setViewingBlog(blog)}
+                        title="Click to read full article"
+                      >
                         {blog.title}
                       </h3>
-                      <p className="text-gray-600 text-sm leading-relaxed mb-5 flex-1">
-                        {expanded[blog.id] ? blog.content : excerpt(blog.content)}
+                      <p className="text-gray-600 text-sm leading-relaxed mb-5 flex-1 line-clamp-3">
+                        {blog.content}
                       </p>
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-100 gap-3">
                         <div className="flex items-center gap-2 min-w-0">
@@ -194,13 +202,11 @@ const PublicBlogs: React.FC = () => {
                           </span>
                           <button
                             type="button"
-                            onClick={() =>
-                              setExpanded((prev) => ({ ...prev, [blog.id]: !prev[blog.id] }))
-                            }
+                            onClick={() => setViewingBlog(blog)}
                             className="font-semibold inline-flex items-center justify-center gap-0.5 w-full sm:w-auto rounded-lg px-3 py-2 bg-brand-pale/20 hover:bg-brand-pale/40 transition-colors"
                             style={{ color: FOREST }}
                           >
-                            {expanded[blog.id] ? 'Show Less' : 'Read More'}
+                            Read Article
                           </button>
                         </div>
                       </div>
@@ -257,6 +263,14 @@ const PublicBlogs: React.FC = () => {
       </section>
 
       <GuestFooter />
+
+      {viewingBlog && (
+        <BlogDetailsModal
+          blog={viewingBlog}
+          blogs={blogs}
+          onClose={() => setViewingBlog(null)}
+        />
+      )}
     </div>
   );
 };
