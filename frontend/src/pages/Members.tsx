@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { User } from '../types';
+import { User, CustomAttributeDefinition, MemberAttributeValue } from '../types';
 import {
   Plus,
   Search,
@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import { relativeTime } from '../lib/relativeTime';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import { customAttributeService } from '../services/customAttributeService';
 
 const PAGE_SIZE = 7;
 
@@ -38,6 +39,7 @@ const Members: React.FC = () => {
     role: 'member',
     status: 'active',
   });
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const queryClient = useQueryClient();
@@ -48,25 +50,66 @@ const Members: React.FC = () => {
     queryFn: () => api.get('/members').then((res) => res.data),
   });
 
+  const { data: customAttributeDefinitions } = useQuery<CustomAttributeDefinition[]>({
+    queryKey: ['customAttributeDefinitions'],
+    queryFn: () => customAttributeService.getDefinitions(),
+    enabled: !!user,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/members/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members'] }),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => api.post('/members', data),
+    mutationFn: async (data: any) => {
+      const response = await api.post('/members', data);
+      const member = response.data;
+      if (Object.keys(customFieldValues).length > 0) {
+        await customAttributeService.updateMemberValues(
+          member.id,
+          Object.entries(customFieldValues).map(([attrId, value]) => ({
+            attributeId: parseInt(attrId),
+            value,
+          }))
+        );
+      }
+      return member;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] });
       closeModal();
+      alert('Member added successfully!');
     },
+    onError: (error: any) => {
+      console.error('Error creating member:', error);
+      alert(error.response?.data?.message || 'Failed to add member.');
+    }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: number; member: any }) => api.put(`/members/${data.id}`, data.member),
+    mutationFn: async (data: { id: number; member: any }) => {
+      const response = await api.put(`/members/${data.id}`, data.member);
+      if (Object.keys(customFieldValues).length > 0) {
+        await customAttributeService.updateMemberValues(
+          data.id,
+          Object.entries(customFieldValues).map(([attrId, value]) => ({
+            attributeId: parseInt(attrId),
+            value,
+          }))
+        );
+      }
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] });
       closeModal();
+      alert('Member updated successfully!');
     },
+    onError: (error: any) => {
+      console.error('Error updating member:', error);
+      alert(error.response?.data?.message || 'Failed to update member.');
+    }
   });
 
   const filteredMembers = useMemo(() => {
@@ -188,7 +231,7 @@ const Members: React.FC = () => {
     };
   }, []);
 
-  const openModal = (member?: User) => {
+  const openModal = async (member?: User) => {
     if (member) {
       setEditingMember(member);
       setFormData({
@@ -198,9 +241,27 @@ const Members: React.FC = () => {
         role: member.role || 'member',
         status: 'active',
       });
+      // Fetch custom field values for this member
+      try {
+        const values = await customAttributeService.getMemberValues(member.id);
+        const valuesMap: Record<number, any> = {};
+        values.forEach(v => {
+          valuesMap[v.attributeId] = v.value;
+        });
+        setCustomFieldValues(valuesMap);
+      } catch (err) {
+        console.error('Error fetching custom field values', err);
+      }
     } else {
       setEditingMember(null);
-      setFormData({ name: '', email: '', password: '', role: 'member', status: 'active' });
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        role: 'member',
+        status: 'active',
+      });
+      setCustomFieldValues({});
     }
     setIsModalOpen(true);
   };
@@ -209,6 +270,7 @@ const Members: React.FC = () => {
     setIsModalOpen(false);
     setEditingMember(null);
     setFormData({ name: '', email: '', password: '', role: 'member', status: 'active' });
+    setCustomFieldValues({});
   };
 
   const toggleSelect = (id: number) => {
@@ -604,6 +666,44 @@ const Members: React.FC = () => {
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
               </div>
+
+              {/* Custom Fields */}
+              {customAttributeDefinitions && customAttributeDefinitions.length > 0 && (
+                <div className="pt-4 border-t border-gray-100 space-y-4">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Additional Information</h4>
+                  {customAttributeDefinitions.map((attr) => (
+                    <div key={attr.id}>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                        {attr.name} {attr.required && <span className="text-rose-500">*</span>}
+                      </label>
+                      {attr.type === 'boolean' ? (
+                        <div className="flex items-center gap-2 py-2">
+                          <input
+                            type="checkbox"
+                            id={`attr-${attr.id}`}
+                            checked={!!customFieldValues[attr.id]}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [attr.id]: e.target.checked })}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <label htmlFor={`attr-${attr.id}`} className="text-sm text-gray-600">
+                            {attr.name}
+                          </label>
+                        </div>
+                      ) : (
+                        <input
+                          type={attr.type === 'number' ? 'number' : attr.type === 'date' ? 'date' : 'text'}
+                          required={attr.required}
+                          value={customFieldValues[attr.id] || ''}
+                          onChange={(e) => setCustomFieldValues({ ...customFieldValues, [attr.id]: e.target.value })}
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
+                          placeholder={`Enter ${attr.name.toLowerCase()}`}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"

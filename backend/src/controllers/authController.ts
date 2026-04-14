@@ -26,6 +26,7 @@ export const register = async (req: Request, res: Response) => {
         : roleRaw === 'orgAdmin' || roleRaw === 'organAdmin'
           ? 'orgAdmin'
           : null;
+          
     if (!role || roleRaw === 'SuperAdmin') {
       return res.status(400).json({ message: 'Invalid role. Register as Organization Admin or Member only.' });
     }
@@ -88,8 +89,9 @@ export const register = async (req: Request, res: Response) => {
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Error registering user', error });
+  } catch (error: any) {
+    console.error('Registration Error:', error);
+    res.status(500).json({ message: 'Error registering user', error: error.message });
   }
 };
 
@@ -110,8 +112,9 @@ export const login = async (req: Request, res: Response) => {
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-  } catch (error) {
-    res.status(500).json({ message: 'Error logging in', error });
+  } catch (error: any) {
+    console.error('Login Error:', error);
+    res.status(500).json({ message: 'Error logging in', error: error.message });
   }
 };
 
@@ -126,8 +129,9 @@ export const getProfile = async (req: any, res: Response) => {
     }
     const { password, ...userWithoutPassword } = user;
     res.status(200).json(userWithoutPassword);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching profile', error });
+  } catch (error: any) {
+    console.error('Fetch Profile Error:', error);
+    res.status(500).json({ message: 'Error fetching profile', error: error.message });
   }
 };
 
@@ -149,8 +153,9 @@ export const updateProfile = async (req: any, res: Response) => {
     });
     const { password, ...userWithoutPassword } = user;
     res.status(200).json(userWithoutPassword);
-  } catch (error) {
-    res.status(500).json({ message: 'Error updating profile', error });
+  } catch (error: any) {
+    console.error('Update Profile Error:', error);
+    res.status(500).json({ message: 'Error updating profile', error: error.message });
   }
 };
 
@@ -176,8 +181,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     console.log(`Password reset token for ${email}: ${token}`);
 
     res.status(200).json({ message: 'Password reset link sent to your email' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error in forgot password', error });
+  } catch (error: any) {
+    console.error('Forgot Password Error:', error);
+    res.status(500).json({ message: 'Error in forgot password', error: error.message });
   }
 };
 
@@ -203,8 +209,9 @@ export const resetPassword = async (req: Request, res: Response) => {
     await prisma.passwordResetToken.delete({ where: { email } });
 
     res.status(200).json({ message: 'Password reset successful' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error in reset password', error });
+  } catch (error: any) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ message: 'Error in reset password', error: error.message });
   }
 };
 
@@ -213,6 +220,7 @@ export const googleLogin = async (req: Request, res: Response) => {
     const { token } = req.body;
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     if (!payload || !payload.email) return res.status(400).json({ message: 'Invalid google token payload' });
@@ -224,8 +232,9 @@ export const googleLogin = async (req: Request, res: Response) => {
 
     const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
     res.status(200).json({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-  } catch (error) {
-    res.status(500).json({ message: 'Error verifying Google authentication', error });
+  } catch (error: any) {
+    console.error('Google Login Error:', error);
+    res.status(500).json({ message: 'Error verifying Google authentication', error: error.message });
   }
 };
 
@@ -241,6 +250,7 @@ export const googleRegister = async (req: Request, res: Response) => {
 
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     if (!payload || !payload.email) return res.status(400).json({ message: 'Invalid google token payload' });
@@ -259,7 +269,6 @@ export const googleRegister = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid role. Register as Organization Admin or Member.' });
     }
 
-    // Assigning a random password since google auth doesn't use standard passwords
     const randomPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
@@ -312,7 +321,8 @@ export const googleRegister = async (req: Request, res: Response) => {
       token: jwtToken,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Error registering via Google', error });
+  } catch (error: any) {
+    console.error('Google Registration Error:', error);
+    res.status(500).json({ message: 'Error registering via Google', error: error.message });
   }
 };
