@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { defaultPathForRole } from '../lib/roleRoutes';
 import { User, Mail, Lock, Building, Briefcase, UserPlus, Users } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
 type RegisterRole = 'orgAdmin' | 'member';
 
@@ -129,6 +129,7 @@ const Register: React.FC = () => {
                   <Users className="h-5 w-5 text-brand-medium/50" />
                 </div>
                 <select
+                title='riole'
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
@@ -254,6 +255,7 @@ const Register: React.FC = () => {
                     <Building className="h-5 w-5 text-brand-medium/50" />
                   </div>
                   <select
+                  title='select organization'
                     name="organization_id"
                     required
                     value={formData.organization_id}
@@ -303,7 +305,7 @@ const Register: React.FC = () => {
 
             <div className="w-full flex justify-center">
               <GoogleLogin
-                onSuccess={async (credentialResponse) => {
+                onSuccess={async (credentialResponse: CredentialResponse) => {
                   setLoading(true);
                   setError('');
                   try {

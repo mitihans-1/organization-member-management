@@ -534,6 +534,7 @@ const Events: React.FC = () => {
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
                 <select
+                title='select events'
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"

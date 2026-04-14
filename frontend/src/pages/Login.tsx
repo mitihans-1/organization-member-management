@@ -5,7 +5,7 @@ import api from '../services/api';
 import { defaultPathForRole } from '../lib/roleRoutes';
 import { Mail, Lock, LogIn, Fingerprint } from 'lucide-react';
 import FaydaModal from '../components/FaydaModal';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -125,7 +125,7 @@ const Login: React.FC = () => {
             <div className="mt-6 flex flex-col gap-4">
               <div className="w-full flex justify-center">
                 <GoogleLogin
-                  onSuccess={async (credentialResponse) => {
+                  onSuccess={async (credentialResponse: CredentialResponse) => {
                     setLoading(true);
                     setError('');
                     try {

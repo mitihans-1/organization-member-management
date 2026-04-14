@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   role: 'guest' | 'member' | 'orgAdmin' | 'SuperAdmin';
+  organizationId?: string;
   organization_name?: string;
   organization_type?: string;
   profile_photo_path?: string;
@@ -13,6 +14,23 @@ export interface User {
   plan_id?: number;
   plan_expiry?: string;
   plan?: Plan;
+  customAttributeValues?: MemberAttributeValue[];
+}
+
+export interface CustomAttributeDefinition {
+  id: number;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'boolean';
+  required: boolean;
+  organizationId: string;
+}
+
+export interface MemberAttributeValue {
+  id: number;
+  memberId: number;
+  attributeId: number;
+  value: string;
+  attribute?: CustomAttributeDefinition;
 }
 
 export interface Member {

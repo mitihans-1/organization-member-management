@@ -15,7 +15,12 @@ export const getMembers = async (req: any, res: Response) => {
 
     const members = await prisma.user.findMany({
       where: whereClause,
-      include: { plan: true }
+      include: { 
+        plan: true,
+        customAttributeValues: {
+          include: { attribute: true }
+        }
+      }
     });
     res.status(200).json(members);
   } catch (error) {

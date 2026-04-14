@@ -18,6 +18,7 @@ model Organization {
   blogs     Blog[]
   events    Event[]
   users     User[]
+  customAttributes CustomAttributeDefinition[]
 
   @@map("organizations")
 }
@@ -47,12 +48,37 @@ model User {
   members            Member[]
   payments           Payment[]
   notifications      Notification[]
+  customAttributeValues MemberAttributeValue[]
   plan               Plan?         @relation(fields: [plan_id], references: [id])
   organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   blogs              Blog[]        @relation("BlogAuthor")
   attendedEvents     Event[]       @relation("EventAttendees")
 
   @@map("users")
+}
+
+model CustomAttributeDefinition {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  type           String                 // "text", "number", "date", "boolean"
+  required       Boolean                @default(false)
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  values         MemberAttributeValue[]
+
+  @@map("custom_attribute_definitions")
+}
+
+model MemberAttributeValue {
+  id          Int                       @id @default(autoincrement())
+  memberId    Int
+  attributeId Int
+  value       String
+  member      User                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  attribute   CustomAttributeDefinition @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, attributeId])
+  @@map("member_attribute_values")
 }
 
 model Notification {
