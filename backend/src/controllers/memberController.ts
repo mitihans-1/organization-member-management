@@ -59,7 +59,9 @@ export const createMember = async (req: any, res: Response) => {
         sex,
         join_date: join_date ? new Date(join_date) : new Date(),
         role: 'member',
+        organizationId: admin.organizationId,
         organization_name: admin.organization_name,
+        organization_type: admin.organization_type,
       },
     });
     res.status(201).json(member);

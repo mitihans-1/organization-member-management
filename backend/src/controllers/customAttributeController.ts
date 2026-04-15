@@ -39,7 +39,9 @@ export const getAttributeDefinitions = async (req: any, res: Response) => {
 
 export const createAttributeDefinition = async (req: any, res: Response) => {
   try {
+    console.log('Creating attribute definition for user:', req.user);
     const { name, type, required } = req.body;
+    console.log('Body:', req.body);
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
       select: { organizationId: true, organization_name: true }
@@ -146,7 +148,8 @@ export const updateMemberAttributeValues = async (req: any, res: Response) => {
 
     await Promise.all(operations);
     res.status(200).json({ message: 'Values updated successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error updating member attribute values', error });
+  } catch (error: any) {
+    console.error('Error updating member attribute values (500):', error);
+    res.status(500).json({ message: 'Error updating member attribute values', error: error.message || error });
   }
 };

@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+import { JWT_SECRET } from '../config/jwtConfig';
 
 export const register = async (req: Request, res: Response) => {
   try {

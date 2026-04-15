@@ -632,8 +632,9 @@ const Members: React.FC = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                 />
+                <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase tracking-widest">Mandatory</p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
@@ -642,8 +643,9 @@ const Members: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                 />
+                <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase tracking-widest">Mandatory</p>
               </div>
               {!editingMember && (
                 <div>
@@ -653,8 +655,9 @@ const Members: React.FC = () => {
                     required
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                   />
+                  <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase tracking-widest">Mandatory</p>
                 </div>
               )}
               <div>
@@ -663,8 +666,9 @@ const Members: React.FC = () => {
                   type="text"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                 />
+                <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Optional</p>
               </div>
 
               {/* Custom Fields */}
@@ -699,6 +703,9 @@ const Members: React.FC = () => {
                           placeholder={`Enter ${attr.name.toLowerCase()}`}
                         />
                       )}
+                      <p className={`mt-1 text-[10px] font-bold uppercase tracking-widest ${attr.required ? 'text-rose-500' : 'text-slate-400'}`}>
+                        {attr.required ? 'Mandatory' : 'Optional'}
+                      </p>
                     </div>
                   ))}
                 </div>
