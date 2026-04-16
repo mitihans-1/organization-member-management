@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, googleLogin, googleRegister } from '../controllers/authController';
+import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, googleLogin, googleRegister, verifyOtp, resendOtp } from '../controllers/authController';
 import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = Router();
 
 router.post('/register', register);
+router.post('/verify-otp', verifyOtp);
+router.post('/resend-otp', resendOtp);
 router.post('/login', login);
 router.post('/google-login', googleLogin);
 router.post('/google-register', googleRegister);
