@@ -4,9 +4,11 @@ import api from '../../services/api';
 import { Users, Zap, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import OrgAdminPageHeader from '../../components/org-admin/OrgAdminPageHeader';
+import { useNavigate } from 'react-router-dom';
 
 const UpgradePlan: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { data: plans } = useQuery({
     queryKey: ['plans'],
     queryFn: () => api.get('/plans').then((r) => r.data),
@@ -80,7 +82,8 @@ const UpgradePlan: React.FC = () => {
               ) : (
                 <button
                   type="button"
-                  className="mt-8 w-full py-3.5 rounded-full bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors shadow-md"
+                  onClick={() => navigate('/org-admin/payments', { state: { autoOpenUpgrade: true, selectedPlanId: plan.id } })}
+                  className="mt-8 w-full py-3.5 px-4 rounded-full bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors shadow-md text-sm sm:text-base flex items-center justify-center text-center"
                 >
                   {plan.name === 'Enterprise' ? 'Get Enterprise' : plan.name === 'Pro' ? 'Get Pro' : `Get ${plan.name}`}
                 </button>

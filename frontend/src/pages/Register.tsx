@@ -27,6 +27,14 @@ const Register: React.FC = () => {
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // OTP States
+  const [step, setStep] = useState<'register' | 'otp'>('register');
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -76,16 +84,52 @@ const Register: React.FC = () => {
 
     try {
       const response = await api.post('/auth/register', payload);
-      login(response.data.token, response.data.user);
-      navigate(defaultPathForRole(response.data.user?.role), { replace: true });
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(message || 'Failed to register');
+      
+      if (response.data.requiresOtp) {
+          setRegisteredEmail(response.data.email);
+          setStep('otp');
+      } else {
+          // Fallback if OTP is disabled
+          login(response.data.token, response.data.user);
+          navigate(defaultPathForRole(response.data.user?.role), { replace: true });
+      }
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Failed to register';
+      setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setOtpError('');
+
+    try {
+      const response = await api.post('/auth/verify-otp', {
+        email: registeredEmail,
+        otp_code: otpCode
+      });
+      login(response.data.token, response.data.user);
+      navigate(defaultPathForRole(response.data.user?.role), { replace: true });
+    } catch (err: any) {
+      setOtpError(err.response?.data?.message || 'Failed to verify OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setResendLoading(true);
+    setOtpError('');
+    try {
+      await api.post('/auth/resend-otp', { email: registeredEmail });
+      alert('A new OTP has been sent to your email.');
+    } catch (err: any) {
+      setOtpError(err.response?.data?.message || 'Failed to resend OTP');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -113,8 +157,56 @@ const Register: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-10 px-8 shadow-2xl sm:rounded-[2.5rem] border border-gray-100">
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            {error && (
+          
+          {step === 'otp' ? (
+             <form className="space-y-6" onSubmit={handleVerifyOtp}>
+               <div className="text-center mb-6">
+                 <h3 className="text-xl font-bold text-gray-900">Check your email</h3>
+                 <p className="text-sm text-gray-500 mt-2">
+                   We sent a 6-digit code to <span className="font-semibold text-gray-700">{registeredEmail}</span>
+                 </p>
+               </div>
+
+               {otpError && (
+                 <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm font-medium border border-red-100 text-center">
+                   {otpError}
+                 </div>
+               )}
+
+               <div>
+                 <input
+                   type="text"
+                   required
+                   maxLength={6}
+                   value={otpCode}
+                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                   placeholder="000000"
+                   className="block w-full text-center text-3xl tracking-[0.5em] py-4 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-0 transition-all font-bold text-gray-800"
+                 />
+               </div>
+
+               <button
+                 type="submit"
+                 disabled={loading || otpCode.length < 6}
+                 className="w-full flex justify-center py-3.5 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all"
+               >
+                 {loading ? 'Verifying...' : 'Verify Account'}
+               </button>
+
+               <div className="text-center">
+                 <button
+                   type="button"
+                   onClick={handleResendOtp}
+                   disabled={resendLoading}
+                   className="text-sm text-indigo-600 font-bold hover:text-indigo-500 transition-colors disabled:opacity-50"
+                 >
+                   {resendLoading ? 'Sending...' : 'Resend Code'}
+                 </button>
+               </div>
+             </form>
+          ) : (
+             <form className="space-y-5" onSubmit={handleSubmit}>
+               {error && (
               <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm font-medium border border-red-100">
                 {error}
               </div>
@@ -292,6 +384,7 @@ const Register: React.FC = () => {
               </button>
             </div>
           </form>
+          )}
 
           <div className="mt-8">
             <div className="relative mb-6">

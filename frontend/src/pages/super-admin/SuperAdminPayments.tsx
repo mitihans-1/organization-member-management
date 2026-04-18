@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Search, MoreVertical, X } from 'lucide-react';
+import { Search, MoreVertical, X, AlertTriangle } from 'lucide-react';
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const SuperAdminPayments: React.FC = () => {
   const { data: payments, isLoading } = useQuery({
@@ -12,19 +13,78 @@ const SuperAdminPayments: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'transactions' | 'invoices'>('transactions');
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<any | null>(null);
+  
+  // Professional Action Modal State
+  const [actionModal, setActionModal] = useState<{type: 'reject' | 'revoke', paymentId: number} | null>(null);
+  const [actionReason, setActionReason] = useState('');
+
+  useBodyScrollLock(!!selected || !!actionModal);
+
+  const queryClient = useQueryClient();
+
+  const confirmPaymentMutation = useMutation({
+    mutationFn: (paymentId: number) => api.put(`/payments/${paymentId}/confirm`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setSelected(null);
+      alert('Payment confirmed and user plan updated!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error confirming payment');
+    }
+  });
+
+  const rejectPaymentMutation = useMutation({
+    mutationFn: (data: { paymentId: number; reason: string }) => 
+      api.put(`/payments/${data.paymentId}/reject`, { reason: data.reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setActionModal(null);
+      setActionReason('');
+      setSelected(null);
+      alert('Payment rejected successfully.');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error rejecting payment');
+    }
+  });
+
+  const revokePaymentMutation = useMutation({
+    mutationFn: (data: { paymentId: number; reason: string }) => 
+      api.put(`/payments/${data.paymentId}/revoke`, { reason: data.reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setActionModal(null);
+      setActionReason('');
+      setSelected(null);
+      alert('Payment revoked and user downgraded successfully.');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error revoking payment');
+    }
+  });
 
   const filtered = useMemo(() => {
-    const list = payments ?? [];
+    let list = payments ?? [];
+    
+    // Default: Hide rejected and revoked payments unless they specifically search for them
     const term = q.trim().toLowerCase();
+    if (!term) {
+        list = list.filter((p: any) => p.status !== 'rejected' && p.status !== 'revoked');
+    }
+
     if (!term) return list;
+    
     return list.filter((p: any) => {
       const plan = p.plan?.name ?? '';
       const member = p.user?.name ?? p.user_id ?? '';
       const tx = p.transaction_id ?? '';
+      const status = p.status ?? '';
       return (
         String(plan).toLowerCase().includes(term) ||
         String(member).toLowerCase().includes(term) ||
-        String(tx).toLowerCase().includes(term)
+        String(tx).toLowerCase().includes(term) ||
+        String(status).toLowerCase().includes(term)
       );
     });
   }, [payments, q]);
@@ -199,10 +259,116 @@ const SuperAdminPayments: React.FC = () => {
                   </span>
                 </div>
               ) : null}
+
+              {/* ACTION BUTTONS */}
+              {(selected.status === 'pending' || selected.status === 'completed') && (
+                <div className="pt-4 mt-4 border-t border-slate-100 flex flex-col gap-3">
+                  {selected.receipt_url && (
+                    <a
+                      href={`http://localhost:5000/${selected.receipt_url.replace(/\\/g, '/')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full text-center py-2 bg-blue-50 text-blue-700 font-bold rounded hover:bg-blue-100"
+                    >
+                      View Uploaded Receipt
+                    </a>
+                  )}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setActionModal({ type: selected.status === 'completed' ? 'revoke' : 'reject', paymentId: selected.id })}
+                      className={`flex-1 py-2 font-bold rounded ${selected.status === 'completed' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                    >
+                      {selected.status === 'completed' ? 'Revoke Payment & Downgrade' : 'Reject'}
+                    </button>
+                    
+                    {selected.status === 'pending' && (
+                      <button
+                        onClick={() => confirmPaymentMutation.mutate(selected.id)}
+                        disabled={confirmPaymentMutation.isPending}
+                        className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        {confirmPaymentMutation.isPending ? 'Confirming...' : 'Confirm'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       ) : null}
+
+      {/* ACTION MODAL FOR REJECT / REVOKE */}
+      {actionModal && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className={`p-6 border-b ${actionModal.type === 'revoke' ? 'bg-red-50/50' : 'bg-gray-50/50'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-full ${actionModal.type === 'revoke' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                   <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900">
+                    {actionModal.type === 'revoke' ? 'Revoke Payment' : 'Reject Payment'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {actionModal.type === 'revoke' 
+                      ? "This will cancel the user's active plan." 
+                      : "The user will be notified of this rejection."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+               <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Reason for {actionModal.type === 'revoke' ? 'revocation' : 'rejection'}
+               </label>
+               <textarea
+                  autoFocus
+                  rows={3}
+                  value={actionReason}
+                  onChange={(e) => setActionReason(e.target.value)}
+                  placeholder={actionModal.type === 'revoke' ? "e.g., Fraudulent transaction detected..." : "e.g., Receipt is blurry..."}
+                  className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
+               />
+            </div>
+
+            <div className="p-4 bg-gray-50 flex gap-3 border-t border-gray-100">
+               <button
+                  type="button"
+                  onClick={() => {
+                      setActionModal(null);
+                      setActionReason('');
+                  }}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+               >
+                  Cancel
+               </button>
+               <button
+                  type="button"
+                  disabled={!actionReason.trim() || rejectPaymentMutation.isPending || revokePaymentMutation.isPending}
+                  onClick={() => {
+                      if (actionModal.type === 'revoke') {
+                          revokePaymentMutation.mutate({ paymentId: actionModal.paymentId, reason: actionReason.trim() });
+                      } else {
+                          rejectPaymentMutation.mutate({ paymentId: actionModal.paymentId, reason: actionReason.trim() });
+                      }
+                  }}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-white transition-colors disabled:opacity-50 ${actionModal.type === 'revoke' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+               >
+                  {actionModal.type === 'revoke' 
+                     ? (revokePaymentMutation.isPending ? 'Revoking...' : 'Confirm Revoke')
+                     : (rejectPaymentMutation.isPending ? 'Rejecting...' : 'Confirm Reject')}
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

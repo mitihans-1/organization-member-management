@@ -1,18 +1,43 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Plan } from '../types';
-import { CheckCircle, Plus, X, Search } from 'lucide-react';
+import { CheckCircle, Plus, X, Search, UploadCloud, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const Payments: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // OCR Payment States
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  
+  // Manual Entry States (Fallback for OCR failure)
+  const [requiresManualEntry, setRequiresManualEntry] = useState(false);
+  const [manualTransactionId, setManualTransactionId] = useState('');
+  const [ocrErrorMsg, setOcrErrorMsg] = useState('');
+
   const queryClient = useQueryClient();
   useBodyScrollLock(isUpgradeModalOpen);
+
+  useEffect(() => {
+    if (location.state?.autoOpenUpgrade) {
+      setIsUpgradeModalOpen(true);
+      if (location.state?.selectedPlanId) {
+         setSelectedPlanId(location.state.selectedPlanId);
+      }
+      // Clear the state so it doesn't reopen on refresh
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   const { data: payments, isLoading: paymentsLoading } = useQuery<any[]>({
     queryKey: ['payments'],
@@ -22,6 +47,11 @@ const Payments: React.FC = () => {
   const { data: plans, isLoading: plansLoading } = useQuery<Plan[]>({
     queryKey: ['plans'],
     queryFn: () => api.get('/plans').then((res) => res.data),
+  });
+
+  const { data: config } = useQuery({
+    queryKey: ['systemConfig'],
+    queryFn: () => api.get('/admin/system-config').then((res) => res.data),
   });
 
   const filtered = useMemo(() => {
@@ -36,6 +66,7 @@ const Payments: React.FC = () => {
     });
   }, [payments, searchTerm]);
 
+  // Original automatic transaction (simulated)
   const upgradeMutation = useMutation({
     mutationFn: (planId: number) =>
       api.post('/payments', {
@@ -51,6 +82,68 @@ const Payments: React.FC = () => {
       alert('Plan upgraded successfully!');
     },
   });
+
+  const confirmPaymentMutation = useMutation({
+    mutationFn: (paymentId: number) => api.put(`/payments/${paymentId}/confirm`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      alert('Payment confirmed and user plan updated!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error confirming payment');
+    }
+  });
+
+  // New OCR Upload Mutation
+  const uploadReceiptMutation = useMutation({
+    mutationFn: (data: { planId: number; file: File; method: string; manualTxnId?: string }) => {
+      const formData = new FormData();
+      formData.append('plan_id', data.planId.toString());
+      formData.append('receipt', data.file);
+      formData.append('payment_method', data.method);
+      if (data.manualTxnId) {
+        formData.append('manual_transaction_id', data.manualTxnId);
+      }
+      return api.post('/payments/upload-receipt', formData);
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setIsUpgradeModalOpen(false);
+      setSelectedPlanId(null);
+      setPaymentMethod(null);
+      setReceiptFile(null);
+      setRequiresManualEntry(false);
+      setManualTransactionId('');
+      setOcrErrorMsg('');
+      alert('Receipt uploaded successfully!');
+    },
+    onError: (error: any) => {
+      const errResponse = error.response?.data;
+      if (errResponse?.requiresManualEntry) {
+         setRequiresManualEntry(true);
+         setOcrErrorMsg(errResponse.message || 'We could not automatically read your receipt. Please enter the Transaction ID manually.');
+      } else {
+         alert(errResponse?.message || 'Error uploading receipt');
+      }
+    }
+  });
+
+  const handleUploadSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlanId || !receiptFile || !paymentMethod) return;
+    
+    if (requiresManualEntry && !manualTransactionId.trim()) {
+        alert("Please enter the Transaction ID manually.");
+        return;
+    }
+
+    uploadReceiptMutation.mutate({ 
+        planId: selectedPlanId, 
+        file: receiptFile, 
+        method: paymentMethod,
+        manualTxnId: requiresManualEntry ? manualTransactionId : undefined
+    });
+  };
 
   return (
     <div className="space-y-6 font-poppins">
@@ -139,10 +232,45 @@ const Payments: React.FC = () => {
                       })}
                     </td>
                     <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-                        <CheckCircle size={12} />
-                        {payment.status}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                            <span 
+                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide 
+                              ${payment.status === 'pending' ? 'bg-amber-50 text-amber-800' 
+                                : payment.status === 'rejected' ? 'bg-red-50 text-red-800' 
+                                : 'bg-emerald-50 text-emerald-800'}`}
+                            >
+                              <CheckCircle size={12} />
+                              {payment.status}
+                            </span>
+                            {user?.role === 'SuperAdmin' && payment.status === 'pending' && (
+                              <div className="flex gap-2">
+                                {payment.receipt_url && (
+                                  <a
+                                    href={`http://localhost:5000/${payment.receipt_url.replace(/\\/g, '/')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100"
+                                  >
+                                    View Receipt
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => confirmPaymentMutation.mutate(payment.id)}
+                                  disabled={confirmPaymentMutation.isPending}
+                                  className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
+                                >
+                                  Confirm
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                        {payment.status === 'rejected' && payment.rejection_reason && (
+                            <p className="text-[10px] text-red-600 font-medium">
+                                Reason: {payment.rejection_reason}
+                            </p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-[10px] font-mono text-gray-400 uppercase">
                       {payment.transaction_id}
@@ -159,19 +287,164 @@ const Payments: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h3 className="text-xl font-black text-gray-900">Choose Your Plan</h3>
+              <div className="flex items-center gap-3">
+                {selectedPlanId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (paymentMethod) setPaymentMethod(null);
+                      else setSelectedPlanId(null);
+                    }}
+                    className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                    aria-label="Go back"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+                <h3 className="text-xl font-black text-gray-900">
+                  {!selectedPlanId ? 'Choose Your Plan' : !paymentMethod ? 'Choose Payment Method' : 'Upload Payment Receipt'}
+                </h3>
+              </div>
               <button
                 type="button"
-                onClick={() => setIsUpgradeModalOpen(false)}
+                onClick={() => {
+                  setIsUpgradeModalOpen(false);
+                  setSelectedPlanId(null);
+                  setPaymentMethod(null);
+                  setReceiptFile(null);
+                  setRequiresManualEntry(false);
+                  setManualTransactionId('');
+                  setOcrErrorMsg('');
+                }}
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
               >
                 <X size={24} />
               </button>
             </div>
+            
             <div className="p-8">
               {plansLoading ? (
                 <div className="text-center py-16 text-gray-400">Loading available plans...</div>
+              ) : selectedPlanId ? (
+                !paymentMethod ? (
+                  // --- STEP 2: CHOOSE PAYMENT METHOD ---
+                  <div className="max-w-lg mx-auto text-center">
+                      <p className="mb-8 text-gray-600">Select your preferred mobile money provider to continue with the payment.</p>
+                      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+                          <button
+                             type="button"
+                             onClick={() => setPaymentMethod('telebirr')}
+                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-4 hover:border-indigo-400 hover:shadow-lg transition-all bg-white"
+                          >
+                             <img 
+                                 src="/asset/telebirr-logo.png" 
+                                 alt="Telebirr" 
+                                 className="w-20 h-20 object-contain rounded-xl"
+                              />
+                             <span className="font-black text-lg text-gray-800">Telebirr</span>
+                          </button>
+                          <button
+                             type="button"
+                             onClick={() => setPaymentMethod('cbe_birr')}
+                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-4 hover:border-indigo-400 hover:shadow-lg transition-all bg-white"
+                          >
+                             <img 
+                                 src="/asset/cbe-logo.png" 
+                                 alt="CBE Birr" 
+                                 className="w-20 h-20 object-contain"
+                              />
+                             <span className="font-black text-lg text-gray-800">CBE Birr</span>
+                          </button>
+                      </div>
+                  </div>
+                ) : (
+                  // --- STEP 3: UPLOAD RECEIPT FLOW ---
+                  <div className="max-w-lg mx-auto">
+                      <div className="flex items-center justify-center gap-3 mb-6">
+                         <img 
+                             src={paymentMethod === 'telebirr' 
+                                 ? "/asset/telebirr-logo.png" 
+                                 : "/asset/cbe-logo.png"} 
+                             alt="Logo" 
+                             className="w-10 h-10 object-contain"
+                          />
+                         <h4 className="text-xl font-black text-gray-800">
+                            {paymentMethod === 'telebirr' ? 'Telebirr Payment' : 'CBE Birr Payment'}
+                         </h4>
+                      </div>
+
+                      <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
+                        Please transfer the exact amount using {paymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to: <br/>
+                        <strong className="text-xl tracking-wider text-amber-900 mt-2 block">
+                          {config?.telebirrPhone || '+251 912 345 678'}
+                        </strong>
+                      </p>
+                      <p className="mb-6 text-gray-600 text-sm text-center">
+                        Once transferred, upload the "Success" screenshot here. Our AI will automatically extract your transaction details!
+                      </p>
+                      <form onSubmit={handleUploadSubmit} className="space-y-6">
+                         <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors bg-gray-50/50">
+                             <UploadCloud className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                         <label className="cursor-pointer">
+                             <span className="block text-sm font-semibold text-indigo-600 hover:text-indigo-500">
+                                 Browse for image
+                             </span>
+                             <input 
+                                type="file" 
+                                accept="image/png, image/jpeg, image/jpg" 
+                                className="hidden"
+                                onChange={(e) => {
+                                    if (e.target.files?.[0]) setReceiptFile(e.target.files[0]);
+                                }}
+                             />
+                         </label>
+                         <p className="mt-1 text-xs text-gray-500">PNG, JPG up to 5MB</p>
+                     </div>
+
+                     {receiptFile && (
+                         <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-sm text-indigo-700 font-medium">
+                             Selected: {receiptFile.name}
+                         </div>
+                     )}
+
+                     {requiresManualEntry && (
+                         <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-top-4">
+                             <div className="text-red-800 text-sm font-bold">
+                                 {ocrErrorMsg}
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                     Transaction ID / Ref No.
+                                 </label>
+                                 <input 
+                                     type="text" 
+                                     required
+                                     value={manualTransactionId}
+                                     onChange={(e) => setManualTransactionId(e.target.value)}
+                                     placeholder="e.g. TXN123456789"
+                                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                 />
+                                 <p className="text-xs text-gray-500 mt-2">
+                                     An admin will manually verify this transaction ID against your uploaded screenshot.
+                                 </p>
+                             </div>
+                         </div>
+                     )}
+
+                     <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                         <button
+                           type="submit"
+                           disabled={uploadReceiptMutation.isPending || !receiptFile}
+                           className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors"
+                         >
+                            {uploadReceiptMutation.isPending ? 'Processing...' : requiresManualEntry ? 'Submit Manual Entry' : 'Verify Payment'}
+                         </button>
+                     </div>
+                  </form>
+                </div>
+                )
               ) : (
+                // --- STEP 1: CHOOSE PLAN ---
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {plans?.map((plan) => (
                     <div
@@ -195,14 +468,23 @@ const Payments: React.FC = () => {
                           {plan.duration_days} days access
                         </li>
                       </ul>
-                      <button
-                        type="button"
-                        onClick={() => upgradeMutation.mutate(plan.id)}
-                        disabled={upgradeMutation.isPending}
-                        className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 disabled:opacity-50"
-                      >
-                        {upgradeMutation.isPending ? 'Processing...' : 'Get Started'}
-                      </button>
+                      <div className="flex flex-col gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPlanId(plan.id)}
+                            className="w-full py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors text-sm sm:text-base flex items-center justify-center"
+                          >
+                            Pay with Mobile Money
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => upgradeMutation.mutate(plan.id)}
+                            disabled={upgradeMutation.isPending}
+                            className="w-full py-3 px-4 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 disabled:opacity-50 text-xs sm:text-sm transition-colors flex items-center justify-center"
+                          >
+                            {upgradeMutation.isPending ? 'Processing...' : 'Simulate API Card Payment'}
+                          </button>
+                      </div>
                     </div>
                   ))}
                 </div>
