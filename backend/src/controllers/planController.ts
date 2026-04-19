@@ -36,7 +36,7 @@ export const updatePlan = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, price, billing_cycle, type, max_members, duration_days } = req.body;
     const plan = await prisma.plan.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         name,
         price,
@@ -56,7 +56,7 @@ export const deletePlan = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.plan.delete({
-      where: { id: parseInt(id) },
+      where: { id: id },
     });
     res.status(204).send();
   } catch (error) {

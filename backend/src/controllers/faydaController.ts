@@ -20,12 +20,31 @@ export const verifyFayda = async (req: Request, res: Response) => {
     // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Mock response data from Fayda System
+    // 1. Check if user already linked this Fayda ID in our DB
+    const existingUser = await prisma.user.findFirst({
+      where: { fayda_id: faydaId }
+    });
+
+    // 2. Mock response data from Fayda System
+    // Since we do not have the real Government API Keys, we mock the response.
+    // If we recognize the ID in our DB, we return the real name.
+    // For testing purposes, we hardcode Nasir's ID.
+    let fullName = 'Ethiopian Citizen';
+    let mockEmail = `citizen.${faydaId}@fayda.gov.et`;
+    
+    if (existingUser) {
+        fullName = existingUser.name;
+        mockEmail = existingUser.email;
+    } else if (faydaId === '643078154180') {
+        fullName = 'Nasir Amme Siraj';
+        mockEmail = 'nasiramme1511@gmail.com';
+    }
+
     const mockData = {
       faydaId,
-      fullName: 'Abebe Bikila',
-      email: `abebe.bikila.${faydaId}@fayda.gov.et`, // Mocking a unique email per ID
-      phoneNumber: '+251911223344',
+      fullName: fullName,
+      email: mockEmail,
+      phoneNumber: existingUser?.phone || '+251911223344',
       dateOfBirth: '1990-01-01',
       address: 'Addis Ababa, Ethiopia',
       gender: 'Male',
@@ -50,7 +69,7 @@ export const faydaLogin = async (req: Request, res: Response) => {
     }
 
     // 1. Check if user exists with this Fayda ID
-    let user = await prisma.user.findUnique({
+    let user = await prisma.user.findFirst({
       where: { fayda_id: faydaId }
     });
 

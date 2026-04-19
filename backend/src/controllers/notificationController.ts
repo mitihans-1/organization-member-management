@@ -39,8 +39,8 @@ export const markNotificationRead = async (req: any, res: Response) => {
   try {
     if (!requireNotificationAccess(req, res)) return;
 
-    const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) {
+    const id = req.params.id;
+    if (!id) {
       return res.status(400).json({ message: 'Invalid id' });
     }
 

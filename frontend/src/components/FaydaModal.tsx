@@ -28,6 +28,20 @@ const FaydaModal: React.FC<FaydaModalProps> = ({ isOpen, onClose, onSuccess }) =
       setError('Please enter your Fayda ID or Scan your card');
       return;
     }
+
+    // Clean input (remove spaces, hyphens, and uppercase)
+    const cleanId = faydaId.replace(/[\s-]/g, '').toUpperCase();
+    
+    // Fayda FIN is exactly a 12-digit number (e.g. 1234 5678 9012)
+    // Fayda FAN is exactly 16 alphanumeric characters.
+    const isFin = /^\d{12}$/.test(cleanId);
+    const isFan = /^[A-Z0-9]{16}$/.test(cleanId);
+
+    if (!isFin && !isFan) {
+      setError('Invalid format. Please enter a valid 12-digit FIN or 16-character FAN.');
+      return;
+    }
+
     setError('');
     setStep('scanning');
 
@@ -91,10 +105,10 @@ const FaydaModal: React.FC<FaydaModalProps> = ({ isOpen, onClose, onSuccess }) =
                 <div className="space-y-2">
                   <input
                     type="text"
-                    placeholder="Enter Fayda ID (e.g., F-123-456)"
+                    placeholder="Enter 12-digit FIN or 16-character FAN"
                     value={faydaId}
                     onChange={(e) => setFaydaId(e.target.value)}
-                    className="w-full px-6 py-4 bg-white/5 border-2 border-white/10 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-bold placeholder:text-white/20 text-white"
+                    className="w-full px-6 py-4 bg-white/5 border-2 border-white/10 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-bold placeholder:text-white/30 text-white"
                   />
                   {error && <p className="text-red-400 text-xs font-bold ml-2">{error}</p>}
                 </div>

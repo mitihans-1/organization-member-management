@@ -86,7 +86,7 @@ export const updateAttributeDefinition = async (req: any, res: Response) => {
     const { name, type, required } = req.body;
     
     const definition = await prisma.customAttributeDefinition.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         name,
         type,
@@ -103,7 +103,7 @@ export const deleteAttributeDefinition = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.customAttributeDefinition.delete({
-      where: { id: parseInt(id) },
+      where: { id: id },
     });
     res.status(204).send();
   } catch (error) {
@@ -115,7 +115,7 @@ export const getMemberAttributeValues = async (req: any, res: Response) => {
   try {
     const { memberId } = req.params;
     const values = await prisma.memberAttributeValue.findMany({
-      where: { memberId: parseInt(memberId) },
+      where: { memberId: memberId },
       include: { attribute: true }
     });
     res.status(200).json(values);
@@ -133,13 +133,13 @@ export const updateMemberAttributeValues = async (req: any, res: Response) => {
       prisma.memberAttributeValue.upsert({
         where: {
           memberId_attributeId: {
-            memberId: parseInt(memberId),
+            memberId: memberId,
             attributeId: v.attributeId,
           }
         },
         update: { value: v.value.toString() },
         create: {
-          memberId: parseInt(memberId),
+          memberId: memberId,
           attributeId: v.attributeId,
           value: v.value.toString(),
         }

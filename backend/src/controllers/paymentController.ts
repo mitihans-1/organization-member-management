@@ -56,7 +56,7 @@ export const getPaymentById = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const payment = await prisma.payment.findUnique({
-      where: { id: parseInt(id), user_id: req.user.userId },
+      where: { id: id, user_id: req.user.userId },
       include: { plan: true },
     });
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
@@ -112,7 +112,7 @@ export const uploadPaymentReceipt = async (req: any, res: Response) => {
       }
 
       // Validate amount fits the exact amount of the plan
-      const plan = await prisma.plan.findUnique({ where: { id: parseInt(plan_id) } });
+      const plan = await prisma.plan.findUnique({ where: { id: plan_id } });
       if (!plan) {
           return res.status(404).json({ message: 'Plan not found' });
       }
@@ -150,7 +150,7 @@ export const uploadPaymentReceipt = async (req: any, res: Response) => {
       // 3. Save as Pending Payment for Admin Confirmation
       const payment = await prisma.payment.create({
           data: {
-              plan_id: parseInt(plan_id),
+              plan_id: plan_id,
               user_id: req.user.userId, // From your auth middleware
               amount: finalAmount,           // Amount is strictly checked above or overridden manually
               payment_method: payment_method || 'telebirr',
@@ -193,7 +193,7 @@ export const confirmPayment = async (req: any, res: Response) => {
     const { id } = req.params;
     
     const payment = await prisma.payment.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: id },
       include: { plan: true }
     });
 
@@ -240,7 +240,7 @@ export const rejectPayment = async (req: any, res: Response) => {
     const { reason } = req.body;
 
     const payment = await prisma.payment.findUnique({
-      where: { id: Number(id) }
+      where: { id: id }
     });
 
     if (!payment) {
@@ -252,7 +252,7 @@ export const rejectPayment = async (req: any, res: Response) => {
     }
 
     const updatedPayment = await prisma.payment.update({
-      where: { id: Number(id) },
+      where: { id: id },
       data: {
         status: 'rejected',
         rejection_reason: reason || 'No reason provided.',
@@ -284,7 +284,7 @@ export const revokePayment = async (req: any, res: Response) => {
     const { reason, suspendUser } = req.body;
 
     const payment = await prisma.payment.findUnique({
-      where: { id: Number(id) }
+      where: { id: id }
     });
 
     if (!payment) {
@@ -296,7 +296,7 @@ export const revokePayment = async (req: any, res: Response) => {
     }
 
     const updatedPayment = await prisma.payment.update({
-      where: { id: Number(id) },
+      where: { id: id },
       data: {
         status: 'revoked',
         rejection_reason: reason || 'Fraudulent or invalid transaction detected after approval.',
@@ -307,7 +307,7 @@ export const revokePayment = async (req: any, res: Response) => {
     await prisma.user.update({
         where: { id: payment.user_id },
         data: {
-            plan_id: 1,
+            plan_id: null,
             plan_expiry: new Date(), // Expire immediately
         }
     });

@@ -47,7 +47,7 @@ export const updateBlog = async (req: any, res: Response) => {
     const { title, content, image, status, category, tags, readTime } = req.body;
 
     const existingBlog = await prisma.blog.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: id }
     });
     
     if (!existingBlog) {
@@ -59,7 +59,7 @@ export const updateBlog = async (req: any, res: Response) => {
     }
 
     const blog = await prisma.blog.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         title,
         content,
@@ -84,7 +84,7 @@ export const deleteBlog = async (req: any, res: Response) => {
     const { id } = req.params;
 
     const existingBlog = await prisma.blog.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: id }
     });
     
     if (!existingBlog) {
@@ -96,7 +96,7 @@ export const deleteBlog = async (req: any, res: Response) => {
     }
 
     await prisma.blog.delete({
-      where: { id: parseInt(id) },
+      where: { id: id },
     });
     res.status(204).send();
   } catch (error) {

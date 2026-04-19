@@ -15,9 +15,10 @@ function requireEnv(name: string): string {
 }
 
 async function main() {
-  await prisma.$executeRawUnsafe(
-    `UPDATE users SET role = 'orgAdmin' WHERE role = 'organAdmin'`,
-  );
+  await prisma.user.updateMany({
+    where: { role: 'organAdmin' },
+    data: { role: 'orgAdmin' },
+  });
 
   const superEmail =
     process.env.SEED_SUPERADMIN_EMAIL?.trim() || 'owner@omms.com';
@@ -87,17 +88,17 @@ async function main() {
     },
   });
 
-  const notifRows = await prisma.$queryRaw<{ n: bigint }[]>`
-    SELECT COUNT(*) AS n FROM notifications WHERE userId = ${user.id}
-  `;
-  const notifCount = Number(notifRows[0]?.n ?? 0);
+  const notifCount = await prisma.notification.count({
+    where: { userId: user.id }
+  });
   if (notifCount === 0) {
-    await prisma.$executeRaw`
-      INSERT INTO notifications (userId, title, read) VALUES
-      (${user.id}, ${'New member registration pending review'}, ${false}),
-      (${user.id}, ${'Event "Annual Member Summit" is in 2 weeks'}, ${false}),
-      (${user.id}, ${'Payment received for Pro plan'}, ${true})
-    `;
+    await prisma.notification.createMany({
+      data: [
+        { userId: user.id, title: 'New member registration pending review', read: false },
+        { userId: user.id, title: 'Event "Annual Member Summit" is in 2 weeks', read: false },
+        { userId: user.id, title: 'Payment received for Pro plan', read: true },
+      ]
+    });
     console.log('Sample notifications seeded for demo org admin');
   }
 

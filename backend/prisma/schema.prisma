@@ -1,70 +1,72 @@
-// Role values: SuperAdmin | orgAdmin | member (SQLite stores as String)
+// Role values: SuperAdmin | orgAdmin | member
 
 generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
+
 model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  type      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  blogs     Blog[]
-  events    Event[]
-  users     User[]
+  id               String                      @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  type             String
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  blogs            Blog[]
+  events           Event[]
+  users            User[]
   customAttributes CustomAttributeDefinition[]
 
   @@map("organizations")
 }
 
 model User {
-  id                 Int           @id @default(autoincrement())
-  name               String
-  email              String        @unique
-  phone              String?
-  role               String        @default("orgAdmin")
-  organizationId     String?
-  organization_name  String?
-  organization_type  String?
-  password           String
-  profile_photo_path String?
-  email_verified_at  DateTime?
-  google_id          String?
-  sex                String?
-  join_date          DateTime?
-  address            String?
-  plan_id            Int?
-  plan_expiry        DateTime?
-  fayda_id           String?       @unique
-  is_fayda_verified  Boolean       @default(false)
-  is_verified        Boolean       @default(false)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  members            Member[]
-  payments           Payment[]
-  notifications      Notification[]
-  otpTokens          OtpToken[]
+  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String
+  email                 String                 @unique
+  phone                 String?
+  role                  String                 @default("orgAdmin")
+  organizationId        String?                @db.ObjectId
+  organization_name     String?
+  organization_type     String?
+  password              String
+  profile_photo_path    String?
+  email_verified_at     DateTime?
+  google_id             String?
+  sex                   String?
+  join_date             DateTime?
+  address               String?
+  plan_id               String?                @db.ObjectId
+  plan_expiry           DateTime?
+  fayda_id              String?
+  is_fayda_verified     Boolean                @default(false)
+  is_verified           Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  members               Member[]
+  payments              Payment[]
+  notifications         Notification[]
+  otpTokens             OtpToken[]
   customAttributeValues MemberAttributeValue[]
-  plan               Plan?         @relation(fields: [plan_id], references: [id])
-  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  blogs              Blog[]        @relation("BlogAuthor")
-  attendedEvents     Event[]       @relation("EventAttendees")
+  plan                  Plan?                  @relation(fields: [plan_id], references: [id])
+  organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  blogs                 Blog[]                 @relation("BlogAuthor")
+  
+  attendedEventsIds     String[]               @db.ObjectId
+  attendedEvents        Event[]                @relation("EventAttendees", fields: [attendedEventsIds], references: [id])
 
   @@map("users")
 }
 
 model CustomAttributeDefinition {
-  id             Int                    @id @default(autoincrement())
+  id             String                 @id @default(auto()) @map("_id") @db.ObjectId
   name           String
   type           String                 // "text", "number", "date", "boolean"
   required       Boolean                @default(false)
-  organizationId String
+  organizationId String                 @db.ObjectId
   organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   values         MemberAttributeValue[]
 
@@ -72,9 +74,9 @@ model CustomAttributeDefinition {
 }
 
 model MemberAttributeValue {
-  id          Int                       @id @default(autoincrement())
-  memberId    Int
-  attributeId Int
+  id          String                    @id @default(auto()) @map("_id") @db.ObjectId
+  memberId    String                    @db.ObjectId
+  attributeId String                    @db.ObjectId
   value       String
   member      User                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   attribute   CustomAttributeDefinition @relation(fields: [attributeId], references: [id], onDelete: Cascade)
@@ -84,8 +86,8 @@ model MemberAttributeValue {
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   title     String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -95,7 +97,7 @@ model Notification {
 }
 
 model PasswordResetToken {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   email     String   @unique
   token     String
   expiresAt DateTime
@@ -105,8 +107,8 @@ model PasswordResetToken {
 }
 
 model OtpToken {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
   otp_code  String
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -116,7 +118,7 @@ model OtpToken {
 }
 
 model Member {
-  id          Int       @id @default(autoincrement())
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   email       String    @unique
   role        String?
@@ -124,7 +126,7 @@ model Member {
   join_date   DateTime?
   last_active DateTime?
   photo       String?
-  user_id     Int
+  user_id     String    @db.ObjectId
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   user        User      @relation(fields: [user_id], references: [id])
@@ -133,7 +135,7 @@ model Member {
 }
 
 model Plan {
-  id            Int       @id @default(autoincrement())
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
   name          String
   price         Float
   billing_cycle String
@@ -149,25 +151,25 @@ model Plan {
 }
 
 model Payment {
-  id             Int      @id @default(autoincrement())
-  user_id        Int
-  plan_id        Int
-  amount         Float
-  payment_method String
-  status         String
-  transaction_id String?
-  receipt_url    String?
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id          String   @db.ObjectId
+  plan_id          String   @db.ObjectId
+  amount           Float
+  payment_method   String
+  status           String
+  transaction_id   String?
+  receipt_url      String?
   rejection_reason String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  plan           Plan     @relation(fields: [plan_id], references: [id])
-  user           User     @relation(fields: [user_id], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  plan             Plan     @relation(fields: [plan_id], references: [id])
+  user             User     @relation(fields: [user_id], references: [id])
 
   @@map("payments")
 }
 
 model Blog {
-  id             Int           @id @default(autoincrement())
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
   title          String
   content        String
   image          String?
@@ -175,10 +177,10 @@ model Blog {
   category       String        @default("general")
   tags           String?
   readTime       Int?
-  author_id      Int
+  author_id      String        @db.ObjectId
   author         User          @relation("BlogAuthor", fields: [author_id], references: [id])
 
-  organizationId String?
+  organizationId String?       @db.ObjectId
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
@@ -187,7 +189,7 @@ model Blog {
 }
 
 model Event {
-  id             Int           @id @default(autoincrement())
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
   title          String
   description    String
   date           DateTime
@@ -199,11 +201,13 @@ model Event {
   capacity       Int?
   virtualLink    String?
   contactEmail   String?
-  organizationId String?
+  organizationId String?       @db.ObjectId
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
-  attendees      User[]        @relation("EventAttendees")
+  
+  attendeesIds   String[]      @db.ObjectId
+  attendees      User[]        @relation("EventAttendees", fields: [attendeesIds], references: [id])
 
   @@map("events")
 }

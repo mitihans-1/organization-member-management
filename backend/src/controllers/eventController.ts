@@ -56,7 +56,7 @@ export const updateEvent = async (req: any, res: Response) => {
     const { id } = req.params;
     const { title, description, date, end_date, location, image, status, category, capacity, virtualLink, contactEmail } = req.body;
     const event = await prisma.event.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         title,
         description,
@@ -81,7 +81,7 @@ export const deleteEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.event.delete({
-      where: { id: parseInt(id) },
+      where: { id: id },
     });
     res.status(204).send();
   } catch (error) {

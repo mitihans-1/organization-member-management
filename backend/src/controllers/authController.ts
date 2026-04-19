@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaClient } from '@prisma/client';
-import { sendOtpEmail } from '../services/emailService';
+import { sendOtpEmail, sendResetPasswordEmail } from '../services/emailService';
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -290,8 +290,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       create: { email, token, expiresAt },
     });
 
-    // Mock email sending
-    console.log(`Password reset token for ${email}: ${token}`);
+    await sendResetPasswordEmail(user.email, token, user.name);
 
     res.status(200).json({ message: 'Password reset link sent to your email' });
   } catch (error: any) {
@@ -404,6 +403,7 @@ export const googleRegister = async (req: Request, res: Response) => {
           organizationId: org.id,
           organization_name: org.name,
           organization_type: org.type,
+          is_verified: true,
         },
       });
     } else {
@@ -425,6 +425,7 @@ export const googleRegister = async (req: Request, res: Response) => {
           organizationId: org.id,
           organization_name: org.name,
           organization_type: org.type,
+          is_verified: true,
         },
       });
     }

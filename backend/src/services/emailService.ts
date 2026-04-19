@@ -60,3 +60,62 @@ export const sendOtpEmail = async (to: string, otpCode: string, name: string) =>
     // throw new Error('Could not send OTP email');
   }
 };
+
+export const sendResetPasswordEmail = async (to: string, token: string, name: string) => {
+  try {
+    let transporter;
+    
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    } else {
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+    }
+
+    const resetLink = `http://localhost:5174/reset-password?token=${token}&email=${encodeURIComponent(to)}`;
+
+    const mailOptions = {
+      from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
+      to,
+      subject: 'Password Reset Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #4f46e5;">Hello ${name},</h2>
+          <p style="color: #475569; font-size: 16px;">We received a request to reset your password. Click the button below to choose a new password:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">Reset Password</a>
+          </div>
+
+          <p style="color: #64748b; font-size: 14px;">This link will expire in 1 hour.</p>
+          <hr style="border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="color: #94a3b8; font-size: 12px;">If you did not request a password reset, please safely ignore this email.</p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Password Reset Email sent: %s', info.messageId);
+    
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+  } catch (error) {
+    console.error('Error sending Password Reset email:', error);
+  }
+};

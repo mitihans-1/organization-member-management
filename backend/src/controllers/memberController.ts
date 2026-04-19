@@ -77,7 +77,7 @@ export const updateMember = async (req: any, res: Response) => {
     
     // In a real app we'd verify the admin owns this member
     const member = await prisma.user.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         name,
         email,
@@ -97,7 +97,7 @@ export const deleteMember = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.user.delete({
-      where: { id: parseInt(id) },
+      where: { id: id },
     });
     res.status(204).send();
   } catch (error) {

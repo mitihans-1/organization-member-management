@@ -47,7 +47,7 @@ export const createOrganization = async (req: any, res: Response) => {
         organization_type: orgType,
         organizationId: organizationRow.id,
         role: 'orgAdmin',
-        plan_id: plan_id ? parseInt(plan_id) : undefined,
+        plan_id: plan_id ? plan_id : undefined,
       },
     });
 
@@ -67,7 +67,7 @@ export const updateOrganization = async (req: any, res: Response) => {
     const { name, email, organization_name, organization_type, plan_id } = req.body;
     const orgName = String(organization_name || '').trim();
     const orgType = String(organization_type || 'business').trim() || 'business';
-    const userId = parseInt(id);
+    const userId = id;
 
     const current = await prisma.user.findUnique({
       where: { id: userId },
@@ -97,7 +97,7 @@ export const updateOrganization = async (req: any, res: Response) => {
         organization_name: orgName,
         organization_type: orgType,
         organizationId: organizationId || undefined,
-        plan_id: plan_id ? parseInt(plan_id) : undefined,
+        plan_id: plan_id ? plan_id : undefined,
       },
     });
 
@@ -114,7 +114,7 @@ export const deleteOrganization = async (req: any, res: Response) => {
 
   try {
     const { id } = req.params;
-    await prisma.user.delete({ where: { id: parseInt(id) } });
+    await prisma.user.delete({ where: { id: id } });
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ message: 'Error deleting organization', error });
