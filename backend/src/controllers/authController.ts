@@ -13,7 +13,6 @@ import { JWT_SECRET } from '../config/jwtConfig';
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export const register = async (req: Request, res: Response) => {
-  console.log('Registration request body:', req.body);
   try {
     const {
       name,
