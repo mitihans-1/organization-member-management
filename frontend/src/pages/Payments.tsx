@@ -14,13 +14,11 @@ const Payments: React.FC = () => {
   const navigate = useNavigate();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // OCR Payment States
+
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  
-  // Manual Entry States (Fallback for OCR failure)
+
   const [requiresManualEntry, setRequiresManualEntry] = useState(false);
   const [manualTransactionId, setManualTransactionId] = useState('');
   const [ocrErrorMsg, setOcrErrorMsg] = useState('');
@@ -34,7 +32,6 @@ const Payments: React.FC = () => {
       if (location.state?.selectedPlanId) {
          setSelectedPlanId(location.state.selectedPlanId);
       }
-      // Clear the state so it doesn't reopen on refresh
       navigate(location.pathname, { replace: true });
     }
   }, [location, navigate]);
@@ -66,7 +63,6 @@ const Payments: React.FC = () => {
     });
   }, [payments, searchTerm]);
 
-  // Original automatic transaction (simulated)
   const upgradeMutation = useMutation({
     mutationFn: (planId: number) =>
       api.post('/payments', {
@@ -94,7 +90,29 @@ const Payments: React.FC = () => {
     }
   });
 
-  // New OCR Upload Mutation
+  const orgPlanPaymentMutation = useMutation({
+    mutationFn: (data: { planId: string; method: string; transactionId: string }) =>
+      api.post('/payments/org-plan', {
+        plan_id: data.planId,
+        payment_method: data.method,
+        manual_transaction_id: data.transactionId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setIsUpgradeModalOpen(false);
+      setSelectedPlanId(null);
+      setPaymentMethod(null);
+      setReceiptFile(null);
+      setRequiresManualEntry(false);
+      setManualTransactionId('');
+      setOcrErrorMsg('');
+      alert('Organization plan payment submitted! It will be confirmed by SuperAdmin shortly.');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error submitting organization payment');
+    }
+  });
+
   const uploadReceiptMutation = useMutation({
     mutationFn: (data: { planId: number; file: File; method: string; manualTxnId?: string }) => {
       const formData = new FormData();
@@ -131,17 +149,28 @@ const Payments: React.FC = () => {
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlanId || !receiptFile || !paymentMethod) return;
-    
+
     if (requiresManualEntry && !manualTransactionId.trim()) {
         alert("Please enter the Transaction ID manually.");
         return;
     }
 
-    uploadReceiptMutation.mutate({ 
-        planId: selectedPlanId, 
-        file: receiptFile, 
+    uploadReceiptMutation.mutate({
+        planId: selectedPlanId,
+        file: receiptFile,
         method: paymentMethod,
         manualTxnId: requiresManualEntry ? manualTransactionId : undefined
+    });
+  };
+
+  const handleOrgPlanPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlanId || !paymentMethod || !manualTransactionId.trim()) return;
+
+    orgPlanPaymentMutation.mutate({
+      planId: selectedPlanId,
+      method: paymentMethod,
+      transactionId: manualTransactionId
     });
   };
 
@@ -234,10 +263,10 @@ const Payments: React.FC = () => {
                     <td className="px-4 py-4">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-3">
-                            <span 
-                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide 
-                              ${payment.status === 'pending' ? 'bg-amber-50 text-amber-800' 
-                                : payment.status === 'rejected' ? 'bg-red-50 text-red-800' 
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide
+                              ${payment.status === 'pending' ? 'bg-amber-50 text-amber-800'
+                                : payment.status === 'rejected' ? 'bg-red-50 text-red-800'
                                 : 'bg-emerald-50 text-emerald-800'}`}
                             >
                               <CheckCircle size={12} />
@@ -321,13 +350,12 @@ const Payments: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            
+
             <div className="p-8">
               {plansLoading ? (
                 <div className="text-center py-16 text-gray-400">Loading available plans...</div>
               ) : selectedPlanId ? (
                 !paymentMethod ? (
-                  // --- STEP 2: CHOOSE PAYMENT METHOD ---
                   <div className="max-w-lg mx-auto text-center">
                       <p className="mb-8 text-gray-600">Select your preferred mobile money provider to continue with the payment.</p>
                       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
@@ -336,9 +364,9 @@ const Payments: React.FC = () => {
                              onClick={() => setPaymentMethod('telebirr')}
                              className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-4 hover:border-indigo-400 hover:shadow-lg transition-all bg-white"
                           >
-                             <img 
-                                 src="/asset/telebirr-logo.png" 
-                                 alt="Telebirr" 
+                             <img
+                                 src="/asset/telebirr-logo.png"
+                                 alt="Telebirr"
                                  className="w-20 h-20 object-contain rounded-xl"
                               />
                              <span className="font-black text-lg text-gray-800">Telebirr</span>
@@ -348,9 +376,9 @@ const Payments: React.FC = () => {
                              onClick={() => setPaymentMethod('cbe_birr')}
                              className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-4 hover:border-indigo-400 hover:shadow-lg transition-all bg-white"
                           >
-                             <img 
-                                 src="/asset/cbe-logo.png" 
-                                 alt="CBE Birr" 
+                             <img
+                                 src="/asset/cbe-logo.png"
+                                 alt="CBE Birr"
                                  className="w-20 h-20 object-contain"
                               />
                              <span className="font-black text-lg text-gray-800">CBE Birr</span>
@@ -358,14 +386,13 @@ const Payments: React.FC = () => {
                       </div>
                   </div>
                 ) : (
-                  // --- STEP 3: UPLOAD RECEIPT FLOW ---
                   <div className="max-w-lg mx-auto">
                       <div className="flex items-center justify-center gap-3 mb-6">
-                         <img 
-                             src={paymentMethod === 'telebirr' 
-                                 ? "/asset/telebirr-logo.png" 
-                                 : "/asset/cbe-logo.png"} 
-                             alt="Logo" 
+                         <img
+                             src={paymentMethod === 'telebirr'
+                                 ? "/asset/telebirr-logo.png"
+                                 : "/asset/cbe-logo.png"}
+                             alt="Logo"
                              className="w-10 h-10 object-contain"
                           />
                          <h4 className="text-xl font-black text-gray-800">
@@ -373,6 +400,45 @@ const Payments: React.FC = () => {
                          </h4>
                       </div>
 
+                      {user?.role === 'orgAdmin' ? (
+                      <div>
+                      <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
+                        Please transfer the exact amount to the platform account: <br/>
+                        <strong className="text-xl tracking-wider text-amber-900 mt-2 block">
+                          {config?.telebirrPhone || '+251 912 345 678'}
+                        </strong>
+                      </p>
+                      <p className="mb-6 text-gray-600 text-sm text-center">
+                        Enter the transaction ID from your bank transfer receipt below.
+                      </p>
+                      <form onSubmit={handleOrgPlanPayment} className="space-y-6">
+                         <div>
+                             <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                 Transaction ID / Ref No.
+                             </label>
+                             <input
+                                 type="text"
+                                 required
+                                 value={manualTransactionId}
+                                 onChange={(e) => setManualTransactionId(e.target.value)}
+                                 placeholder="Enter transaction ID from your receipt"
+                                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                             />
+                             <p className="text-xs text-gray-500 mt-2">
+                               A SuperAdmin will manually verify this transaction ID.
+                             </p>
+                         </div>
+                         <button
+                           type="submit"
+                           disabled={orgPlanPaymentMutation.isPending || !manualTransactionId.trim()}
+                           className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors"
+                         >
+                            {orgPlanPaymentMutation.isPending ? 'Submitting...' : 'Submit Payment'}
+                         </button>
+                      </form>
+                      </div>
+                      ) : (
+                      <div>
                       <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
                         Please transfer the exact amount using {paymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to: <br/>
                         <strong className="text-xl tracking-wider text-amber-900 mt-2 block">
@@ -389,9 +455,9 @@ const Payments: React.FC = () => {
                              <span className="block text-sm font-semibold text-indigo-600 hover:text-indigo-500">
                                  Browse for image
                              </span>
-                             <input 
-                                type="file" 
-                                accept="image/png, image/jpeg, image/jpg" 
+                             <input
+                                type="file"
+                                accept="image/png, image/jpeg, image/jpg"
                                 className="hidden"
                                 onChange={(e) => {
                                     if (e.target.files?.[0]) setReceiptFile(e.target.files[0]);
@@ -416,8 +482,8 @@ const Payments: React.FC = () => {
                                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                                      Transaction ID / Ref No.
                                  </label>
-                                 <input 
-                                     type="text" 
+                                 <input
+                                     type="text"
                                      required
                                      value={manualTransactionId}
                                      onChange={(e) => setManualTransactionId(e.target.value)}
@@ -441,10 +507,11 @@ const Payments: React.FC = () => {
                          </button>
                      </div>
                   </form>
-                </div>
+                  </div>
+                      )}
+                  </div>
                 )
               ) : (
-                // --- STEP 1: CHOOSE PLAN ---
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {plans?.map((plan) => (
                     <div
@@ -474,8 +541,9 @@ const Payments: React.FC = () => {
                             onClick={() => setSelectedPlanId(plan.id)}
                             className="w-full py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors text-sm sm:text-base flex items-center justify-center"
                           >
-                            Pay with Mobile Money
+                            {user?.role === 'orgAdmin' ? 'Pay via Bank Transfer' : 'Pay with Mobile Money'}
                           </button>
+                          {user?.role !== 'orgAdmin' && (
                           <button
                             type="button"
                             onClick={() => upgradeMutation.mutate(plan.id)}
@@ -484,6 +552,7 @@ const Payments: React.FC = () => {
                           >
                             {upgradeMutation.isPending ? 'Processing...' : 'Simulate API Card Payment'}
                           </button>
+                          )}
                       </div>
                     </div>
                   ))}

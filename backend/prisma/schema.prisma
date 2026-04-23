@@ -19,6 +19,9 @@ model Organization {
   events           Event[]
   users            User[]
   customAttributes CustomAttributeDefinition[]
+  plan_id          String?                     @db.ObjectId
+  plan_expiry      DateTime?
+  plan             Plan?                       @relation(fields: [plan_id], references: [id])
 
   @@map("organizations")
 }
@@ -146,6 +149,7 @@ model Plan {
   updatedAt     DateTime  @updatedAt
   payments      Payment[]
   users         User[]
+  organizations Organization[]
 
   @@map("plans")
 }
@@ -164,6 +168,15 @@ model Payment {
   updatedAt        DateTime @updatedAt
   plan             Plan     @relation(fields: [plan_id], references: [id])
   user             User     @relation(fields: [user_id], references: [id])
+
+  payer_type       String?
+  payer_id         String?
+  payee_type       String?
+  payee_id         String?
+  reference_type   String?
+  reference_id     String?
+
+  organization_id  String?  @db.ObjectId
 
   @@map("payments")
 }
@@ -184,6 +197,8 @@ model Blog {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
+  price          Float?
+  payment_required Boolean    @default(false)
 
   @@map("blogs")
 }
@@ -202,10 +217,12 @@ model Event {
   virtualLink    String?
   contactEmail   String?
   organizationId String?       @db.ObjectId
+  price          Float?
+  payment_required Boolean    @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
-  
+
   attendeesIds   String[]      @db.ObjectId
   attendees      User[]        @relation("EventAttendees", fields: [attendeesIds], references: [id])
 

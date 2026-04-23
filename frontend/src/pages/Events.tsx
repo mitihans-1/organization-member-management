@@ -46,6 +46,8 @@ const Events: React.FC = () => {
     capacity: '',
     virtualLink: '',
     contactEmail: '',
+    price: '',
+    payment_required: false,
   });
   const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
 
@@ -121,10 +123,12 @@ const Events: React.FC = () => {
         capacity: event.capacity ? String(event.capacity) : '',
         virtualLink: event.virtualLink || '',
         contactEmail: event.contactEmail || '',
+        price: event.price !== undefined && event.price !== null ? String(event.price) : '',
+        payment_required: (event as any).payment_required || false,
       });
     } else {
       setEditingEvent(null);
-      setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '' });
+      setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false });
     }
     setIsModalOpen(true);
   };
@@ -137,10 +141,17 @@ const Events: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingEvent) {
-      updateMutation.mutate({ ...formData, id: editingEvent.id });
+    const payload: any = { ...formData };
+    if (formData.payment_required && formData.price) {
+      payload.price = parseFloat(formData.price);
     } else {
-      createMutation.mutate(formData);
+      payload.price = null;
+      payload.payment_required = false;
+    }
+    if (editingEvent) {
+      updateMutation.mutate({ ...payload, id: editingEvent.id });
+    } else {
+      createMutation.mutate(payload);
     }
   };
 
@@ -591,12 +602,39 @@ const Events: React.FC = () => {
                   />
                 </div>
               </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.payment_required}
+                    onChange={(e) => setFormData({ ...formData, payment_required: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-bold text-gray-700">Require payment to register</span>
+                </label>
+              </div>
+              {formData.payment_required && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ticket Price (ETB)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required={formData.payment_required}
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image File</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image URL</label>
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageFileChange(e.target.files?.[0] ?? null)}
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={formData.image}
+                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
                 {formData.image ? (
@@ -605,7 +643,7 @@ const Events: React.FC = () => {
                     onClick={() => setFormData({ ...formData, image: '' })}
                     className="mt-2 text-xs font-semibold text-gray-500 hover:text-gray-700"
                   >
-                    Remove selected image
+                    Clear image URL
                   </button>
                 ) : null}
               </div>

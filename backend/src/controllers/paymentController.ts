@@ -326,3 +326,369 @@ export const revokePayment = async (req: any, res: Response) => {
     res.status(500).json({ message: 'Error revoking payment', error });
   }
 };
+
+export const createOrgPlanPayment = async (req: any, res: Response) => {
+  try {
+    const { plan_id, payment_method, manual_transaction_id } = req.body;
+
+    if (req.user.role !== 'orgAdmin') {
+      return res.status(403).json({ message: 'Only organization admins can create org plan payments.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      include: { organization: true }
+    });
+
+    if (!user?.organization) {
+      return res.status(400).json({ message: 'No organization found for this user.' });
+    }
+
+    const plan = await prisma.plan.findUnique({ where: { id: plan_id } });
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    if (!manual_transaction_id) {
+      return res.status(400).json({ message: 'Transaction ID is required for bank-based payments.' });
+    }
+
+    const existingPayment = await prisma.payment.findFirst({
+      where: { transaction_id: manual_transaction_id }
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        message: `Transaction ID ${manual_transaction_id} has already been used.`
+      });
+    }
+
+    const payment = await prisma.payment.create({
+      data: {
+        plan_id: plan.id,
+        user_id: req.user.userId,
+        amount: plan.price,
+        payment_method: payment_method || 'bank_transfer',
+        status: 'pending',
+        transaction_id: manual_transaction_id,
+        payer_type: 'organization',
+        payer_id: user.organization.id,
+        payee_type: 'superadmin',
+        payee_id: 'platform',
+        reference_type: 'plan_subscription',
+        reference_id: plan.id,
+        organization_id: user.organization.id,
+      }
+    });
+
+    const superAdmins = await prisma.user.findMany({ where: { role: 'SuperAdmin' } });
+    if (superAdmins.length > 0) {
+      const notificationsData = superAdmins.map(admin => ({
+        userId: admin.id,
+        title: `New org subscription payment: ${user.organization?.name || 'Unknown'} paid ${plan.price} ETB via ${payment_method || 'bank_transfer'} (Txn: ${manual_transaction_id})`
+      }));
+      await prisma.notification.createMany({ data: notificationsData });
+    }
+
+    res.status(201).json({
+      message: 'Organization plan payment submitted and is pending SuperAdmin confirmation.',
+      payment
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error creating organization plan payment', error });
+  }
+};
+
+export const createEventPayment = async (req: any, res: Response) => {
+  try {
+    const { event_id, payment_method, manual_transaction_id } = req.body;
+
+    if (!event_id) {
+      return res.status(400).json({ message: 'Event ID is required.' });
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: event_id },
+      include: { organizations: true }
+    });
+
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found.' });
+    }
+
+    if (!event.payment_required || event.price === null) {
+      return res.status(400).json({ message: 'This event does not require payment.' });
+    }
+
+    if (!manual_transaction_id) {
+      return res.status(400).json({ message: 'Transaction ID is required for event payment.' });
+    }
+
+    const existingPayment = await prisma.payment.findFirst({
+      where: {
+        transaction_id: manual_transaction_id,
+        reference_type: 'event',
+        reference_id: event_id
+      }
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        message: `Transaction ID ${manual_transaction_id} has already been used for this event.`
+      });
+    }
+
+    const payment = await prisma.payment.create({
+      data: {
+        plan_id: '',
+        user_id: req.user.userId,
+        amount: event.price,
+        payment_method: payment_method || 'bank_transfer',
+        status: 'pending',
+        transaction_id: manual_transaction_id,
+        payer_type: 'member',
+        payer_id: req.user.userId,
+        payee_type: 'organization',
+        payee_id: event.organizationId,
+        reference_type: 'event',
+        reference_id: event_id,
+        organization_id: event.organizationId || undefined,
+      }
+    });
+
+    const orgAdmins = await prisma.user.findMany({
+      where: {
+        organizationId: event.organizationId,
+        role: 'orgAdmin'
+      }
+    });
+
+    if (orgAdmins.length > 0) {
+      const notificationsData = orgAdmins.map(admin => ({
+        userId: admin.id,
+        title: `New event payment: Member paid ${event.price} ETB for "${event.title}" via ${payment_method || 'bank_transfer'} (Txn: ${manual_transaction_id})`
+      }));
+      await prisma.notification.createMany({ data: notificationsData });
+    }
+
+    res.status(201).json({
+      message: 'Event payment submitted and is pending organization admin confirmation.',
+      payment
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error creating event payment', error });
+  }
+};
+
+export const getOrgPayments = async (req: any, res: Response) => {
+  try {
+    if (req.user.role === 'SuperAdmin') {
+      const payments = await prisma.payment.findMany({
+        where: { reference_type: 'plan_subscription' },
+        include: { user: true, plan: true },
+      });
+      return res.status(200).json(payments);
+    }
+
+    if (req.user.role === 'orgAdmin') {
+      const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+      const payments = await prisma.payment.findMany({
+        where: {
+          OR: [
+            { organization_id: user?.organizationId },
+            { payer_id: user?.organizationId, payer_type: 'organization' }
+          ]
+        },
+        include: { user: true, plan: true },
+      });
+      return res.status(200).json(payments);
+    }
+
+    const payments = await prisma.payment.findMany({
+      where: {
+        OR: [
+          { user_id: req.user.userId },
+          { payer_id: req.user.userId, payer_type: 'member' }
+        ]
+      },
+      include: { user: true },
+    });
+    res.status(200).json(payments);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching payments', error });
+  }
+};
+
+export const confirmOrgPayment = async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Only SuperAdmin can confirm org plan payments.' });
+    }
+
+    const { id } = req.params;
+    const payment = await prisma.payment.findUnique({
+      where: { id: id },
+      include: { plan: true }
+    });
+
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'completed' }
+    });
+
+    if (payment.payer_type === 'organization' && payment.payer_id) {
+      await prisma.organization.update({
+        where: { id: payment.payer_id },
+        data: {
+          plan_id: payment.plan?.id,
+          plan_expiry: new Date(Date.now() + (payment.plan?.duration_days || 30) * 86400000),
+        }
+      }).catch(() => {});
+
+      const orgAdmins = await prisma.user.findMany({
+        where: { organizationId: payment.payer_id, role: 'orgAdmin' }
+      });
+
+      for (const admin of orgAdmins) {
+        await prisma.notification.create({
+          data: {
+            userId: admin.id,
+            title: `Your organization payment of ${payment.amount} ETB has been approved! Subscription active until ${new Date(Date.now() + (payment.plan?.duration_days || 30) * 86400000).toLocaleDateString()}.`
+          }
+        });
+      }
+    }
+
+    res.status(200).json({ message: 'Organization payment confirmed', payment: updatedPayment });
+  } catch (error) {
+    res.status(500).json({ message: 'Error confirming organization payment', error });
+  }
+};
+
+export const rejectOrgPayment = async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Only SuperAdmin can reject org payments.' });
+    }
+
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const payment = await prisma.payment.findUnique({ where: { id: id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: id },
+      data: { status: 'rejected', rejection_reason: reason || 'Payment rejected by SuperAdmin.' }
+    });
+
+    if (payment.payer_type === 'organization' && payment.payer_id) {
+      const orgAdmins = await prisma.user.findMany({
+        where: { organizationId: payment.payer_id, role: 'orgAdmin' }
+      });
+      for (const admin of orgAdmins) {
+        await prisma.notification.create({
+          data: {
+            userId: admin.id,
+            title: `Organization payment of ${payment.amount} ETB was rejected. Reason: ${reason || 'Invalid payment details.'}`
+          }
+        });
+      }
+    }
+
+    res.status(200).json({ message: 'Organization payment rejected', payment: updatedPayment });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rejecting organization payment', error });
+  }
+};
+
+export const confirmEventPayment = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const payment = await prisma.payment.findUnique({ where: { id: id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'completed' }
+    });
+
+    if (payment.reference_type === 'event' && payment.reference_id) {
+      const event = await prisma.event.findUnique({ where: { id: payment.reference_id } });
+      if (event) {
+        await prisma.event.update({
+          where: { id: event.id },
+          data: {
+            attendeesIds: {
+              push: payment.user_id
+            }
+          }
+        }).catch(() => {});
+
+        const eventOrgAdmins = await prisma.user.findMany({
+          where: { organizationId: event.organizationId, role: 'orgAdmin' }
+        });
+        for (const admin of eventOrgAdmins) {
+          await prisma.notification.create({
+            data: {
+              userId: admin.id,
+              title: `Event payment for "${event.title}" confirmed. Member has been registered.`
+            }
+          });
+        }
+
+        const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
+        if (member) {
+          await prisma.notification.create({
+            data: {
+              userId: member.id,
+              title: `Your payment of ${payment.amount} ETB for "${event.title}" has been confirmed. You are now registered!`
+            }
+          });
+        }
+      }
+    }
+
+    res.status(200).json({ message: 'Event payment confirmed', payment: updatedPayment });
+  } catch (error) {
+    res.status(500).json({ message: 'Error confirming event payment', error });
+  }
+};
+
+export const rejectEventPayment = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const payment = await prisma.payment.findUnique({ where: { id: id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: id },
+      data: { status: 'rejected', rejection_reason: reason || 'Event payment rejected.' }
+    });
+
+    const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
+    if (member) {
+      await prisma.notification.create({
+        data: {
+          userId: member.id,
+          title: `Your event payment of ${payment.amount} ETB was rejected. Reason: ${reason || 'Invalid payment details.'}`
+        }
+      });
+    }
+
+    res.status(200).json({ message: 'Event payment rejected', payment: updatedPayment });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rejecting event payment', error });
+  }
+};

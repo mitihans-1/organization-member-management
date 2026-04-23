@@ -10,12 +10,17 @@ const SuperAdminPayments: React.FC = () => {
     queryFn: () => api.get('/payments').then((r) => r.data),
   });
 
-  const [activeTab, setActiveTab] = useState<'transactions' | 'invoices'>('transactions');
+  const { data: orgPayments, isLoading: orgPaymentsLoading } = useQuery({
+    queryKey: ['org-payments'],
+    queryFn: () => api.get('/payments/org/all').then((r) => r.data),
+  });
+
+  const [activeTab, setActiveTab] = useState<'transactions' | 'orgPayments' | 'invoices'>('transactions');
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<any | null>(null);
   
   // Professional Action Modal State
-  const [actionModal, setActionModal] = useState<{type: 'reject' | 'revoke', paymentId: number} | null>(null);
+  const [actionModal, setActionModal] = useState<{type: 'reject' | 'revoke', paymentId: number, isOrgPayment?: boolean} | null>(null);
   const [actionReason, setActionReason] = useState('');
 
   useBodyScrollLock(!!selected || !!actionModal);
@@ -31,6 +36,33 @@ const SuperAdminPayments: React.FC = () => {
     },
     onError: (error: any) => {
       alert(error.response?.data?.message || 'Error confirming payment');
+    }
+  });
+
+  const confirmOrgPaymentMutation = useMutation({
+    mutationFn: (paymentId: number) => api.put(`/payments/org/${paymentId}/confirm`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setSelected(null);
+      alert('Organization payment confirmed!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error confirming organization payment');
+    }
+  });
+
+  const rejectOrgPaymentMutation = useMutation({
+    mutationFn: (data: { paymentId: number; reason: string }) =>
+      api.put(`/payments/org/${data.paymentId}/reject`, { reason: data.reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      setActionModal(null);
+      setActionReason('');
+      setSelected(null);
+      alert('Organization payment rejected.');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error rejecting organization payment');
     }
   });
 
@@ -106,7 +138,18 @@ const SuperAdminPayments: React.FC = () => {
               : 'text-slate-500 border-transparent'
           }`}
         >
-          Payment Transactions
+          User Payments
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('orgPayments')}
+          className={`px-4 py-2 text-sm font-bold border-b-2 ${
+            activeTab === 'orgPayments'
+              ? 'text-sky-600 border-sky-600'
+              : 'text-slate-500 border-transparent'
+          }`}
+        >
+          Organization Payments
         </button>
         <button
           type="button"
@@ -140,6 +183,14 @@ const SuperAdminPayments: React.FC = () => {
                   <th className="text-left p-3 font-bold text-slate-600">Billing</th>
                   <th className="text-left p-3 font-bold text-slate-600">Member</th>
                 </>
+              ) : activeTab === 'orgPayments' ? (
+                <>
+                  <th className="text-left p-3 font-bold text-slate-600">Organization</th>
+                  <th className="text-left p-3 font-bold text-slate-600">Plan</th>
+                  <th className="text-left p-3 font-bold text-slate-600">Amount</th>
+                  <th className="text-left p-3 font-bold text-slate-600">Method</th>
+                  <th className="text-left p-3 font-bold text-slate-600">Status</th>
+                </>
               ) : (
                 <>
                   <th className="text-left p-3 font-bold text-slate-600">Invoice</th>
@@ -160,10 +211,44 @@ const SuperAdminPayments: React.FC = () => {
               </tr>
             ) : !filtered?.length ? (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-500">
+                <td colSpan={activeTab === 'orgPayments' ? 5 : 5} className="p-8 text-center text-slate-500">
                   No payments yet
                 </td>
               </tr>
+            ) : activeTab === 'orgPayments' ? (
+              orgPayments?.map((p: any) => (
+                <tr key={p.id} className="border-t border-slate-100">
+                  <td className="p-3 font-medium">{p.user?.organization_name || p.payer_id || '—'}</td>
+                  <td className="p-3 text-slate-600">{p.plan?.name ?? '—'}</td>
+                  <td className="p-3">${p.amount ?? 0}</td>
+                  <td className="p-3 text-slate-600">{p.payment_method ?? '—'}</td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                      p.status === 'pending' ? 'bg-amber-50 text-amber-800'
+                      : p.status === 'rejected' ? 'bg-red-50 text-red-800'
+                      : 'bg-emerald-50 text-emerald-800'}`}>
+                      {p.status}
+                    </span>
+                    {p.status === 'pending' && (
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          onClick={() => confirmOrgPaymentMutation.mutate(p.id)}
+                          disabled={confirmOrgPaymentMutation.isPending}
+                          className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setActionModal({ type: 'reject', paymentId: p.id })}
+                          className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))
             ) : (
               filtered.map((p: any) => (
                 <tr key={p.id} className="border-t border-slate-100">
@@ -290,6 +375,23 @@ const SuperAdminPayments: React.FC = () => {
                         {confirmPaymentMutation.isPending ? 'Confirming...' : 'Confirm'}
                       </button>
                     )}
+                    {selected.payer_type === 'organization' && selected.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => confirmOrgPaymentMutation.mutate(selected.id)}
+                          disabled={confirmOrgPaymentMutation.isPending}
+                          className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          {confirmOrgPaymentMutation.isPending ? 'Confirming...' : 'Confirm Org Payment'}
+                        </button>
+                        <button
+                          onClick={() => setActionModal({ type: 'reject', paymentId: selected.id, isOrgPayment: true })}
+                          className="flex-1 py-2 bg-red-100 text-red-700 font-bold rounded hover:bg-red-200"
+                        >
+                          Reject Org Payment
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -353,8 +455,10 @@ const SuperAdminPayments: React.FC = () => {
                   type="button"
                   disabled={!actionReason.trim() || rejectPaymentMutation.isPending || revokePaymentMutation.isPending}
                   onClick={() => {
-                      if (actionModal.type === 'revoke') {
+                      if (actionModal?.type === 'revoke') {
                           revokePaymentMutation.mutate({ paymentId: actionModal.paymentId, reason: actionReason.trim() });
+                      } else if (actionModal?.isOrgPayment) {
+                          rejectOrgPaymentMutation.mutate({ paymentId: actionModal.paymentId, reason: actionReason.trim() });
                       } else {
                           rejectPaymentMutation.mutate({ paymentId: actionModal.paymentId, reason: actionReason.trim() });
                       }

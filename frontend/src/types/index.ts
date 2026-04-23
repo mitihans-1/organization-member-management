@@ -96,4 +96,6 @@ export interface Event {
   contactEmail?: string;
   organizationId?: string;
   _count?: { attendees: number };
+  price?: number;
+  payment_required?: boolean;
 }
