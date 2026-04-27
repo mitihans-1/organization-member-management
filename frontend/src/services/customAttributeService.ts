@@ -1,7 +1,7 @@
 import api from './api';
 
 export interface CustomAttributeDefinition {
-  id: number;
+  id: string;
   name: string;
   type: 'text' | 'number' | 'date' | 'boolean';
   required: boolean;
@@ -9,9 +9,9 @@ export interface CustomAttributeDefinition {
 }
 
 export interface MemberAttributeValue {
-  id: number;
-  memberId: number;
-  attributeId: number;
+  id: string;
+  memberId: string;
+  attributeId: string;
   value: string;
   attribute?: CustomAttributeDefinition;
 }
@@ -27,21 +27,21 @@ export const customAttributeService = {
     return response.data;
   },
 
-  updateDefinition: async (id: number, data: Partial<CustomAttributeDefinition>) => {
+  updateDefinition: async (id: string, data: Partial<CustomAttributeDefinition>) => {
     const response = await api.put<CustomAttributeDefinition>(`/custom-attributes/definitions/${id}`, data);
     return response.data;
   },
 
-  deleteDefinition: async (id: number) => {
+  deleteDefinition: async (id: string) => {
     await api.delete(`/custom-attributes/definitions/${id}`);
   },
 
-  getMemberValues: async (memberId: number) => {
+  getMemberValues: async (memberId: string) => {
     const response = await api.get<MemberAttributeValue[]>(`/custom-attributes/values/${memberId}`);
     return response.data;
   },
 
-  updateMemberValues: async (memberId: number, values: { attributeId: number; value: any }[]) => {
+  updateMemberValues: async (memberId: string, values: { attributeId: string; value: any }[]) => {
     const response = await api.post(`/custom-attributes/values/${memberId}`, { values });
     return response.data;
   },

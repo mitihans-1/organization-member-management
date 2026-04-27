@@ -24,3 +24,24 @@ export const uploadReceipt = multer({
         cb(new Error('Only images (jpeg, jpg, png) are allowed!'));
     }
 });
+
+const generalStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/images/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname}`);
+    }
+});
+
+export const uploadImage = multer({
+    storage: generalStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png|webp/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (mimetype && extname) return cb(null, true);
+        cb(new Error('Only images are allowed!'));
+    }
+});

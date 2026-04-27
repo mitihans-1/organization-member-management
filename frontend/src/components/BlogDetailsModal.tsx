@@ -17,8 +17,14 @@ function formatStamp(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function stableViews(id: number) {
-  return 80 + (id * 47) % 420;
+function stableViews(id: string) {
+  let num = 0;
+  if (id) {
+    for (let i = 0; i < id.length; i++) {
+      num += id.charCodeAt(i);
+    }
+  }
+  return 80 + (num * 47) % 420;
 }
 
 const BlogDetailsModal: React.FC<BlogDetailsModalProps> = ({

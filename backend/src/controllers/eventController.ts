@@ -21,6 +21,7 @@ export const getEvents = async (req: Request, res: Response) => {
 export const createEvent = async (req: any, res: Response) => {
   try {
     const { title, description, date, end_date, location, image, status, category, capacity, virtualLink, contactEmail } = req.body;
+    const finalImage = req.file ? req.file.path : image;
     
     // Fallback: If your token doesn't include organizationId, fetch it
     let orgId = req.user?.organizationId;
@@ -36,7 +37,7 @@ export const createEvent = async (req: any, res: Response) => {
         date: new Date(date),
         end_date: end_date ? new Date(end_date) : undefined,
         location,
-        image,
+        image: finalImage,
         category: category || 'general',
         capacity: capacity ? parseInt(capacity) : null,
         virtualLink: virtualLink || null,
@@ -54,7 +55,8 @@ export const createEvent = async (req: any, res: Response) => {
 export const updateEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, date, end_date, location, image, status, category, capacity, virtualLink, contactEmail } = req.body;
+    const { title, description, date, end_date, location, status, category, capacity, virtualLink, contactEmail } = req.body;
+    const image = req.file ? req.file.path : req.body.image;
     const event = await prisma.event.update({
       where: { id: id },
       data: {

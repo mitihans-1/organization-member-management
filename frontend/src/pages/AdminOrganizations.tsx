@@ -50,7 +50,7 @@ const AdminOrganizations: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/admin/organizations/${id}`),
+    mutationFn: (id: string) => api.delete(`/admin/organizations/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] });
     },
@@ -109,9 +109,7 @@ const AdminOrganizations: React.FC = () => {
     }
 
     if (mode === 'edit' && editIdRaw && organizations) {
-      const editId = Number(editIdRaw);
-      if (Number.isNaN(editId)) return;
-      const org = organizations.find((o) => o.id === editId);
+      const org = organizations.find((o) => o.id === editIdRaw);
       if (org) openModal(org);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

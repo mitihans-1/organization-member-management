@@ -11,7 +11,7 @@ const FILTERS = ['All', 'Meeting', 'Volunteer', 'Fundraiser', 'Training'] as con
 const MemberEvents: React.FC = () => {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
-  const [rsvp, setRsvp] = useState<Record<number, RSVP>>({});
+  const [rsvp, setRsvp] = useState<Record<string, RSVP>>({});
 
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['events'],
@@ -26,7 +26,7 @@ const MemberEvents: React.FC = () => {
     );
   }, [events, filter]);
 
-  const handleRsvp = (eventId: number, value: Exclude<RSVP, null>) => {
+  const handleRsvp = (eventId: string, value: Exclude<RSVP, null>) => {
     setRsvp((prev) => ({
       ...prev,
       // Toggle off when user clicks the same RSVP again.

@@ -33,6 +33,7 @@ const OrgSettings: React.FC = () => {
   const [memberJoinAlerts, setMemberJoinAlerts] = useState(false);
   const [publicTagline, setPublicTagline] = useState('');
   const [accentNote, setAccentNote] = useState('');
+  const [paymentPhone, setPaymentPhone] = useState('');
 
   // Custom Attributes State
   const [attributes, setAttributes] = useState<CustomAttributeDefinition[]>([]);
@@ -45,7 +46,19 @@ const OrgSettings: React.FC = () => {
   useEffect(() => {
     setDisplayName(user?.organization_name ?? '');
     fetchAttributes();
+    fetchMyOrganization();
   }, [user?.organization_name]);
+
+  const fetchMyOrganization = async () => {
+    try {
+      const res = await api.get('/organizations/me');
+      if (res.data) {
+        setPaymentPhone(res.data.payment_phone || '');
+      }
+    } catch (err) {
+      console.error('Error fetching organization data', err);
+    }
+  };
 
   const fetchAttributes = async () => {
     try {
@@ -66,6 +79,10 @@ const OrgSettings: React.FC = () => {
       
       const response = await api.put('/auth/profile', {
         organization_name: displayName,
+      });
+
+      await api.put('/organizations/me', {
+        payment_phone: paymentPhone,
       });
       
       updateUser(response.data);
@@ -95,7 +112,7 @@ const OrgSettings: React.FC = () => {
     }
   };
 
-  const handleDeleteAttribute = async (id: number) => {
+  const handleDeleteAttribute = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this custom field? All member data for this field will be lost.')) return;
     try {
       await customAttributeService.deleteDefinition(id);
@@ -415,6 +432,31 @@ const OrgSettings: React.FC = () => {
               className={input}
               placeholder="Internal note (optional)"
             />
+          </div>
+        </div>
+      </section>
+
+      <section className={card}>
+        <h2 className={sectionTitle}>
+          <CreditCard className="h-5 w-5 shrink-0 text-indigo-600" aria-hidden />
+          Receiving Payments
+        </h2>
+        <div className="space-y-4">
+          <div>
+            <label className={label} htmlFor="org-payment-phone">
+              Mobile Money Phone Number (Telebirr / CBE Birr)
+            </label>
+            <input
+              id="org-payment-phone"
+              type="text"
+              value={paymentPhone}
+              onChange={(e) => setPaymentPhone(e.target.value)}
+              className={input}
+              placeholder="e.g., 0911223344"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Members will send payments to this number for event registrations and other dues.
+            </p>
           </div>
         </div>
       </section>

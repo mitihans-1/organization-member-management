@@ -30,7 +30,7 @@ const Events: React.FC = () => {
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -76,7 +76,7 @@ const Events: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/events/${id}`),
+    mutationFn: (id: string) => api.delete(`/events/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
   });
 
@@ -136,7 +136,7 @@ const Events: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingEvent(null);
-    setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '' });
+    setFormData({ title: '', description: '', date: '', end_date: '', location: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -629,22 +629,41 @@ const Events: React.FC = () => {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                />
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cover Image (URL or File)</label>
+                <div className="flex flex-col gap-3">
+                  <input
+                    type="url"
+                    placeholder="https://example.com/image.jpg"
+                    value={formData.image.startsWith('data:') ? '' : formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  />
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-400">OR UPLOAD</span>
+                    <input
+                      key={formData.image ? 'has-img' : 'no-img'}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageFileChange(e.target.files?.[0] ?? null)}
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm bg-white"
+                    />
+                  </div>
+                </div>
                 {formData.image ? (
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, image: '' })}
-                    className="mt-2 text-xs font-semibold text-gray-500 hover:text-gray-700"
-                  >
-                    Clear image URL
-                  </button>
+                  <div className="mt-2 flex items-center gap-4">
+                    {formData.image.startsWith('data:') ? (
+                      <span className="text-xs text-green-600 font-semibold">File attached</span>
+                    ) : (
+                      <span className="text-xs text-blue-600 font-semibold">URL provided</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: '' })}
+                      className="text-xs font-semibold text-red-500 hover:text-red-700"
+                    >
+                      Clear Image
+                    </button>
+                  </div>
                 ) : null}
               </div>
               <div className="flex gap-3 pt-2">

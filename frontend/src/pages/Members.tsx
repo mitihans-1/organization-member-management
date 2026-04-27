@@ -26,8 +26,8 @@ const Members: React.FC = () => {
   const isOrgAdmin = user?.role === 'orgAdmin';
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -39,7 +39,7 @@ const Members: React.FC = () => {
     role: 'member',
     status: 'active',
   });
-  const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const queryClient = useQueryClient();
@@ -57,7 +57,7 @@ const Members: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/members/${id}`),
+    mutationFn: (id: string) => api.delete(`/members/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members'] }),
   });
 
@@ -69,7 +69,7 @@ const Members: React.FC = () => {
         await customAttributeService.updateMemberValues(
           member.id,
           Object.entries(customFieldValues).map(([attrId, value]) => ({
-            attributeId: parseInt(attrId),
+            attributeId: attrId,
             value,
           }))
         );
@@ -88,13 +88,13 @@ const Members: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; member: any }) => {
+    mutationFn: async (data: { id: string; member: any }) => {
       const response = await api.put(`/members/${data.id}`, data.member);
       if (Object.keys(customFieldValues).length > 0) {
         await customAttributeService.updateMemberValues(
           data.id,
           Object.entries(customFieldValues).map(([attrId, value]) => ({
-            attributeId: parseInt(attrId),
+            attributeId: attrId,
             value,
           }))
         );
@@ -244,7 +244,7 @@ const Members: React.FC = () => {
       // Fetch custom field values for this member
       try {
         const values = await customAttributeService.getMemberValues(member.id);
-        const valuesMap: Record<number, any> = {};
+        const valuesMap: Record<string, any> = {};
         values.forEach(v => {
           valuesMap[v.attributeId] = v.value;
         });
@@ -273,7 +273,7 @@ const Members: React.FC = () => {
     setCustomFieldValues({});
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);

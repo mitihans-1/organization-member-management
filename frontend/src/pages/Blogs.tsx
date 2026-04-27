@@ -45,7 +45,7 @@ const Blogs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const isAdmin = user?.role === 'orgAdmin' || user?.role === 'SuperAdmin';
@@ -65,7 +65,7 @@ const Blogs: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (updatedBlog: Record<string, unknown> & { id: number }) =>
+    mutationFn: (updatedBlog: Record<string, unknown> & { id: string }) =>
       api.put(`/blogs/${updatedBlog.id}`, updatedBlog),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
@@ -74,7 +74,7 @@ const Blogs: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/blogs/${id}`),
+    mutationFn: (id: string) => api.delete(`/blogs/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blogs'] }),
   });
 
@@ -457,22 +457,42 @@ const Blogs: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Featured Image File
+                  Featured Image (URL or File)
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageFileChange(e.target.files?.[0] ?? null)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                />
+                <div className="flex flex-col gap-3">
+                  <input
+                    type="url"
+                    placeholder="https://example.com/image.jpg"
+                    value={formData.image.startsWith('data:') ? '' : formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  />
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-400">OR UPLOAD</span>
+                    <input
+                      key={formData.image ? 'has-img' : 'no-img'}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageFileChange(e.target.files?.[0] ?? null)}
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm bg-white"
+                    />
+                  </div>
+                </div>
                 {formData.image ? (
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, image: '' })}
-                    className="mt-2 text-xs font-semibold text-gray-500 hover:text-gray-700"
-                  >
-                    Remove selected image
-                  </button>
+                  <div className="mt-2 flex items-center gap-4">
+                    {formData.image.startsWith('data:') ? (
+                      <span className="text-xs text-green-600 font-semibold">File attached</span>
+                    ) : (
+                      <span className="text-xs text-blue-600 font-semibold">URL provided</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: '' })}
+                      className="text-xs font-semibold text-red-500 hover:text-red-700"
+                    >
+                      Clear Image
+                    </button>
+                  </div>
                 ) : null}
               </div>
               <div className="flex gap-3 pt-2">

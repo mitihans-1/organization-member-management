@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Plan } from '../types';
@@ -8,14 +9,21 @@ import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+/** Must match UpgradePlan.tsx — survives React Strict Mode remounts. */
+const PAYMENTS_UPGRADE_FLAG = 'omms_payments_open_upgrade';
+const PAYMENTS_UPGRADE_PLAN = 'omms_payments_upgrade_plan_id';
+
 const Payments: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'subscription' | 'members'>('subscription');
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [editPhoneValue, setEditPhoneValue] = useState('');
 
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
@@ -26,22 +34,73 @@ const Payments: React.FC = () => {
   const queryClient = useQueryClient();
   useBodyScrollLock(isUpgradeModalOpen);
 
+  const clearUpgradeDeepLink = useCallback(() => {
+    try {
+      sessionStorage.removeItem(PAYMENTS_UPGRADE_FLAG);
+      sessionStorage.removeItem(PAYMENTS_UPGRADE_PLAN);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  const resetUpgradeWizardFields = useCallback(() => {
+    setSelectedPlanId(null);
+    setPaymentMethod(null);
+    setReceiptFile(null);
+    setRequiresManualEntry(false);
+    setManualTransactionId('');
+    setOcrErrorMsg('');
+  }, []);
+
+  const closeUpgradeModal = useCallback(() => {
+    setIsUpgradeModalOpen(false);
+    resetUpgradeWizardFields();
+    clearUpgradeDeepLink();
+  }, [resetUpgradeWizardFields, clearUpgradeDeepLink]);
+
+  const openUpgradeModal = useCallback(() => {
+    clearUpgradeDeepLink();
+    resetUpgradeWizardFields();
+    setIsUpgradeModalOpen(true);
+  }, [clearUpgradeDeepLink, resetUpgradeWizardFields]);
+
   useEffect(() => {
-    if (location.state?.autoOpenUpgrade) {
-      setIsUpgradeModalOpen(true);
-      if (location.state?.selectedPlanId) {
-         setSelectedPlanId(location.state.selectedPlanId);
+    const state = location.state as { autoOpenUpgrade?: boolean; selectedPlanId?: string } | null;
+    if (state?.autoOpenUpgrade) {
+      try {
+        sessionStorage.setItem(PAYMENTS_UPGRADE_FLAG, '1');
+        if (state.selectedPlanId != null && state.selectedPlanId !== '') {
+          sessionStorage.setItem(PAYMENTS_UPGRADE_PLAN, String(state.selectedPlanId));
+        }
+      } catch {
+        /* ignore */
       }
       navigate(location.pathname, { replace: true });
+      return;
     }
-  }, [location, navigate]);
+
+    try {
+      if (sessionStorage.getItem(PAYMENTS_UPGRADE_FLAG) === '1') {
+        setIsUpgradeModalOpen(true);
+        const pid = sessionStorage.getItem(PAYMENTS_UPGRADE_PLAN);
+        if (pid) setSelectedPlanId(pid);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const { data: payments, isLoading: paymentsLoading } = useQuery<any[]>({
     queryKey: ['payments'],
-    queryFn: () => api.get('/payments').then((res) => res.data),
+    queryFn: () => api.get('/payments/org/all').then((res) => res.data),
   });
 
-  const { data: plans, isLoading: plansLoading } = useQuery<Plan[]>({
+  const {
+    data: plans,
+    isLoading: plansLoading,
+    isError: plansError,
+    refetch: refetchPlans,
+  } = useQuery<Plan[]>({
     queryKey: ['plans'],
     queryFn: () => api.get('/plans').then((res) => res.data),
   });
@@ -51,20 +110,67 @@ const Payments: React.FC = () => {
     queryFn: () => api.get('/admin/system-config').then((res) => res.data),
   });
 
+  const { data: organization } = useQuery({
+    queryKey: ['myOrganization'],
+    queryFn: () => api.get('/organizations/me').then(r => r.data),
+    enabled: user?.role === 'orgAdmin'
+  });
+
+  const updatePhoneMutation = useMutation({
+    mutationFn: (phone: string) => api.put('/organizations/me', { payment_phone: phone }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myOrganization'] });
+      alert('Payment phone updated!');
+    }
+  });
+
   const filtered = useMemo(() => {
     const list = payments ?? [];
+    
+    const tabFiltered = list.filter((p: any) => {
+      if (activeTab === 'subscription') {
+        return p.payer_type === 'organization' || !p.payer_type;
+      } else {
+        return p.payer_type === 'member';
+      }
+    });
+
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((p) => {
+    if (!q) return tabFiltered;
+    return tabFiltered.filter((p: any) => {
       const planName = p.plan?.name?.toLowerCase() ?? '';
       const method = p.payment_method?.toLowerCase() ?? '';
       const tid = p.transaction_id?.toLowerCase() ?? '';
-      return planName.includes(q) || method.includes(q) || tid.includes(q);
+      const refId = p.reference_id?.toLowerCase() ?? '';
+      const memberName = p.user?.name?.toLowerCase() ?? '';
+      return planName.includes(q) || method.includes(q) || tid.includes(q) || refId.includes(q) || memberName.includes(q);
     });
-  }, [payments, searchTerm]);
+  }, [payments, searchTerm, activeTab]);
+
+  const confirmMemberPaymentMutation = useMutation({
+    mutationFn: (paymentId: string) => api.put(`/payments/member-to-org/${paymentId}/confirm`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      alert('Member payment confirmed!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error confirming member payment');
+    }
+  });
+
+  const rejectMemberPaymentMutation = useMutation({
+    mutationFn: (paymentId: string) => api.put(`/payments/member-to-org/${paymentId}/reject`, { reason: 'Rejected by admin' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      alert('Member payment rejected!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error rejecting member payment');
+    }
+  });
 
   const upgradeMutation = useMutation({
-    mutationFn: (planId: number) =>
+    mutationFn: (planId: string) =>
       api.post('/payments', {
         plan_id: planId,
         amount: plans?.find((p) => p.id === planId)?.price || 0,
@@ -74,7 +180,7 @@ const Payments: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['auth', 'profile'] });
-      setIsUpgradeModalOpen(false);
+      closeUpgradeModal();
       alert('Plan upgraded successfully!');
     },
   });
@@ -99,13 +205,7 @@ const Payments: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      setIsUpgradeModalOpen(false);
-      setSelectedPlanId(null);
-      setPaymentMethod(null);
-      setReceiptFile(null);
-      setRequiresManualEntry(false);
-      setManualTransactionId('');
-      setOcrErrorMsg('');
+      closeUpgradeModal();
       alert('Organization plan payment submitted! It will be confirmed by SuperAdmin shortly.');
     },
     onError: (error: any) => {
@@ -114,7 +214,7 @@ const Payments: React.FC = () => {
   });
 
   const uploadReceiptMutation = useMutation({
-    mutationFn: (data: { planId: number; file: File; method: string; manualTxnId?: string }) => {
+    mutationFn: (data: { planId: string; file: File; method: string; manualTxnId?: string }) => {
       const formData = new FormData();
       formData.append('plan_id', data.planId.toString());
       formData.append('receipt', data.file);
@@ -126,13 +226,7 @@ const Payments: React.FC = () => {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      setIsUpgradeModalOpen(false);
-      setSelectedPlanId(null);
-      setPaymentMethod(null);
-      setReceiptFile(null);
-      setRequiresManualEntry(false);
-      setManualTransactionId('');
-      setOcrErrorMsg('');
+      closeUpgradeModal();
       alert('Receipt uploaded successfully!');
     },
     onError: (error: any) => {
@@ -145,6 +239,11 @@ const Payments: React.FC = () => {
       }
     }
   });
+
+  const selectedPlan = useMemo(
+    () => plans?.find((p) => String(p.id) === String(selectedPlanId)),
+    [plans, selectedPlanId]
+  );
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,19 +278,96 @@ const Payments: React.FC = () => {
       <OrgAdminPageHeader
         title="Payments"
         subtitle="View subscription charges and payment history"
-        actions={
-          user?.role === 'orgAdmin' ? (
+      />
+
+      {user?.role === 'orgAdmin' && (
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-gray-200">
+          <div className="flex min-w-0">
             <button
               type="button"
-              onClick={() => setIsUpgradeModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-500"
+              className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${
+                activeTab === 'subscription'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('subscription')}
             >
-              <Plus size={18} />
-              Upgrade Plan
+              My Subscription
             </button>
-          ) : undefined
-        }
-      />
+            <button
+              type="button"
+              className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${
+                activeTab === 'members'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('members')}
+            >
+              Member Payments
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={openUpgradeModal}
+            className="mb-0.5 inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-indigo-500 sm:px-5 sm:py-2.5"
+          >
+            <Plus size={18} />
+            Upgrade plan
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'members' && organization && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Receiving Phone Number</h3>
+            <p className="text-xs text-gray-500 mt-1">This is the phone number your members will send money to.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {isEditingPhone ? (
+              <>
+                <input
+                  type="text"
+                  value={editPhoneValue}
+                  onChange={(e) => setEditPhoneValue(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                  placeholder="+251..."
+                />
+                <button
+                  onClick={() => {
+                    updatePhoneMutation.mutate(editPhoneValue);
+                    setIsEditingPhone(false);
+                  }}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-sm transition"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setIsEditingPhone(false)}
+                  className="px-3 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-bold transition"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="font-mono font-bold text-gray-800 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                  {organization.payment_phone || 'Not set'}
+                </span>
+                <button
+                  onClick={() => {
+                    setEditPhoneValue(organization.payment_phone || '');
+                    setIsEditingPhone(true);
+                  }}
+                  className="text-indigo-600 text-sm font-bold hover:underline px-2"
+                >
+                  Edit
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -213,12 +389,14 @@ const Payments: React.FC = () => {
             <thead className="bg-gray-50/80 text-gray-500 text-[11px] font-bold uppercase tracking-wider">
               <tr>
                 {user?.role === 'SuperAdmin' && <th className="px-4 py-3">Organization</th>}
-                <th className="px-4 py-3">Plan</th>
+                {activeTab === 'members' && <th className="px-4 py-3">Member</th>}
+                <th className="px-4 py-3">{activeTab === 'members' ? 'Reference' : 'Plan'}</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Method</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Transaction ID</th>
+                {activeTab === 'members' && <th className="px-4 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -234,7 +412,7 @@ const Payments: React.FC = () => {
               ) : filtered?.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={user?.role === 'SuperAdmin' ? 7 : 6}
+                    colSpan={user?.role === 'SuperAdmin' ? 7 : (activeTab === 'members' ? 8 : 6)}
                     className="px-4 py-10 text-center text-gray-400"
                   >
                     No payment history found
@@ -248,7 +426,14 @@ const Payments: React.FC = () => {
                         {payment.user?.organization_name || payment.user?.name}
                       </td>
                     )}
-                    <td className="px-4 py-4 font-bold text-gray-900">{payment.plan?.name}</td>
+                    {activeTab === 'members' && (
+                      <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                        {payment.user?.name}
+                      </td>
+                    )}
+                    <td className="px-4 py-4 font-bold text-gray-900">
+                      {activeTab === 'members' ? payment.reference_id : payment.plan?.name}
+                    </td>
                     <td className="px-4 py-4 text-gray-800 font-semibold">
                       ETB {Number(payment.amount).toFixed(2)}
                     </td>
@@ -272,8 +457,8 @@ const Payments: React.FC = () => {
                               <CheckCircle size={12} />
                               {payment.status}
                             </span>
-                            {user?.role === 'SuperAdmin' && payment.status === 'pending' && (
-                              <div className="flex gap-2">
+                            {(user?.role === 'SuperAdmin' || (user?.role === 'orgAdmin' && activeTab === 'members')) && payment.status === 'pending' && (
+                              <div className="flex gap-2 mt-2 flex-wrap">
                                 {payment.receipt_url && (
                                   <a
                                     href={`http://localhost:5000/${payment.receipt_url.replace(/\\/g, '/')}`}
@@ -284,13 +469,36 @@ const Payments: React.FC = () => {
                                     View Receipt
                                   </a>
                                 )}
-                                <button
-                                  onClick={() => confirmPaymentMutation.mutate(payment.id)}
-                                  disabled={confirmPaymentMutation.isPending}
-                                  className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
-                                >
-                                  Confirm
-                                </button>
+                                {activeTab === 'members' ? (
+                                  <>
+                                    <button
+                                      onClick={() => confirmMemberPaymentMutation.mutate(payment.id)}
+                                      disabled={confirmMemberPaymentMutation.isPending}
+                                      className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm('Are you sure you want to reject this payment?')) {
+                                          rejectMemberPaymentMutation.mutate(payment.id);
+                                        }
+                                      }}
+                                      disabled={rejectMemberPaymentMutation.isPending}
+                                      className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => confirmPaymentMutation.mutate(payment.id)}
+                                    disabled={confirmPaymentMutation.isPending}
+                                    className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
+                                  >
+                                    Confirm
+                                  </button>
+                                )}
                               </div>
                             )}
                         </div>
@@ -304,6 +512,7 @@ const Payments: React.FC = () => {
                     <td className="px-4 py-4 text-[10px] font-mono text-gray-400 uppercase">
                       {payment.transaction_id}
                     </td>
+                    {activeTab === 'members' && <td className="px-4 py-4"></td>}
                   </tr>
                 ))
               )}
@@ -312,8 +521,15 @@ const Payments: React.FC = () => {
         </div>
       </div>
 
-      {isUpgradeModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+      {isUpgradeModalOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
+            style={{ zIndex: 2147483000 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upgrade-plan-dialog-title"
+          >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <div className="flex items-center gap-3">
@@ -330,21 +546,13 @@ const Payments: React.FC = () => {
                     <ArrowLeft size={20} />
                   </button>
                 )}
-                <h3 className="text-xl font-black text-gray-900">
+                <h3 id="upgrade-plan-dialog-title" className="text-xl font-black text-gray-900">
                   {!selectedPlanId ? 'Choose Your Plan' : !paymentMethod ? 'Choose Payment Method' : 'Upload Payment Receipt'}
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setIsUpgradeModalOpen(false);
-                  setSelectedPlanId(null);
-                  setPaymentMethod(null);
-                  setReceiptFile(null);
-                  setRequiresManualEntry(false);
-                  setManualTransactionId('');
-                  setOcrErrorMsg('');
-                }}
+                onClick={closeUpgradeModal}
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
               >
                 <X size={24} />
@@ -352,17 +560,48 @@ const Payments: React.FC = () => {
             </div>
 
             <div className="p-8">
-              {plansLoading ? (
+              {plansLoading && !selectedPlanId ? (
                 <div className="text-center py-16 text-gray-400">Loading available plans...</div>
+              ) : plansError && !selectedPlanId ? (
+                <div className="mx-auto max-w-md rounded-2xl border border-rose-100 bg-rose-50/80 px-6 py-8 text-center">
+                  <p className="text-sm font-bold text-rose-900">We couldn’t load the plan list</p>
+                  <p className="mt-2 text-xs leading-relaxed text-rose-800/90">
+                    Your browser couldn’t get the list of plans from the server (often the server is off, offline, or
+                    the address is wrong). Try again in a moment.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => refetchPlans()}
+                    className="mt-5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : !plansLoading && !selectedPlanId && (!plans || plans.length === 0) ? (
+                <div className="mx-auto max-w-md rounded-2xl border border-amber-100 bg-amber-50/80 px-6 py-8 text-center text-sm text-amber-950">
+                  <p className="font-bold">There are no plans to choose from</p>
+                  <p className="mt-2 text-xs leading-relaxed text-amber-900/90">
+                    Upgrading works by picking a plan (like Basic or Pro). Right now the system returned an empty list,
+                    so there is nothing to pick. Someone who controls this app needs to create plans on the server
+                    before you can upgrade.
+                  </p>
+                </div>
               ) : selectedPlanId ? (
                 !paymentMethod ? (
-                  <div className="max-w-lg mx-auto text-center">
-                      <p className="mb-8 text-gray-600">Select your preferred mobile money provider to continue with the payment.</p>
+                  <div className="max-w-3xl mx-auto">
+                      <p className="mb-2 text-center text-gray-900 font-bold">
+                        {selectedPlan ? `${selectedPlan.name} plan` : 'Selected plan'}
+                      </p>
+                      <p className="mb-8 text-gray-600 text-center text-sm">
+                        {selectedPlan
+                          ? `You will pay ETB ${Number(selectedPlan.price).toFixed(2)} (${selectedPlan.billing_cycle}). Pick how you send it.`
+                          : 'Select your preferred mobile money provider to continue with the payment.'}
+                      </p>
                       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                           <button
                              type="button"
                              onClick={() => setPaymentMethod('telebirr')}
-                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-4 hover:border-indigo-400 hover:shadow-lg transition-all bg-white"
+                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:border-indigo-400 hover:shadow-lg transition-all bg-white text-center"
                           >
                              <img
                                  src="/asset/telebirr-logo.png"
@@ -370,11 +609,14 @@ const Payments: React.FC = () => {
                                  className="w-20 h-20 object-contain rounded-xl"
                               />
                              <span className="font-black text-lg text-gray-800">Telebirr</span>
+                             <span className="text-xs text-gray-500 leading-relaxed">
+                               Send from the Telebirr app to the number below. Use the success screen as your receipt.
+                             </span>
                           </button>
                           <button
                              type="button"
                              onClick={() => setPaymentMethod('cbe_birr')}
-                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-4 hover:border-indigo-400 hover:shadow-lg transition-all bg-white"
+                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:border-indigo-400 hover:shadow-lg transition-all bg-white text-center"
                           >
                              <img
                                  src="/asset/cbe-logo.png"
@@ -382,6 +624,9 @@ const Payments: React.FC = () => {
                                  className="w-20 h-20 object-contain"
                               />
                              <span className="font-black text-lg text-gray-800">CBE Birr</span>
+                             <span className="text-xs text-gray-500 leading-relaxed">
+                               Pay with CBE Birr and capture the confirmation screen showing amount and reference.
+                             </span>
                           </button>
                       </div>
                   </div>
@@ -400,7 +645,7 @@ const Payments: React.FC = () => {
                          </h4>
                       </div>
 
-                      {user?.role === 'orgAdmin' ? (
+                      {false ? (
                       <div>
                       <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
                         Please transfer the exact amount to the platform account: <br/>
@@ -439,15 +684,24 @@ const Payments: React.FC = () => {
                       </div>
                       ) : (
                       <div>
+                      {selectedPlan && (
+                        <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-900">
+                          <span className="font-bold">{selectedPlan.name}</span>
+                          <span className="text-indigo-700"> — transfer exactly </span>
+                          <span className="font-black">ETB {Number(selectedPlan.price).toFixed(2)}</span>
+                        </div>
+                      )}
                       <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
                         Please transfer the exact amount using {paymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to: <br/>
                         <strong className="text-xl tracking-wider text-amber-900 mt-2 block">
                           {config?.telebirrPhone || '+251 912 345 678'}
                         </strong>
                       </p>
-                      <p className="mb-6 text-gray-600 text-sm text-center">
-                        Once transferred, upload the "Success" screenshot here. Our AI will automatically extract your transaction details!
-                      </p>
+                      <ul className="mb-6 text-gray-600 text-sm list-disc list-inside space-y-1">
+                        <li>Use the same method you selected above so automated checks can read your receipt.</li>
+                        <li>Upload a clear screenshot of the success or confirmation screen (not your home screen).</li>
+                        <li>We read the transaction ID and amount from the image; if anything is unclear, you can enter the ID manually.</li>
+                      </ul>
                       <form onSubmit={handleUploadSubmit} className="space-y-6">
                          <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors bg-gray-50/50">
                              <UploadCloud className="mx-auto h-12 w-12 text-gray-400 mb-3" />
@@ -460,7 +714,13 @@ const Payments: React.FC = () => {
                                 accept="image/png, image/jpeg, image/jpg"
                                 className="hidden"
                                 onChange={(e) => {
-                                    if (e.target.files?.[0]) setReceiptFile(e.target.files[0]);
+                                    const f = e.target.files?.[0];
+                                    if (f) {
+                                      setReceiptFile(f);
+                                      setRequiresManualEntry(false);
+                                      setManualTransactionId('');
+                                      setOcrErrorMsg('');
+                                    }
                                 }}
                              />
                          </label>
@@ -500,10 +760,14 @@ const Payments: React.FC = () => {
                      <div className="flex flex-col sm:flex-row gap-4 pt-4">
                          <button
                            type="submit"
-                           disabled={uploadReceiptMutation.isPending || !receiptFile}
+                           disabled={
+                             uploadReceiptMutation.isPending ||
+                             !receiptFile ||
+                             (requiresManualEntry && !manualTransactionId.trim())
+                           }
                            className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors"
                          >
-                            {uploadReceiptMutation.isPending ? 'Processing...' : requiresManualEntry ? 'Submit Manual Entry' : 'Verify Payment'}
+                            {uploadReceiptMutation.isPending ? 'Processing...' : requiresManualEntry ? 'Submit with manual ID' : 'Verify payment'}
                          </button>
                      </div>
                   </form>
@@ -538,7 +802,7 @@ const Payments: React.FC = () => {
                       <div className="flex flex-col gap-3">
                           <button
                             type="button"
-                            onClick={() => setSelectedPlanId(plan.id)}
+                            onClick={() => setSelectedPlanId(String(plan.id))}
                             className="w-full py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors text-sm sm:text-base flex items-center justify-center"
                           >
                             {user?.role === 'orgAdmin' ? 'Pay via Bank Transfer' : 'Pay with Mobile Money'}
@@ -560,8 +824,9 @@ const Payments: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </div>
   );
 };

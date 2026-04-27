@@ -692,3 +692,301 @@ export const rejectEventPayment = async (req: any, res: Response) => {
     res.status(500).json({ message: 'Error rejecting event payment', error });
   }
 };
+
+export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
+  try {
+      if (!req.file) {
+          return res.status(400).json({ message: 'No receipt image uploaded.' });
+      }
+
+      const { reason, amount: reqAmount, payment_method, manual_transaction_id } = req.body;
+      const imagePath = req.file.path;
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+      });
+
+      if (!user?.organizationId) {
+        return res.status(400).json({ message: 'User does not belong to any organization.' });
+      }
+
+      // 1. Run OCR Processing
+      const extracted = await extractReceiptData(imagePath);
+      let { transactionId, amount, isTelebirr, isCbeBirr } = extracted;
+
+      if (manual_transaction_id) {
+          transactionId = manual_transaction_id;
+      }
+
+      if (!manual_transaction_id) {
+          if (payment_method === 'telebirr' && !isTelebirr) {
+              return res.status(400).json({
+                  message: 'The uploaded receipt does not appear to be a valid Telebirr screenshot.',
+                  rawText: extracted.rawText,
+                  requiresManualEntry: true
+              });
+          }
+          if (payment_method === 'cbe_birr' && !isCbeBirr) {
+              return res.status(400).json({
+                  message: 'The uploaded receipt does not appear to be a valid CBE Birr screenshot.',
+                  rawText: extracted.rawText,
+                  requiresManualEntry: true
+              });
+          }
+      }
+
+      if (!transactionId) {
+          return res.status(400).json({
+              message: 'Could not extract a Transaction ID from the image. Please enter it manually.',
+              rawText: extracted.rawText,
+              requiresManualEntry: true
+          });
+      }
+
+      const expectedAmount = parseFloat(reqAmount);
+      if (amount !== null && !manual_transaction_id && expectedAmount) {
+          if (amount !== expectedAmount) {
+              return res.status(400).json({
+                  message: `The receipt amount (${amount} ETB) does not match the entered amount (${expectedAmount} ETB).`,
+                  requiresManualEntry: true
+              });
+          }
+      }
+
+      const finalAmount = amount || expectedAmount || 0;
+
+      const existingPayment = await prisma.payment.findFirst({
+          where: { transaction_id: transactionId }
+      });
+
+      if (existingPayment) {
+          return res.status(400).json({
+              message: `Transaction ID ${transactionId} has already been used.`
+          });
+      }
+
+      const payment = await prisma.payment.create({
+          data: {
+              user_id: req.user.userId,
+              amount: finalAmount,
+              payment_method: payment_method || 'telebirr',
+              status: 'pending',
+              transaction_id: transactionId,
+              receipt_url: imagePath,
+              payer_type: 'member',
+              payer_id: req.user.userId.toString(),
+              payee_type: 'organization',
+              payee_id: user.organizationId.toString(),
+              reference_type: 'member_to_org',
+              reference_id: reason || 'Other',
+              organization_id: user.organizationId,
+          }
+      });
+
+      const orgAdmins = await prisma.user.findMany({ 
+        where: { role: 'orgAdmin', organizationId: user.organizationId } 
+      });
+      if (orgAdmins.length > 0) {
+          const notificationsData = orgAdmins.map(admin => ({
+              userId: admin.id,
+              title: `New member payment: ${user.name} paid ${finalAmount} ETB for "${reason || 'Other'}" via ${payment_method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} (Txn ID: ${transactionId})`
+          }));
+          await prisma.notification.createMany({ data: notificationsData });
+      }
+
+      res.status(201).json({
+          message: 'Payment receipt uploaded and is pending organization confirmation.',
+          extracted_data: extracted,
+          payment
+      });
+  } catch (error) {
+      console.error('Member OCR Payment Error:', error);
+      res.status(500).json({ message: 'Internal server error processing receipt.', error });
+  }
+};
+
+export const uploadEventPaymentReceipt = async (req: any, res: Response) => {
+  try {
+      if (!req.file) {
+          return res.status(400).json({ message: 'No receipt image uploaded.' });
+      }
+
+      const { event_id, payment_method, manual_transaction_id } = req.body;
+      const imagePath = req.file.path;
+
+      if (!event_id) {
+          return res.status(400).json({ message: 'Event ID is required.' });
+      }
+
+      const event = await prisma.event.findUnique({
+          where: { id: event_id }
+      });
+
+      if (!event) {
+          return res.status(404).json({ message: 'Event not found.' });
+      }
+
+      // 1. Run OCR Processing
+      const extracted = await extractReceiptData(imagePath);
+      let { transactionId, amount, isTelebirr, isCbeBirr } = extracted;
+
+      if (manual_transaction_id) {
+          transactionId = manual_transaction_id;
+      }
+
+      if (!manual_transaction_id) {
+          if (payment_method === 'telebirr' && !isTelebirr) {
+              return res.status(400).json({
+                  message: 'The uploaded receipt does not appear to be a valid Telebirr screenshot.',
+                  rawText: extracted.rawText,
+                  requiresManualEntry: true
+              });
+          }
+          if (payment_method === 'cbe_birr' && !isCbeBirr) {
+              return res.status(400).json({
+                  message: 'The uploaded receipt does not appear to be a valid CBE Birr screenshot.',
+                  rawText: extracted.rawText,
+                  requiresManualEntry: true
+              });
+          }
+      }
+
+      if (!transactionId) {
+          return res.status(400).json({
+              message: 'Could not extract a Transaction ID from the image. Please enter it manually.',
+              rawText: extracted.rawText,
+              requiresManualEntry: true
+          });
+      }
+
+      if (amount !== null && !manual_transaction_id && event.price) {
+          if (amount !== event.price) {
+              return res.status(400).json({
+                  message: `The receipt amount (${amount} ETB) does not match the event price (${event.price} ETB).`,
+                  requiresManualEntry: true
+              });
+          }
+      }
+
+      const existingPayment = await prisma.payment.findFirst({
+          where: { 
+              transaction_id: transactionId,
+              reference_type: 'event',
+              reference_id: event_id
+          }
+      });
+
+      if (existingPayment) {
+          return res.status(400).json({
+              message: `Transaction ID ${transactionId} has already been used for this event.`
+          });
+      }
+
+      const payment = await prisma.payment.create({
+          data: {
+              user_id: req.user.userId,
+              amount: event.price || amount || 0,
+              payment_method: payment_method || 'telebirr',
+              status: 'pending',
+              transaction_id: transactionId,
+              receipt_url: imagePath,
+              payer_type: 'member',
+              payer_id: req.user.userId,
+              payee_type: 'organization',
+              payee_id: event.organizationId || '',
+              reference_type: 'event',
+              reference_id: event_id,
+              organization_id: event.organizationId,
+          }
+      });
+
+      const orgAdmins = await prisma.user.findMany({ 
+        where: { role: 'orgAdmin', organizationId: event.organizationId } 
+      });
+      if (orgAdmins.length > 0) {
+          const notificationsData = orgAdmins.map(admin => ({
+              userId: admin.id,
+              title: `New event payment: Member paid for "${event.title}" via ${payment_method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} (Txn ID: ${transactionId})`
+          }));
+          await prisma.notification.createMany({ data: notificationsData });
+      }
+
+      res.status(201).json({
+          message: 'Event payment receipt uploaded and is pending organization confirmation.',
+          extracted_data: extracted,
+          payment
+      });
+  } catch (error) {
+      console.error('Event OCR Payment Error:', error);
+      res.status(500).json({ message: 'Internal server error processing receipt.', error });
+  }
+};
+
+export const confirmMemberPayment = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const payment = await prisma.payment.findUnique({ where: { id: id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (user?.role !== 'orgAdmin' || user?.organizationId?.toString() !== payment.payee_id) {
+      return res.status(403).json({ message: 'Only the organization admin can confirm this payment.' });
+    }
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'completed' }
+    });
+
+    const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
+    if (member) {
+      await prisma.notification.create({
+        data: {
+          userId: member.id,
+          title: `Your payment of ${payment.amount} ETB for "${payment.reference_id}" has been confirmed by the organization!`
+        }
+      });
+    }
+
+    res.status(200).json({ message: 'Member payment confirmed', payment: updatedPayment });
+  } catch (error) {
+    res.status(500).json({ message: 'Error confirming member payment', error });
+  }
+};
+
+export const rejectMemberPayment = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const payment = await prisma.payment.findUnique({ where: { id: id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (user?.role !== 'orgAdmin' || user?.organizationId?.toString() !== payment.payee_id) {
+      return res.status(403).json({ message: 'Only the organization admin can reject this payment.' });
+    }
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: id },
+      data: { status: 'rejected', rejection_reason: reason || 'Payment rejected by Organization.' }
+    });
+
+    const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
+    if (member) {
+      await prisma.notification.create({
+        data: {
+          userId: member.id,
+          title: `Your payment of ${payment.amount} ETB for "${payment.reference_id}" was rejected. Reason: ${reason || 'Invalid payment details.'}`
+        }
+      });
+    }
+
+    res.status(200).json({ message: 'Member payment rejected', payment: updatedPayment });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rejecting member payment', error });
+  }
+};

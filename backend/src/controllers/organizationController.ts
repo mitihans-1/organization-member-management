@@ -57,3 +57,52 @@ export const listPublicOrganizations = async (_req: Request, res: Response) => {
     res.status(500).json({ message: 'Error fetching organizations', error });
   }
 };
+
+export const getMyOrganization = async (req: any, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+    });
+    
+    if (!user?.organizationId) {
+      return res.status(404).json({ message: 'Organization not found for this user.' });
+    }
+    
+    const org = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+    });
+    
+    res.status(200).json(org);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching organization', error });
+  }
+};
+
+export const updateMyOrganization = async (req: any, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+    });
+    
+    if (!user?.organizationId) {
+      return res.status(404).json({ message: 'Organization not found for this user.' });
+    }
+    
+    if (user.role !== 'orgAdmin') {
+      return res.status(403).json({ message: 'Only org admins can update organization settings.' });
+    }
+
+    const { payment_phone } = req.body;
+    
+    const updatedOrg = await prisma.organization.update({
+      where: { id: user.organizationId },
+      data: {
+        payment_phone,
+      },
+    });
+    
+    res.status(200).json(updatedOrg);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating organization', error });
+  }
+};

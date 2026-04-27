@@ -114,7 +114,7 @@ const MemberLayout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
+      <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col overflow-x-hidden">
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex justify-between lg:justify-end items-center sticky top-0 z-[30]">
           <button 
             onClick={toggleSidebar}

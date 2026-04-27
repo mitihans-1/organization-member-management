@@ -1,5 +1,5 @@
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: 'guest' | 'member' | 'orgAdmin' | 'SuperAdmin';
@@ -11,14 +11,14 @@ export interface User {
   address?: string;
   sex?: string;
   join_date?: string;
-  plan_id?: number;
+  plan_id?: string;
   plan_expiry?: string;
   plan?: Plan;
   customAttributeValues?: MemberAttributeValue[];
 }
 
 export interface CustomAttributeDefinition {
-  id: number;
+  id: string;
   name: string;
   type: 'text' | 'number' | 'date' | 'boolean';
   required: boolean;
@@ -26,15 +26,15 @@ export interface CustomAttributeDefinition {
 }
 
 export interface MemberAttributeValue {
-  id: number;
-  memberId: number;
-  attributeId: number;
+  id: string;
+  memberId: string;
+  attributeId: string;
   value: string;
   attribute?: CustomAttributeDefinition;
 }
 
 export interface Member {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role?: string;
@@ -42,11 +42,11 @@ export interface Member {
   join_date?: string;
   last_active?: string;
   photo?: string;
-  user_id: number;
+  user_id: string;
 }
 
 export interface Plan {
-  id: number;
+  id: string;
   name: string;
   price: number;
   billing_cycle: string;
@@ -56,19 +56,20 @@ export interface Plan {
 }
 
 export interface Payment {
-  id: number;
-  user_id: number;
-  plan_id: number;
+  id: string;
+  user_id: string;
+  plan_id?: string;
   amount: number;
   payment_method: string;
   status: string;
   transaction_id?: string;
+  reference_id?: string;
   createdAt: string;
   plan?: Plan;
 }
 
 export interface Blog {
-  id: number;
+  id: string;
   title: string;
   content: string;
   image?: string;
@@ -76,13 +77,13 @@ export interface Blog {
   category?: string;
   tags?: string;
   readTime?: number;
-  author_id: number;
-  author?: { id: number; name: string; email: string };
+  author_id: string;
+  author?: { id: string; name: string; email: string };
   createdAt: string;
 }
 
 export interface Event {
-  id: number;
+  id: string;
   title: string;
   description: string;
   date: string;

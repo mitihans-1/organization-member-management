@@ -15,43 +15,57 @@ function requireEnv(name: string): string {
 }
 
 async function main() {
-  await prisma.user.updateMany({
-    where: { role: 'organAdmin' },
-    data: { role: 'orgAdmin' },
-  });
+
 
   const superEmail =
     process.env.SEED_SUPERADMIN_EMAIL?.trim() || 'owner@omms.com';
   const superPassword = requireEnv('SEED_SUPERADMIN_PASSWORD');
   const superPasswordHash = await bcrypt.hash(superPassword, 10);
 
-  await prisma.user.upsert({
-    where: { email: superEmail },
-    update: {
-      password: superPasswordHash,
-      role: 'SuperAdmin',
-    },
-    create: {
-      name: 'Platform Owner',
-      email: superEmail,
-      password: superPasswordHash,
-      role: 'SuperAdmin',
-    },
-  });
+  let superUser = await prisma.user.findUnique({ where: { email: superEmail } });
+  if (superUser) {
+    await prisma.user.update({
+      where: { email: superEmail },
+      data: {
+        password: superPasswordHash,
+        role: 'SuperAdmin',
+      },
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        name: 'Platform Owner',
+        email: superEmail,
+        password: superPasswordHash,
+        role: 'SuperAdmin',
+      },
+    });
+  }
   console.log('SuperAdmin ready:', superEmail, '(password from SEED_SUPERADMIN_PASSWORD)');
 
-  const planCount = await prisma.plan.count();
-  if (planCount === 0) {
-    const plans = [
-      { name: 'Basic', price: 10.0, billing_cycle: 'monthly', type: 'Standard', max_members: 10, duration_days: 30 },
-      { name: 'Pro', price: 25.0, billing_cycle: 'monthly', type: 'Premium', max_members: 50, duration_days: 30 },
-      { name: 'Enterprise', price: 100.0, billing_cycle: 'yearly', type: 'Elite', max_members: 500, duration_days: 365 },
-    ];
-    for (const plan of plans) {
-      await prisma.plan.create({ data: plan });
+  /** Default subscription plans for org upgrade / Payments UI (idempotent: creates any that are missing by name). */
+  const defaultPlans = [
+    { name: 'Basic', price: 0, billing_cycle: 'monthly', type: 'Standard', max_members: 10, duration_days: 30 },
+    { name: 'Pro', price: 25, billing_cycle: 'monthly', type: 'Premium', max_members: 50, duration_days: 30 },
+    {
+      name: 'Enterprise',
+      price: 100,
+      billing_cycle: 'yearly',
+      type: 'Elite',
+      max_members: 500,
+      duration_days: 365,
+    },
+  ] as const;
+
+  for (const plan of defaultPlans) {
+    const existing = await prisma.plan.findFirst({ where: { name: plan.name } });
+    if (!existing) {
+      await prisma.plan.create({ data: { ...plan } });
+      console.log('Plan created:', plan.name);
     }
-    console.log('Plans seeded');
   }
+  const planTotal = await prisma.plan.count();
+  console.log('Plans in database:', planTotal, `(${defaultPlans.map((p) => p.name).join(', ')})`);
 
   const demoEmail =
     process.env.SEED_DEMO_ORG_ADMIN_EMAIL?.trim() ||
@@ -68,25 +82,31 @@ async function main() {
     });
   }
 
-  const user = await prisma.user.upsert({
-    where: { email: demoEmail },
-    create: {
-      name: 'Demo Admin',
-      email: demoEmail,
-      password: hashedPassword,
-      role: 'orgAdmin',
-      organizationId: demoOrg.id,
-      organization_name: demoOrg.name,
-      organization_type: demoOrg.type,
-    },
-    update: {
-      password: hashedPassword,
-      organizationId: demoOrg.id,
-      organization_name: demoOrg.name,
-      organization_type: demoOrg.type,
-      role: 'orgAdmin',
-    },
-  });
+  let user = await prisma.user.findUnique({ where: { email: demoEmail } });
+  if (user) {
+    user = await prisma.user.update({
+      where: { email: demoEmail },
+      data: {
+        password: hashedPassword,
+        organizationId: demoOrg.id,
+        organization_name: demoOrg.name,
+        organization_type: demoOrg.type,
+        role: 'orgAdmin',
+      },
+    });
+  } else {
+    user = await prisma.user.create({
+      data: {
+        name: 'Demo Admin',
+        email: demoEmail,
+        password: hashedPassword,
+        role: 'orgAdmin',
+        organizationId: demoOrg.id,
+        organization_name: demoOrg.name,
+        organization_type: demoOrg.type,
+      },
+    });
+  }
 
   const notifCount = await prisma.notification.count({
     where: { userId: user.id }

@@ -20,9 +20,7 @@ const MemberOverview: React.FC = () => {
     <div className="max-w-5xl space-y-8 font-poppins">
       <div className="rounded-2xl bg-sky-600 text-white px-8 py-10 shadow-lg">
         <h1 className="text-2xl font-black">Welcome back, {user?.name}!</h1>
-        <p className="mt-2 text-sky-100 text-sm">
-          Here&apos;s your membership overview for today.
-        </p>
+        <p className="mt-2 text-sky-100 text-sm">Here&apos;s your membership overview for today.</p>
       </div>
 
       {isLoading ? (
@@ -38,9 +36,7 @@ const MemberOverview: React.FC = () => {
             <p className="text-lg font-black text-emerald-600 mt-2">Active</p>
             <p className="text-sm text-slate-600 mt-1">{user?.plan?.name ?? 'Basic'} member</p>
             {user?.plan_expiry && (
-              <p className="text-xs text-slate-400 mt-2">
-                Renews {new Date(user.plan_expiry).toLocaleDateString()}
-              </p>
+              <p className="text-xs text-slate-400 mt-2">Renews {new Date(user.plan_expiry).toLocaleDateString()}</p>
             )}
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
@@ -54,6 +50,9 @@ const MemberOverview: React.FC = () => {
             <p className="text-xs font-bold text-slate-500 uppercase">Outstanding dues</p>
             <p className="text-2xl font-black text-amber-600 mt-2">ETB 0.00</p>
             <p className="text-xs text-slate-500 mt-1">All payments up to date</p>
+            <Link to="/member/payments" className="mt-3 inline-block text-sm font-bold text-sky-600 hover:text-sky-500">
+              Payments →
+            </Link>
           </div>
         </div>
       )}
