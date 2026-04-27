@@ -6,6 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 import OrgAdminPageHeader from '../../components/org-admin/OrgAdminPageHeader';
 import { useNavigate } from 'react-router-dom';
 
+const PAYMENTS_UPGRADE_FLAG = 'omms_payments_open_upgrade';
+const PAYMENTS_UPGRADE_PLAN = 'omms_payments_upgrade_plan_id';
+
 const UpgradePlan: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -17,9 +20,9 @@ const UpgradePlan: React.FC = () => {
   const list = plans?.length
     ? plans
     : [
-        { id: 1, name: 'Basic', price: 0, billing_cycle: 'monthly', max_members: 5 },
-        { id: 2, name: 'Pro', price: 25, billing_cycle: 'monthly', max_members: 500 },
-        { id: 3, name: 'Enterprise', price: 50, billing_cycle: 'yearly', max_members: 5000 },
+        { id: '1', name: 'Basic', price: 0, billing_cycle: 'monthly', max_members: 5 },
+        { id: '2', name: 'Pro', price: 25, billing_cycle: 'monthly', max_members: 500 },
+        { id: '3', name: 'Enterprise', price: 50, billing_cycle: 'yearly', max_members: 5000 },
       ];
 
   const currentName = user?.plan?.name ?? 'Basic';
@@ -82,7 +85,15 @@ const UpgradePlan: React.FC = () => {
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate('/org-admin/payments', { state: { autoOpenUpgrade: true, selectedPlanId: plan.id } })}
+                  onClick={() => {
+                    try {
+                      sessionStorage.setItem(PAYMENTS_UPGRADE_FLAG, '1');
+                      sessionStorage.setItem(PAYMENTS_UPGRADE_PLAN, String(plan.id));
+                    } catch {
+                      /* private mode */
+                    }
+                    navigate('/org-admin/payments');
+                  }}
                   className="mt-8 w-full py-3.5 px-4 rounded-full bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-colors shadow-md text-sm sm:text-base flex items-center justify-center text-center"
                 >
                   {plan.name === 'Enterprise' ? 'Get Enterprise' : plan.name === 'Pro' ? 'Get Pro' : `Get ${plan.name}`}

@@ -20,11 +20,12 @@ export const getBlogs = async (req: Request, res: Response) => {
 export const createBlog = async (req: any, res: Response) => {
   try {
     const { title, content, image, status, category, tags, readTime } = req.body;
+    const finalImage = req.file ? req.file.path : image;
     const blog = await prisma.blog.create({
       data: {
         title,
         content,
-        image,
+        image: finalImage,
         status: status || 'draft',
         category: category || 'general',
         tags: tags || null,
@@ -44,7 +45,8 @@ export const createBlog = async (req: any, res: Response) => {
 export const updateBlog = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, content, image, status, category, tags, readTime } = req.body;
+    const { title, content, status, category, tags, readTime } = req.body;
+    const image = req.file ? req.file.path : req.body.image;
 
     const existingBlog = await prisma.blog.findUnique({
       where: { id: id }

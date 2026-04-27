@@ -23,18 +23,30 @@ function excerpt(text: string, max = 140) {
   return t.slice(0, max).trim() + '…';
 }
 
-function stableViews(id: number) {
-  return 80 + (id * 47) % 420;
+function stableViews(id: string) {
+  let num = 0;
+  if (id) {
+    for (let i = 0; i < id.length; i++) {
+      num += id.charCodeAt(i);
+    }
+  }
+  return 80 + (num * 47) % 420;
 }
 
-function tagForBlog(id: number): { label: string; urgent?: boolean } {
+function tagForBlog(id: string): { label: string; urgent?: boolean } {
   const tags = [
     { label: 'general' },
     { label: 'urgent', urgent: true },
     { label: 'general' },
     { label: 'urgent', urgent: true },
   ];
-  return tags[id % tags.length];
+  let num = 0;
+  if (id) {
+    for (let i = 0; i < id.length; i++) {
+      num += id.charCodeAt(i);
+    }
+  }
+  return tags[num % tags.length];
 }
 
 const PublicBlogs: React.FC = () => {
