@@ -300,31 +300,49 @@ const MemberPayments: React.FC = () => {
                   )}
                   <p className="text-center text-sm font-bold text-slate-800">Supported methods</p>
                   <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-slate-50/80 p-6 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, payment_method: 'telebirr' })}
+                      className={`flex flex-col items-center rounded-2xl border-2 p-6 text-center transition-all hover:shadow-md ${
+                        formData.payment_method === 'telebirr'
+                          ? 'border-indigo-600 bg-indigo-50/50'
+                          : 'border-slate-200 bg-slate-50/80 hover:border-indigo-300'
+                      }`}
+                    >
                       <img src="/asset/telebirr-logo.png" alt="" className="mb-3 h-20 w-20 object-contain" />
                       <span className="text-lg font-black text-slate-900">Telebirr</span>
                       <p className="mt-2 text-xs leading-relaxed text-slate-600">
                         Pay in the Telebirr app, then upload the success screen. We read your transaction details when
                         the image is clear.
                       </p>
-                    </div>
-                    <div className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-slate-50/80 p-6 text-center">
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, payment_method: 'cbe_birr' })}
+                      className={`flex flex-col items-center rounded-2xl border-2 p-6 text-center transition-all hover:shadow-md ${
+                        formData.payment_method === 'cbe_birr'
+                          ? 'border-indigo-600 bg-indigo-50/50'
+                          : 'border-slate-200 bg-slate-50/80 hover:border-indigo-300'
+                      }`}
+                    >
                       <img src="/asset/cbe-logo.png" alt="" className="mb-3 h-20 w-20 object-contain" />
                       <span className="text-lg font-black text-slate-900">CBE Birr</span>
                       <p className="mt-2 text-xs leading-relaxed text-slate-600">
                         Pay with CBE Birr and upload the confirmation screen showing amount and reference.
                       </p>
-                    </div>
-                  </div>
-                  <div className="flex justify-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentIntro(false)}
-                      className="rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-indigo-500"
-                    >
-                      Continue to payment details
                     </button>
                   </div>
+                  {formData.payment_method && (
+                    <div className="flex justify-center pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentIntro(false)}
+                        className="rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-indigo-500"
+                      >
+                        Continue to payment details
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : !detailsConfirmed ? (
                 <div className="max-w-lg mx-auto">
@@ -363,7 +381,6 @@ const MemberPayments: React.FC = () => {
                       disabled={!formData.reason || !formData.amount}
                       onClick={() => {
                         setDetailsConfirmed(true);
-                        setFormData({ ...formData, payment_method: '' });
                       }}
                       className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors mt-6"
                     >
