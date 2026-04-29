@@ -41,73 +41,54 @@ export const register = async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    let user;
-
-    if (role === 'orgAdmin') {
-      if (!organization_name?.trim() || !organization_type?.trim()) {
-        return res.status(400).json({ message: 'Organization name and type are required' });
-      }
-      const org = await prisma.organization.create({
-        data: {
-          name: organization_name.trim(),
-          type: organization_type.trim(),
-        },
-      });
-      user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          role: 'orgAdmin',
-          organizationId: org.id,
-          organization_name: org.name,
-          organization_type: org.type,
-        },
-      });
-    } else {
-      const orgId = organization_id as string | undefined;
-      if (!orgId?.trim()) {
-        return res.status(400).json({ message: 'Please select an organization' });
-      }
-      const org = await prisma.organization.findUnique({ where: { id: orgId.trim() } });
-      if (!org) {
-        return res.status(400).json({ message: 'Organization not found' });
-      }
-      user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          role: 'member',
-          organizationId: org.id,
-          organization_name: org.name,
-          organization_type: org.type,
-          is_verified: false,
-        },
-      });
-    }
-
-    // Generate and store OTP
     const otpCode = generateOtp();
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
-    await prisma.otpToken.create({
-      data: {
-        userId: user.id,
+    // Store in PendingUser instead of User
+    // Using type assertion to bypass temporary Prisma Client generation lock
+    await (prisma as any).pendingUser.upsert({
+      where: { email },
+      update: {
+        name,
+        password: hashedPassword,
+        role,
+        organization_name: organization_name?.trim() || null,
+        organization_type: organization_type?.trim() || null,
+        organization_id: organization_id || null,
         otp_code: hashedOtp,
         expiresAt,
-      }
+      },
+      create: {
+        name,
+        email,
+        password: hashedPassword,
+        role,
+        organization_name: organization_name?.trim() || null,
+        organization_type: organization_type?.trim() || null,
+        organization_id: organization_id || null,
+        otp_code: hashedOtp,
+        expiresAt,
+      },
     });
 
     // Send OTP via Email
-    await sendOtpEmail(user.email, otpCode, user.name);
+    try {
+      await sendOtpEmail(email, otpCode, name);
+    } catch (emailError: any) {
+      console.error('Email Sending Failed during registration:', emailError);
+      // In this flow, we still have the pending user saved, so they can try to resend or log in to verify
+      return res.status(500).json({ 
+        message: 'Registration data saved, but failed to send verification email. Please try to resend the code.', 
+        error: emailError.message,
+        email,
+        requiresOtp: true 
+      });
+    }
 
     res.status(201).json({
-      message: 'User registered. Please verify your email with the OTP sent.',
-      userId: user.id,
-      email: user.email,
+      message: 'Registration initiated. Please verify your email with the OTP sent.',
+      email,
       requiresOtp: true
     });
   } catch (error: any) {
@@ -124,41 +105,76 @@ export const verifyOtp = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email and OTP code are required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Look for the user in PendingUser instead of User
+    const pendingUser = await (prisma as any).pendingUser.findUnique({ where: { email } });
+    
+    if (!pendingUser) {
+      // Check if user is already verified and in User table
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email is already verified. Please log in.' });
+      }
+      return res.status(404).json({ message: 'Registration not found or expired. Please register again.' });
     }
 
-    if (user.is_verified) {
-      return res.status(400).json({ message: 'User is already verified' });
+    if (new Date() > pendingUser.expiresAt) {
+      await (prisma as any).pendingUser.delete({ where: { id: pendingUser.id } });
+      return res.status(400).json({ message: 'OTP has expired. Please register again.' });
     }
 
-    const otpRecord = await prisma.otpToken.findUnique({ where: { userId: user.id } });
-    if (!otpRecord) {
-      return res.status(400).json({ message: 'No OTP found for this user. Please request a new one.' });
-    }
-
-    if (new Date() > otpRecord.expiresAt) {
-      await prisma.otpToken.delete({ where: { id: otpRecord.id } });
-      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
-    }
-
-    const isValid = await bcrypt.compare(otp_code, otpRecord.otp_code);
+    const isValid = await bcrypt.compare(otp_code, pendingUser.otp_code);
     if (!isValid) {
       return res.status(400).json({ message: 'Invalid OTP code.' });
     }
 
-    // Mark user as verified and delete the OTP
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: user.id }, data: { is_verified: true } }),
-      prisma.otpToken.delete({ where: { id: otpRecord.id } })
-    ]);
+    let user;
+
+    // Create User and Organization now that OTP is verified
+    if (pendingUser.role === 'orgAdmin') {
+      const org = await prisma.organization.create({
+        data: {
+          name: pendingUser.organization_name!,
+          type: pendingUser.organization_type!,
+        },
+      });
+      user = await prisma.user.create({
+        data: {
+          name: pendingUser.name,
+          email: pendingUser.email,
+          password: pendingUser.password,
+          role: 'orgAdmin',
+          organizationId: org.id,
+          organization_name: org.name,
+          organization_type: org.type,
+          is_verified: true,
+        },
+      });
+    } else {
+      const org = await prisma.organization.findUnique({ where: { id: pendingUser.organization_id! } });
+      if (!org) {
+        return res.status(400).json({ message: 'Target organization no longer exists. Please register again.' });
+      }
+      user = await prisma.user.create({
+        data: {
+          name: pendingUser.name,
+          email: pendingUser.email,
+          password: pendingUser.password,
+          role: 'member',
+          organizationId: org.id,
+          organization_name: org.name,
+          organization_type: org.type,
+          is_verified: true,
+        },
+      });
+    }
+    // Delete the pending user record
+    await (prisma as any).pendingUser.delete({ where: { id: pendingUser.id } });
 
     // Log the user in
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({
-      message: 'Email verified successfully',
+      message: 'Email verified and account created successfully',
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role }
     });
@@ -175,27 +191,27 @@ export const resendOtp = async (req: Request, res: Response) => {
 
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.is_verified) return res.status(400).json({ message: 'User is already verified' });
-
-    // Delete any existing OTP
-    await prisma.otpToken.deleteMany({ where: { userId: user.id } });
+    const pendingUser = await (prisma as any).pendingUser.findUnique({ where: { email } });
+    if (!pendingUser) {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) return res.status(400).json({ message: 'User is already verified' });
+      return res.status(404).json({ message: 'Registration not found. Please register again.' });
+    }
 
     // Generate new OTP
     const otpCode = generateOtp();
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
-    await prisma.otpToken.create({
+    await (prisma as any).pendingUser.update({
+      where: { id: pendingUser.id },
       data: {
-        userId: user.id,
         otp_code: hashedOtp,
         expiresAt,
       }
     });
 
-    await sendOtpEmail(user.email, otpCode, user.name);
+    await sendOtpEmail(pendingUser.email, otpCode, pendingUser.name);
 
     res.status(200).json({ message: 'A new OTP has been sent to your email.' });
   } catch (error: any) {
@@ -210,6 +226,15 @@ export const login = async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      // Check if it's a pending registration
+      const pendingUser = await (prisma as any).pendingUser.findUnique({ where: { email } });
+      if (pendingUser) {
+        return res.status(403).json({ 
+          message: 'Your registration is pending verification. Please verify your email with the OTP sent.', 
+          requiresOtp: true, 
+          email: pendingUser.email 
+        });
+      }
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
@@ -218,6 +243,8 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    // Since in the new flow, User is only created after verification,
+    // this check might be redundant but keeping it for safety/consistency.
     if (!user.is_verified) {
       return res.status(403).json({ message: 'Please verify your email address before logging in.', requiresOtp: true, email: user.email });
     }

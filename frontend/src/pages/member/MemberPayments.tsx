@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import { Payment } from '../../types';
-import { CreditCard, UploadCloud, Plus, X, ArrowLeft, Smartphone } from 'lucide-react';
+import { Payment, Event } from '../../types';
+import { CreditCard, UploadCloud, Plus, X, ArrowLeft, Smartphone, ChevronDown, Check } from 'lucide-react';
 import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const MemberPayments: React.FC = () => {
@@ -12,6 +12,7 @@ const MemberPayments: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string>('other');
   const [formData, setFormData] = useState<{
     reason: string;
     amount: string;
@@ -43,6 +44,13 @@ const MemberPayments: React.FC = () => {
     queryFn: () => api.get('/organizations/me').then((r) => r.data),
   });
 
+  const { data: events } = useQuery<Event[]>({
+    queryKey: ['events'],
+    queryFn: () => api.get('/events').then((r) => r.data),
+  });
+
+  const paidEvents = events?.filter(e => e.payment_required && e.price && e.price > 0) || [];
+
   const memberPaymentMutation = useMutation({
     mutationFn: async (data: FormData) => {
       const res = await api.post('/payments/member-to-org/upload-receipt', data, {
@@ -71,6 +79,7 @@ const MemberPayments: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setShowPaymentIntro(false);
+    setSelectedEventId('other');
     setFormData({ reason: '', amount: '', payment_method: '', manual_transaction_id: '' });
     setReceiptFile(null);
     setPaymentError(null);
@@ -80,6 +89,7 @@ const MemberPayments: React.FC = () => {
   };
 
   const openFreshPaymentModal = useCallback(() => {
+    setSelectedEventId('other');
     setFormData({ reason: '', amount: '', payment_method: '', manual_transaction_id: '' });
     setReceiptFile(null);
     setPaymentError(null);
@@ -348,21 +358,56 @@ const MemberPayments: React.FC = () => {
                 <div className="max-w-lg mx-auto">
                   <p className="mb-8 text-gray-600 text-center text-sm leading-relaxed">
                     Tell your organization what this payment is for and how much you sent. You will choose Telebirr or
-                    CBE Birr next, then upload the confirmation screenshot — the same automated receipt check your org
-                    uses for plan payments will read your transaction ID and amount when possible.
+                    CBE Birr next, then upload the confirmation screenshot.
                   </p>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">Payment reason</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.reason}
-                        onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
-                        placeholder="e.g. Monthly dues, donation, event fee"
-                      />
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">What are you paying for?</label>
+                      <div className="space-y-3">
+                        <select
+                          value={selectedEventId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedEventId(val);
+                            if (val === 'other') {
+                              setFormData({ ...formData, reason: '', amount: '' });
+                            } else {
+                              const ev = paidEvents.find((event) => event.id === val);
+                              if (ev) {
+                                setFormData({
+                                  ...formData,
+                                  reason: `Event: ${ev.title}`,
+                                  amount: String(ev.price || ''),
+                                });
+                              }
+                            }
+                          }}
+                          className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none bg-white pr-10"
+                        >
+                          <option value="other">Other reason (Type below)</option>
+                          {paidEvents.map((ev) => (
+                            <option key={ev.id} value={ev.id}>
+                              {ev.title} — {ev.price} ETB
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
+
+                    {selectedEventId === 'other' && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Payment reason</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.reason}
+                          onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                          className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                          placeholder="e.g. Monthly dues, donation, fee"
+                        />
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">Amount (ETB)</label>
                       <input
@@ -371,10 +416,18 @@ const MemberPayments: React.FC = () => {
                         min="1"
                         step="0.01"
                         value={formData.amount}
+                        readOnly={selectedEventId !== 'other'}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                        className={`w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all ${
+                          selectedEventId !== 'other' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''
+                        }`}
                         placeholder="Enter amount"
                       />
+                      {selectedEventId !== 'other' && (
+                        <p className="mt-1 text-[10px] text-gray-400">
+                          Amount is fixed for the selected event.
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"

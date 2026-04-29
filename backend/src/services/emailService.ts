@@ -2,14 +2,13 @@ import nodemailer from 'nodemailer';
 
 export const sendOtpEmail = async (to: string, otpCode: string, name: string) => {
   try {
-    // Note: For MVP/development, if no SMTP credentials are provided in .env,
-    // we dynamically create a fake Ethereal account for testing.
     let transporter;
     
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
@@ -21,10 +20,10 @@ export const sendOtpEmail = async (to: string, otpCode: string, name: string) =>
       transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
-        secure: false, // true for 465, false for other ports
+        secure: false,
         auth: {
-          user: testAccount.user, // generated ethereal user
-          pass: testAccount.pass, // generated ethereal password
+          user: testAccount.user,
+          pass: testAccount.pass,
         },
       });
     }
@@ -48,16 +47,20 @@ export const sendOtpEmail = async (to: string, otpCode: string, name: string) =>
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('OTP Email sent: %s', info.messageId);
+    console.log('OTP Email successfully sent to %s: %s', to, info.messageId);
     
-    // Always print the Ethereal URL if we aren't using real credentials
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
     }
+    return info;
   } catch (error) {
-    console.error('Error sending OTP email:', error);
-    // Depending on your setup, you might want to throw the error to handle it in the controller
-    // throw new Error('Could not send OTP email');
+    console.error('CRITICAL: Failed to send OTP email to %s:', to, error);
+    console.log('-----------------------------------------');
+    console.log('FALLBACK OTP FOR TESTING:');
+    console.log(`EMAIL: ${to}`);
+    console.log(`OTP CODE: ${otpCode}`);
+    console.log('-----------------------------------------');
+    throw error; // Re-throw so registration can fail if email fails
   }
 };
 
@@ -66,13 +69,25 @@ export const sendResetPasswordEmail = async (to: string, token: string, name: st
     let transporter;
     
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
+      const isGmail = process.env.SMTP_HOST?.includes('gmail');
+      
+      transporter = nodemailer.createTransport(isGmail ? {
+        service: 'gmail',
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
         },
+      } : {
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_PORT === '465',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
       });
     } else {
       const testAccount = await nodemailer.createTestAccount();
@@ -110,12 +125,14 @@ export const sendResetPasswordEmail = async (to: string, token: string, name: st
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Password Reset Email sent: %s', info.messageId);
+    console.log('Password Reset Email successfully sent to %s: %s', to, info.messageId);
     
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
     }
+    return info;
   } catch (error) {
-    console.error('Error sending Password Reset email:', error);
+    console.error('CRITICAL: Failed to send Password Reset email to %s:', to, error);
+    throw error;
   }
 };

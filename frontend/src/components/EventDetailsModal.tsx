@@ -15,6 +15,7 @@ import {
 import { Event } from '../types';
 import CoverImage from './CoverImage';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface EventDetailsModalProps {
   event: Event;
@@ -58,11 +59,24 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   onClose,
   showRegisterActions = true,
 }) => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | null>(null);
   const [manualTxnId, setManualTxnId] = useState('');
+
+  const registerMutation = useMutation({
+    mutationFn: (eventId: string) => api.post(`/events/${eventId}/register`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      alert('Successfully registered for the event!');
+      onClose();
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error registering for event');
+    }
+  });
 
   const eventPaymentMutation = useMutation({
     mutationFn: (data: { eventId: string; method: string; transactionId: string }) =>
@@ -83,7 +97,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     }
   });
 
-  const isPaymentRequired = (event as any).payment_required && (event as any).price !== undefined && (event as any).price !== null;
+  const isPaymentRequired = !!(event.payment_required && event.price && event.price > 0);
 
   const handleEventPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,16 +204,21 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
             !isPaymentRequired ? (
             <button
               type="button"
+              disabled={registerMutation.isPending}
               onClick={() => {
-                if (event.organizationId) {
-                  navigate(`/register?org=${event.organizationId}`);
+                if (user) {
+                  registerMutation.mutate(event.id);
                 } else {
-                  navigate(`/register`);
+                  if (event.organizationId) {
+                    navigate(`/register?org=${event.organizationId}`);
+                  } else {
+                    navigate(`/register`);
+                  }
                 }
               }}
-              className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none"
+              className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none disabled:opacity-50"
             >
-              Register for this Event
+              {registerMutation.isPending ? 'Registering...' : 'Register for this Event'}
             </button>
             ) : !showPaymentForm ? (
             <button

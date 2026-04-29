@@ -99,4 +99,5 @@ export interface Event {
   _count?: { attendees: number };
   price?: number;
   payment_required?: boolean;
+  attendeesIds?: string[];
 }
