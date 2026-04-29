@@ -9,6 +9,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model PendingUser {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  email             String   @unique
+  password          String
+  role              String
+  organization_name String?
+  organization_type String?
+  organization_id   String?
+  otp_code          String
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@map("pending_users")
+}
+
 model Organization {
   id               String                      @id @default(auto()) @map("_id") @db.ObjectId
   name             String

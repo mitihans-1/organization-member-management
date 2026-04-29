@@ -1,22 +1,45 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { Event } from '../../types';
-import { Calendar, MapPin, Users, List, LayoutGrid, Download } from 'lucide-react';
+import { Calendar, MapPin, Users, List, LayoutGrid, Download, CreditCard, CheckCircle } from 'lucide-react';
+import EventDetailsModal from '../../components/EventDetailsModal';
+import { useAuth } from '../../context/AuthContext';
 
 type RSVP = 'yes' | 'maybe' | 'no' | null;
 
 const FILTERS = ['All', 'Meeting', 'Volunteer', 'Fundraiser', 'Training'] as const;
 
 const MemberEvents: React.FC = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const [rsvp, setRsvp] = useState<Record<string, RSVP>>({});
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
-  const { data: events, isLoading } = useQuery<Event[]>({
+  const registerMutation = useMutation({
+    mutationFn: (eventId: string) => api.post(`/events/${eventId}/register`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      alert('Successfully registered for the event!');
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Error registering for event');
+    }
+  });
+
+  const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['events'],
     queryFn: () => api.get('/events').then((r) => r.data),
   });
+
+  const { data: userPayments, isLoading: paymentsLoading } = useQuery<any[]>({
+    queryKey: ['my-payments'],
+    queryFn: () => api.get('/payments').then((r) => r.data),
+  });
+
+  const isLoading = eventsLoading || paymentsLoading;
 
   const filtered = useMemo(() => {
     if (!events?.length) return [];
@@ -35,9 +58,11 @@ const MemberEvents: React.FC = () => {
   };
 
   const downloadTicket = (ev: Event) => {
-    const current = rsvp[ev.id] ?? null;
-    if (current !== 'yes') {
-      alert('Please RSVP "yes" before downloading a ticket.');
+    const isRegistered = !!(user && ev.attendeesIds?.includes(user.id));
+    const currentStatus = isRegistered ? 'yes' : (rsvp[ev.id] ?? null);
+    
+    if (currentStatus !== 'yes') {
+      alert('Please register or RSVP "yes" before downloading a ticket.');
       return;
     }
 
@@ -48,7 +73,7 @@ const MemberEvents: React.FC = () => {
       `Title: ${ev.title}`,
       `Date: ${ev.date ? new Date(ev.date).toLocaleString() : '—'}`,
       `Location: ${ev.location || 'TBA'}`,
-      `RSVP: YES`,
+      `Status: REGISTERED`,
       '',
       'Please present this ticket at check-in.',
     ].join('\n');
@@ -129,17 +154,51 @@ const MemberEvents: React.FC = () => {
       ) : (
         <ul className="space-y-4">
           {filtered.map((ev) => {
-            const status = rsvp[ev.id] ?? null;
+            const isRegistered = !!(user && ev.attendeesIds?.includes(user.id));
+            const pendingPayment = userPayments?.find(
+              (p) => p.reference_type === 'event' && p.reference_id === ev.id && p.status === 'pending'
+            );
+            const status = isRegistered ? 'yes' : (rsvp[ev.id] ?? null);
+            const isPaymentRequired = !!(ev.payment_required && ev.price && ev.price > 0);
+
             return (
               <li
                 key={ev.id}
-                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4"
+                className={`bg-white border rounded-xl p-6 shadow-sm space-y-4 transition-all relative overflow-hidden ${
+                  isRegistered ? 'border-emerald-200 bg-emerald-50/10' : 'border-slate-200'
+                }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <h2 className="text-lg font-black text-slate-900 break-words">{ev.title}</h2>
-                  <span className="text-xs font-bold px-2 py-1 rounded-full bg-sky-50 text-sky-700 shrink-0">
-                    Event
-                  </span>
+                {/* Top Right corner badge */}
+                <div className="absolute top-0 right-0">
+                  {isPaymentRequired ? (
+                    <div className="bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-wider shadow-sm">
+                      Paid
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-wider shadow-sm">
+                      Free
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 pr-12">
+                  <div className="space-y-1">
+                    <h2 
+                      className="text-lg font-black text-slate-900 break-words cursor-pointer hover:text-sky-600 transition-colors flex items-center gap-2"
+                      onClick={() => setSelectedEvent(ev)}
+                    >
+                      {ev.title}
+                      {isRegistered && <CheckCircle size={18} className="text-emerald-500" />}
+                    </h2>
+                    {isRegistered ? (
+                      <p className="text-xs font-bold text-emerald-600">You are registered for this event</p>
+                    ) : pendingPayment ? (
+                      <p className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        Payment pending verification...
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-2 text-sm text-slate-600">
                   <span className="flex items-center gap-2">
@@ -150,12 +209,18 @@ const MemberEvents: React.FC = () => {
                     <MapPin size={16} className="text-slate-400" />
                     {ev.location || 'TBA'}
                   </span>
-                  <span className="flex items-center gap-2 sm:col-span-2">
+                  <span className="flex items-center gap-2">
                     <Users size={16} className="text-slate-400" />
                     Open to members
                   </span>
+                  {isPaymentRequired && (
+                    <span className="flex items-center gap-2 font-bold text-slate-900">
+                      <CreditCard size={16} className="text-slate-400" />
+                      ETB {Number(ev.price).toFixed(2)}
+                    </span>
+                  )}
                 </div>
-                {ev.description && <p className="text-sm text-slate-700">{ev.description}</p>}
+                {ev.description && <p className="text-sm text-slate-700 line-clamp-2">{ev.description}</p>}
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-2 border-t border-slate-100">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-slate-500">RSVP:</span>
@@ -163,7 +228,20 @@ const MemberEvents: React.FC = () => {
                       <button
                         key={k}
                         type="button"
-                        onClick={() => handleRsvp(ev.id, k)}
+                        disabled={isRegistered || !!pendingPayment || registerMutation.isPending}
+                        onClick={() => {
+                          if (k === 'yes') {
+                            if (isPaymentRequired) {
+                              // FOR PAID EVENTS: Always redirect to modal/payment flow
+                              setSelectedEvent(ev);
+                            } else {
+                              // FOR FREE EVENTS: Direct registration
+                              registerMutation.mutate(ev.id);
+                            }
+                          } else {
+                            handleRsvp(ev.id, k);
+                          }
+                        }}
                         className={`px-3 py-2 rounded-lg text-xs font-bold capitalize min-w-[56px] ${
                           status === k
                             ? k === 'yes'
@@ -172,9 +250,11 @@ const MemberEvents: React.FC = () => {
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-red-100 text-red-800'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
+                        } ${(isRegistered || !!pendingPayment) ? 'opacity-70 cursor-not-allowed' : ''}`}
                       >
-                        {k}
+                        {k === 'yes' ? (
+                          isRegistered ? 'Paid' : (pendingPayment ? 'Pending' : (isPaymentRequired ? 'Pay & RSVP' : 'Register'))
+                        ) : k}
                       </button>
                     ))}
                     {status && (
@@ -197,6 +277,15 @@ const MemberEvents: React.FC = () => {
             );
           })}
         </ul>
+      )}
+
+      {selectedEvent && (
+        <EventDetailsModal
+          event={selectedEvent}
+          events={events}
+          onClose={() => setSelectedEvent(null)}
+          showRegisterActions={true}
+        />
       )}
     </div>
   );

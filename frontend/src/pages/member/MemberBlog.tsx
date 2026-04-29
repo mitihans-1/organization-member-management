@@ -5,9 +5,11 @@ import api from '../../services/api';
 import { Blog } from '../../types';
 import CoverImage from '../../components/CoverImage';
 import { Search, ExternalLink } from 'lucide-react';
+import BlogDetailsModal from '../../components/BlogDetailsModal';
 
 const MemberBlog: React.FC = () => {
   const [q, setQ] = useState('');
+  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
     queryKey: ['blogs'],
@@ -62,19 +64,22 @@ const MemberBlog: React.FC = () => {
           {filtered.map((b, index) => (
             <li
               key={b.id}
-              className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col sm:flex-row"
+              onClick={() => setSelectedBlog(b)}
+              className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col sm:flex-row cursor-pointer hover:border-sky-300 hover:shadow-md transition-all group"
             >
-              <div className="relative sm:w-40 h-36 sm:h-auto shrink-0 bg-slate-100">
+              <div className="relative sm:w-40 h-36 sm:h-auto shrink-0 bg-slate-100 overflow-hidden">
                 <CoverImage
                   stored={b.image}
                   slotIndex={index}
                   variant="blog"
                   alt=""
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
               <div className="p-5 flex-1 min-w-0">
-                <h2 className="font-black text-slate-900">{b.title}</h2>
+                <h2 className="font-black text-slate-900 group-hover:text-sky-600 transition-colors">
+                  {b.title}
+                </h2>
                 <p className="text-xs text-slate-400 mt-1">
                   {b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}
                 </p>
@@ -86,6 +91,14 @@ const MemberBlog: React.FC = () => {
             </li>
           ))}
         </ul>
+      )}
+
+      {selectedBlog && (
+        <BlogDetailsModal
+          blog={selectedBlog}
+          blogs={blogs}
+          onClose={() => setSelectedBlog(null)}
+        />
       )}
     </div>
   );
