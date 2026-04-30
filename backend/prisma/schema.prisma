@@ -81,6 +81,34 @@ model User {
   @@map("users")
 }
 
+model SystemConfig {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  platformName     String   @default("OMMS")
+  supportEmail     String   @default("support@omms.com")
+  maintenanceMode  Boolean  @default(false)
+  telebirrPhone    String?
+  cbeBirrPhone     String?
+  paymentInstructions String?
+  
+  // Contact Info for Home Page
+  contactPhone     String?  @default("+251 911 234 567")
+  contactAddress   String?  @default("Addis Ababa, Ethiopia")
+  contactEmail     String?  @default("info@omms.com")
+  contactHours     String?  @default("Mon - Fri: 8:00 AM - 5:00 PM")
+  
+  // Live Chat Config
+  showLiveChat     Boolean  @default(false)
+  liveChatUrl      String?  @default("")
+  
+  facebookUrl      String?
+  telegramUrl      String?
+  linkedinUrl      String?
+
+  updatedAt        DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
 model CustomAttributeDefinition {
   id             String                 @id @default(auto()) @map("_id") @db.ObjectId
   name           String

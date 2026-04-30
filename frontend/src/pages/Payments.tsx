@@ -650,11 +650,18 @@ const Payments: React.FC = () => {
                       <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
                         Please transfer the exact amount to the platform account: <br/>
                         <strong className="text-xl tracking-wider text-amber-900 mt-2 block">
-                          {config?.telebirrPhone || '+251 912 345 678'}
+                          {paymentMethod === 'telebirr' 
+                            ? (config?.telebirrPhone || '+251 912 345 678')
+                            : (config?.cbeBirrPhone || '+251 987 654 321')}
                         </strong>
                       </p>
+                      {config?.paymentInstructions && (
+                        <p className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800 italic">
+                          "{config.paymentInstructions}"
+                        </p>
+                      )}
                       <p className="mb-6 text-gray-600 text-sm text-center">
-                        Enter the transaction ID from your bank transfer receipt below.
+                        Enter the transaction ID from your Telebirr or CBE Birr receipt below.
                       </p>
                       <form onSubmit={handleOrgPlanPayment} className="space-y-6">
                          <div>
@@ -694,9 +701,16 @@ const Payments: React.FC = () => {
                       <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
                         Please transfer the exact amount using {paymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to: <br/>
                         <strong className="text-xl tracking-wider text-amber-900 mt-2 block">
-                          {config?.telebirrPhone || '+251 912 345 678'}
+                          {paymentMethod === 'telebirr' 
+                            ? (config?.telebirrPhone || '+251 912 345 678')
+                            : (config?.cbeBirrPhone || '+251 987 654 321')}
                         </strong>
                       </p>
+                      {config?.paymentInstructions && (
+                        <p className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800 italic">
+                          "{config.paymentInstructions}"
+                        </p>
+                      )}
                       <ul className="mb-6 text-gray-600 text-sm list-disc list-inside space-y-1">
                         <li>Use the same method you selected above so automated checks can read your receipt.</li>
                         <li>Upload a clear screenshot of the success or confirmation screen (not your home screen).</li>

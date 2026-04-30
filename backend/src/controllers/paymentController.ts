@@ -350,7 +350,7 @@ export const createOrgPlanPayment = async (req: any, res: Response) => {
     }
 
     if (!manual_transaction_id) {
-      return res.status(400).json({ message: 'Transaction ID is required for bank-based payments.' });
+      return res.status(400).json({ message: 'Transaction ID is required for Telebirr or CBE Birr payments.' });
     }
 
     const existingPayment = await prisma.payment.findFirst({
@@ -368,7 +368,7 @@ export const createOrgPlanPayment = async (req: any, res: Response) => {
         plan_id: plan.id,
         user_id: req.user.userId,
         amount: plan.price,
-        payment_method: payment_method || 'bank_transfer',
+        payment_method: payment_method || 'manual_payment',
         status: 'pending',
         transaction_id: manual_transaction_id,
         payer_type: 'organization',
@@ -385,7 +385,7 @@ export const createOrgPlanPayment = async (req: any, res: Response) => {
     if (superAdmins.length > 0) {
       const notificationsData = superAdmins.map(admin => ({
         userId: admin.id,
-        title: `New org subscription payment: ${user.organization?.name || 'Unknown'} paid ${plan.price} ETB via ${payment_method || 'bank_transfer'} (Txn: ${manual_transaction_id})`
+        title: `New org subscription payment: ${user.organization?.name || 'Unknown'} paid ${plan.price} ETB via ${payment_method || 'Telebirr/CBE Birr'} (Txn: ${manual_transaction_id})`
       }));
       await prisma.notification.createMany({ data: notificationsData });
     }
@@ -444,7 +444,7 @@ export const createEventPayment = async (req: any, res: Response) => {
         plan_id: '',
         user_id: req.user.userId,
         amount: event.price,
-        payment_method: payment_method || 'bank_transfer',
+        payment_method: payment_method || 'manual_payment',
         status: 'pending',
         transaction_id: manual_transaction_id,
         payer_type: 'member',
@@ -467,7 +467,7 @@ export const createEventPayment = async (req: any, res: Response) => {
     if (orgAdmins.length > 0) {
       const notificationsData = orgAdmins.map(admin => ({
         userId: admin.id,
-        title: `New event payment: Member paid ${event.price} ETB for "${event.title}" via ${payment_method || 'bank_transfer'} (Txn: ${manual_transaction_id})`
+        title: `New event payment: Member paid ${event.price} ETB for "${event.title}" via ${payment_method || 'Telebirr/CBE Birr'} (Txn: ${manual_transaction_id})`
       }));
       await prisma.notification.createMany({ data: notificationsData });
     }

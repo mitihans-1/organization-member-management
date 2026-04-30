@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Search, MoreVertical, X, AlertTriangle } from 'lucide-react';
+import { Search, MoreVertical, X, AlertTriangle, Settings } from 'lucide-react';
 import useBodyScrollLock from '../../hooks/useBodyScrollLock';
+import SystemConfigPage from './SystemConfig';
 
 const SuperAdminPayments: React.FC = () => {
   const { data: payments, isLoading } = useQuery({
@@ -15,7 +16,7 @@ const SuperAdminPayments: React.FC = () => {
     queryFn: () => api.get('/payments/org/all').then((r) => r.data),
   });
 
-  const [activeTab, setActiveTab] = useState<'transactions' | 'orgPayments' | 'invoices'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'orgPayments' | 'invoices' | 'settings'>('transactions');
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<any | null>(null);
   
@@ -160,129 +161,149 @@ const SuperAdminPayments: React.FC = () => {
         >
           Invoices &amp; Receipts
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('settings')}
+          className={`px-4 py-2 text-sm font-bold border-b-2 ${
+            activeTab === 'settings'
+              ? 'text-sky-600 border-sky-600'
+              : 'text-slate-500 border-transparent'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Settings size={16} />
+            Payment Settings
+          </div>
+        </button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-        <input
-          placeholder="Search…"
-          className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
+      {activeTab === 'settings' ? (
+        <SystemConfigPage />
+      ) : (
+        <>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              placeholder="Search…"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              {activeTab === 'transactions' ? (
-                <>
-                  <th className="text-left p-3 font-bold text-slate-600">Plan</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Amount</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Billing</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Member</th>
-                </>
-              ) : activeTab === 'orgPayments' ? (
-                <>
-                  <th className="text-left p-3 font-bold text-slate-600">Organization</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Plan</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Amount</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Method</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Status</th>
-                </>
-              ) : (
-                <>
-                  <th className="text-left p-3 font-bold text-slate-600">Invoice</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Member</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Amount</th>
-                  <th className="text-left p-3 font-bold text-slate-600">Method</th>
-                </>
-              )}
-              <th className="w-10 p-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-500">
-                  Loading…
-                </td>
-              </tr>
-            ) : !filtered?.length ? (
-              <tr>
-                <td colSpan={activeTab === 'orgPayments' ? 5 : 5} className="p-8 text-center text-slate-500">
-                  No payments yet
-                </td>
-              </tr>
-            ) : activeTab === 'orgPayments' ? (
-              orgPayments?.map((p: any) => (
-                <tr key={p.id} className="border-t border-slate-100">
-                  <td className="p-3 font-medium">{p.user?.organization_name || p.payer_id || '—'}</td>
-                  <td className="p-3 text-slate-600">{p.plan?.name ?? '—'}</td>
-                  <td className="p-3">${p.amount ?? 0}</td>
-                  <td className="p-3 text-slate-600">{p.payment_method ?? '—'}</td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                      p.status === 'pending' ? 'bg-amber-50 text-amber-800'
-                      : p.status === 'rejected' ? 'bg-red-50 text-red-800'
-                      : 'bg-emerald-50 text-emerald-800'}`}>
-                      {p.status}
-                    </span>
-                    {p.status === 'pending' && (
-                      <div className="flex gap-2 mt-1">
-                        <button
-                          onClick={() => confirmOrgPaymentMutation.mutate(p.id)}
-                          disabled={confirmOrgPaymentMutation.isPending}
-                          className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => setActionModal({ type: 'reject', paymentId: p.id })}
-                          className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              filtered.map((p: any) => (
-                <tr key={p.id} className="border-t border-slate-100">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
                   {activeTab === 'transactions' ? (
                     <>
-                      <td className="p-3 font-medium">{p.plan?.name ?? '—'}</td>
-                      <td className="p-3">${p.amount ?? 0}</td>
-                      <td className="p-3 text-slate-600">{p.plan?.billing_cycle ?? '—'}</td>
-                      <td className="p-3 text-slate-600">{p.user?.name ?? p.user_id ?? '—'}</td>
+                      <th className="text-left p-3 font-bold text-slate-600">Plan</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Amount</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Billing</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Member</th>
+                    </>
+                  ) : activeTab === 'orgPayments' ? (
+                    <>
+                      <th className="text-left p-3 font-bold text-slate-600">Organization</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Plan</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Amount</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Method</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Status</th>
                     </>
                   ) : (
                     <>
-                      <td className="p-3 font-medium">{p.transaction_id ?? '—'}</td>
-                      <td className="p-3 text-slate-600">{p.user?.name ?? p.user_id ?? '—'}</td>
-                      <td className="p-3">${p.amount ?? 0}</td>
-                      <td className="p-3 text-slate-600">{p.payment_method ?? '—'}</td>
+                      <th className="text-left p-3 font-bold text-slate-600">Invoice</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Member</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Amount</th>
+                      <th className="text-left p-3 font-bold text-slate-600">Method</th>
                     </>
                   )}
-                  <td className="p-3">
-                    <button
-                      type="button"
-                      className="p-1 text-slate-400 hover:text-slate-600"
-                      aria-label="Payment actions"
-                      onClick={() => setSelected(p)}
-                    >
-                      <MoreVertical size={18} />
-                    </button>
-                  </td>
+                  <th className="w-10 p-3" />
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-slate-500">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : !filtered?.length ? (
+                  <tr>
+                    <td colSpan={activeTab === 'orgPayments' ? 5 : 5} className="p-8 text-center text-slate-500">
+                      No payments yet
+                    </td>
+                  </tr>
+                ) : activeTab === 'orgPayments' ? (
+                  orgPayments?.map((p: any) => (
+                    <tr key={p.id} className="border-t border-slate-100">
+                      <td className="p-3 font-medium">{p.user?.organization_name || p.payer_id || '—'}</td>
+                      <td className="p-3 text-slate-600">{p.plan?.name ?? '—'}</td>
+                      <td className="p-3">${p.amount ?? 0}</td>
+                      <td className="p-3 text-slate-600">{p.payment_method ?? '—'}</td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          p.status === 'pending' ? 'bg-amber-50 text-amber-800'
+                          : p.status === 'rejected' ? 'bg-red-50 text-red-800'
+                          : 'bg-emerald-50 text-emerald-800'}`}>
+                          {p.status}
+                        </span>
+                        {p.status === 'pending' && (
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              onClick={() => confirmOrgPaymentMutation.mutate(p.id)}
+                              disabled={confirmOrgPaymentMutation.isPending}
+                              className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setActionModal({ type: 'reject', paymentId: p.id })}
+                              className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  filtered.map((p: any) => (
+                    <tr key={p.id} className="border-t border-slate-100">
+                      {activeTab === 'transactions' ? (
+                        <>
+                          <td className="p-3 font-medium">{p.plan?.name ?? '—'}</td>
+                          <td className="p-3">${p.amount ?? 0}</td>
+                          <td className="p-3 text-slate-600">{p.plan?.billing_cycle ?? '—'}</td>
+                          <td className="p-3 text-slate-600">{p.user?.name ?? p.user_id ?? '—'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-3 font-medium">{p.transaction_id ?? '—'}</td>
+                          <td className="p-3 text-slate-600">{p.user?.name ?? p.user_id ?? '—'}</td>
+                          <td className="p-3">${p.amount ?? 0}</td>
+                          <td className="p-3 text-slate-600">{p.payment_method ?? '—'}</td>
+                        </>
+                      )}
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          className="p-1 text-slate-400 hover:text-slate-600"
+                          aria-label="Payment actions"
+                          onClick={() => setSelected(p)}
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {selected ? (
         <div

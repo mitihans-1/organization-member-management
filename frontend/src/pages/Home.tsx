@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import GuestNavbar from '../components/GuestNavbar';
 import GuestFooter from '../components/GuestFooter';
+import LiveChatWidget from '../components/LiveChatWidget';
 
 const forest = '#3d5a2b';
 const forestHover = '#4f772d';
@@ -429,6 +430,7 @@ const Home: React.FC = () => {
       </section>
 
       <GuestFooter />
+      <LiveChatWidget />
     </div>
   );
 };

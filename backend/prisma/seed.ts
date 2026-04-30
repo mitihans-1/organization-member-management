@@ -29,6 +29,7 @@ async function main() {
       data: {
         password: superPasswordHash,
         role: 'SuperAdmin',
+        is_verified: true,
       },
     });
   } else {
@@ -38,6 +39,7 @@ async function main() {
         email: superEmail,
         password: superPasswordHash,
         role: 'SuperAdmin',
+        is_verified: true,
       },
     });
   }
@@ -92,6 +94,7 @@ async function main() {
         organization_name: demoOrg.name,
         organization_type: demoOrg.type,
         role: 'orgAdmin',
+        is_verified: true,
       },
     });
   } else {
@@ -104,6 +107,7 @@ async function main() {
         organizationId: demoOrg.id,
         organization_name: demoOrg.name,
         organization_type: demoOrg.type,
+        is_verified: true,
       },
     });
   }
