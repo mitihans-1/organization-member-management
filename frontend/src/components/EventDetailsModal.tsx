@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +12,7 @@ import {
   Link as LinkIcon,
   Tag,
   CreditCard,
+  ArrowLeft,
 } from 'lucide-react';
 import { Event } from '../types';
 import CoverImage from './CoverImage';
@@ -63,7 +65,8 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | null>(null);
+  const [paymentMode, setPaymentMode] = useState<'direct' | 'manual' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | 'ebirr' | 'chapa' | null>(null);
   const [manualTxnId, setManualTxnId] = useState('');
 
   const registerMutation = useMutation({
@@ -75,6 +78,21 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     },
     onError: (error: any) => {
       alert(error.response?.data?.message || 'Error registering for event');
+    }
+  });
+
+  const chapaMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      const res = await api.post('/chapa/initialize/event', { eventId });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data.status === 'success' && data.data?.checkout_url) {
+        window.location.href = data.data.checkout_url;
+      }
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Failed to initialize Chapa payment');
     }
   });
 
@@ -227,30 +245,79 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
               className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none flex items-center justify-center gap-2"
             >
               <CreditCard size={20} />
-              Pay {Number((event as any).price).toFixed(2)} ETB & Register
+              Pay {Number(event.price).toFixed(2)} ETB & Register
             </button>
-            ) : (
-            <form onSubmit={handleEventPayment} className="space-y-4">
-              <div className="flex flex-col gap-3">
+            ) : !paymentMode ? (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <button
+                  type="button"
+                  disabled={chapaMutation.isPending}
+                  onClick={() => {
+                    setPaymentMode('direct');
+                    chapaMutation.mutate(event.id);
+                  }}
+                  className="flex flex-col items-center p-6 rounded-2xl border-2 border-slate-100 hover:border-brand-medium hover:bg-brand-pale/5 transition-all text-center group"
+                >
+                  <div className="h-12 w-12 rounded-xl bg-brand-pale/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <CreditCard className="h-6 w-6 text-brand-medium" />
+                  </div>
+                  <span className="text-sm font-black text-slate-900 mb-1">Direct Pay</span>
+                  <span className="text-[10px] text-slate-500">Instant activation</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('manual')}
+                  className="flex flex-col items-center p-6 rounded-2xl border-2 border-slate-100 hover:border-brand-medium hover:bg-brand-pale/5 transition-all text-center group"
+                >
+                  <div className="h-12 w-12 rounded-xl bg-brand-pale/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Tag className="h-6 w-6 text-brand-medium" />
+                  </div>
+                  <span className="text-sm font-black text-slate-900 mb-1">Manual Pay</span>
+                  <span className="text-[10px] text-slate-500">Upload screenshot</span>
+                </button>
+              </div>
+            ) : paymentMode === 'manual' && (
+            <form onSubmit={handleEventPayment} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center justify-between mb-2">
+                 <button 
+                  type="button" 
+                  onClick={() => { setPaymentMode(null); setPaymentMethod(null); }}
+                  className="text-xs font-bold text-brand-medium hover:underline flex items-center gap-1"
+                >
+                  <ArrowLeft size={12} /> Change Method
+                </button>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Manual Upload</span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('telebirr')}
-                  className={`w-full py-3 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-2 ${
-                    paymentMethod === 'telebirr' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                  className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                    paymentMethod === 'telebirr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
                   }`}
                 >
-                  <img src="/asset/telebirr-logo.png" alt="Telebirr" className="w-8 h-8 object-contain" />
-                  Telebirr
+                  <img src="/asset/telebirr-logo.png" alt="Telebirr" className="h-10 w-10 object-contain mb-2" />
+                  <span className="text-[10px] font-bold text-slate-900">Telebirr</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('cbe_birr')}
-                  className={`w-full py-3 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-2 ${
-                    paymentMethod === 'cbe_birr' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                  className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                    paymentMethod === 'cbe_birr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
                   }`}
                 >
-                  <img src="/asset/cbe-logo.png" alt="CBE Birr" className="w-8 h-8 object-contain" />
-                  CBE Birr
+                  <img src="/asset/cbe-logo.png" alt="CBE Birr" className="h-10 w-10 object-contain mb-2" />
+                  <span className="text-[10px] font-bold text-slate-900">CBE Birr</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('ebirr')}
+                  className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                    paymentMethod === 'ebirr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
+                  }`}
+                >
+                  <img src="/asset/ebirr-logo.png" alt="E-Birr" className="h-10 w-10 object-contain mb-2" />
+                  <span className="text-[10px] font-bold text-slate-900">E-Birr</span>
                 </button>
               </div>
               {paymentMethod && (

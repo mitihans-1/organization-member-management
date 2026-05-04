@@ -38,11 +38,18 @@ const LiveChatWidget: React.FC = () => {
             </button>
           </div>
           <div className="flex-1 bg-slate-50 relative">
-            <iframe 
-              src={config.liveChatUrl} 
-              className="w-full h-full border-none"
-              title="Chat Window"
-            />
+            {config.liveChatUrl ? (
+              <iframe 
+                src={config.liveChatUrl} 
+                className="w-full h-full border-none"
+                title="Chat Window"
+                onError={(e) => console.error('Live Chat Iframe Error:', e)}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 text-xs p-8 text-center">
+                Chat service not configured correctly.
+              </div>
+            )}
           </div>
         </div>
       )}

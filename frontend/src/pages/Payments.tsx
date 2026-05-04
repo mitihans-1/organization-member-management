@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Plan } from '../types';
-import { CheckCircle, Plus, X, Search, UploadCloud, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Plus, X, Search, UploadCloud, ArrowLeft, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
@@ -24,8 +24,20 @@ const Payments: React.FC = () => {
   const [editPhoneValue, setEditPhoneValue] = useState('');
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | null>(null);
+  const [paymentMode, setPaymentMode] = useState<'direct' | 'manual' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | 'ebirr' | 'chapa' | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [isChapaLoaded, setIsChapaLoaded] = useState(!!((window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout));
+
+  useEffect(() => {
+    if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
+      const script = document.createElement('script');
+      script.src = "https://js.chapa.co/v1/inline.js";
+      script.async = true;
+      script.onload = () => setIsChapaLoaded(true);
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const [requiresManualEntry, setRequiresManualEntry] = useState(false);
   const [manualTransactionId, setManualTransactionId] = useState('');
@@ -183,6 +195,110 @@ const Payments: React.FC = () => {
       closeUpgradeModal();
       alert('Plan upgraded successfully!');
     },
+  });
+
+  const chapaMutation = useMutation({
+    mutationFn: async (planId: string) => {
+      const res = await api.post('/chapa/initialize/plan', { planId });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      console.log('Payment initialization success, response data:', data);
+      if (data.status === 'success') {
+        const startPay = () => {
+          const chapa = (window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout;
+          const publicKey = import.meta.env.VITE_CHAPA_PUBLIC_KEY;
+          
+          console.log('Chapa SDK detection:', { 
+            Chapa: !!(window as any).Chapa, 
+            chapa: !!(window as any).chapa, 
+            ChapaCheckout: !!(window as any).ChapaCheckout,
+            publicKey: !!publicKey 
+          });
+
+          // PREFER REDIRECT: If we have a checkout_url, use it immediately to avoid SDK issues
+          if (data.data?.checkout_url) {
+            console.log('Redirecting to checkout URL:', data.data.checkout_url);
+            window.location.href = data.data.checkout_url;
+            return;
+          }
+
+          // FALLBACK TO INLINE: Only if redirect URL is missing
+          if (chapa && publicKey) {
+            const plan = plans?.find(p => p.id === selectedPlanId);
+            console.log('Launching Chapa payment modal as fallback...');
+            
+            const paymentData = {
+              public_key: publicKey,
+              tx_ref: data.tx_ref || `plan-${Date.now()}`,
+              amount: plan?.price || 0,
+              currency: 'ETB',
+              email: user?.email || '',
+              first_name: user?.name?.split(' ')[0] || 'User',
+              last_name: user?.name?.split(' ').slice(1).join(' ') || 'Name',
+              title: `Upgrade to ${plan?.name || 'Plan'}`,
+              description: `Subscription for ${user?.organization_name || 'Organization'}`,
+              callback_url: `${import.meta.env.VITE_API_URL}/chapa/webhook`,
+              return_url: `${window.location.origin}/org-admin/payments?tx_ref=${data.tx_ref}`,
+              customization: {
+                title: `Upgrade to ${plan?.name || 'Plan'}`,
+                description: `Subscription for ${user?.organization_name || 'Organization'}`,
+              },
+              onSuccess: () => {
+                console.log('Chapa: Payment successful');
+                closeUpgradeModal();
+                queryClient.invalidateQueries({ queryKey: ['payments'] });
+              },
+              onClose: () => {
+                console.log('Chapa: Modal closed');
+                setPaymentMode(null);
+              },
+              onError: (err: any) => {
+                console.error('Chapa Error:', err);
+                alert('Payment failed to initialize.');
+                setPaymentMode(null);
+              }
+            };
+
+            if (typeof chapa === 'function') {
+               try {
+                 const instance = new chapa(paymentData);
+                 if (instance.open) instance.open();
+                 else if (instance.pay) instance.pay();
+               } catch (e) {
+                 console.error('Failed to initialize Chapa class:', e);
+                 setPaymentMode(null);
+               }
+            } else if (chapa.pay) {
+              chapa.pay(paymentData);
+            }
+          } else {
+            console.error('No checkout URL and no SDK found');
+            alert('Payment initialization failed. Please try again.');
+            setPaymentMode(null);
+          }
+        };
+
+        // Execute immediately if we have a checkout_url
+        if (data.data?.checkout_url) {
+          startPay();
+        } else {
+          // Only wait for SDK if we don't have a redirect URL
+          if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
+            setTimeout(startPay, 1000);
+          } else {
+            startPay();
+          }
+        }
+      } else {
+        setPaymentMode(null);
+        alert(data.message || 'Chapa initialization failed.');
+      }
+    },
+    onError: (error: any) => {
+      setPaymentMode(null);
+      alert(error.response?.data?.message || error.message || 'Failed to initialize Chapa payment');
+    }
   });
 
   const confirmPaymentMutation = useMutation({
@@ -524,20 +640,21 @@ const Payments: React.FC = () => {
       {isUpgradeModalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
-            style={{ zIndex: 2147483000 }}
+            className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm z-[9999]"
+            onClick={(e) => { if (e.target === e.currentTarget) closeUpgradeModal(); }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="upgrade-plan-dialog-title"
           >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-100">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-100 animate-in fade-in zoom-in-95 duration-300">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <div className="flex items-center gap-3">
-                {selectedPlanId && (
+                {(selectedPlanId || paymentMode) && (
                   <button
                     type="button"
                     onClick={() => {
                       if (paymentMethod) setPaymentMethod(null);
+                      else if (paymentMode) setPaymentMode(null);
                       else setSelectedPlanId(null);
                     }}
                     className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
@@ -547,7 +664,13 @@ const Payments: React.FC = () => {
                   </button>
                 )}
                 <h3 id="upgrade-plan-dialog-title" className="text-xl font-black text-gray-900">
-                  {!selectedPlanId ? 'Choose Your Plan' : !paymentMethod ? 'Choose Payment Method' : 'Upload Payment Receipt'}
+                  {!selectedPlanId 
+                    ? 'Choose Your Plan' 
+                    : paymentMode === 'direct'
+                    ? 'Redirecting to Payment'
+                    : !paymentMethod 
+                      ? 'Choose Payment Method' 
+                      : 'Upload Payment Receipt'}
                 </h3>
               </div>
               <button
@@ -588,47 +711,110 @@ const Payments: React.FC = () => {
                 </div>
               ) : selectedPlanId ? (
                 !paymentMethod ? (
-                  <div className="max-w-3xl mx-auto">
-                      <p className="mb-2 text-center text-gray-900 font-bold">
-                        {selectedPlan ? `${selectedPlan.name} plan` : 'Selected plan'}
-                      </p>
-                      <p className="mb-8 text-gray-600 text-center text-sm">
-                        {selectedPlan
-                          ? `You will pay ETB ${Number(selectedPlan.price).toFixed(2)} (${selectedPlan.billing_cycle}). Pick how you send it.`
-                          : 'Select your preferred mobile money provider to continue with the payment.'}
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
-                          <button
-                             type="button"
-                             onClick={() => setPaymentMethod('telebirr')}
-                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:border-indigo-400 hover:shadow-lg transition-all bg-white text-center"
-                          >
-                             <img
-                                 src="/asset/telebirr-logo.png"
-                                 alt="Telebirr"
-                                 className="w-20 h-20 object-contain rounded-xl"
-                              />
-                             <span className="font-black text-lg text-gray-800">Telebirr</span>
-                             <span className="text-xs text-gray-500 leading-relaxed">
-                               Send from the Telebirr app to the number below. Use the success screen as your receipt.
-                             </span>
-                          </button>
-                          <button
-                             type="button"
-                             onClick={() => setPaymentMethod('cbe_birr')}
-                             className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:border-indigo-400 hover:shadow-lg transition-all bg-white text-center"
-                          >
-                             <img
-                                 src="/asset/cbe-logo.png"
-                                 alt="CBE Birr"
-                                 className="w-20 h-20 object-contain"
-                              />
-                             <span className="font-black text-lg text-gray-800">CBE Birr</span>
-                             <span className="text-xs text-gray-500 leading-relaxed">
-                               Pay with CBE Birr and capture the confirmation screen showing amount and reference.
-                             </span>
-                          </button>
+                  <div className="space-y-6">
+                    {!paymentMode ? (
+                      <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <button
+                          type="button"
+                          disabled={chapaMutation.isPending}
+                          onClick={() => {
+                            setPaymentMode('direct');
+                            if (selectedPlanId) chapaMutation.mutate(selectedPlanId);
+                          }}
+                          className="flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50/10 transition-all text-center group disabled:opacity-50"
+                        >
+                          <div className="h-16 w-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            {chapaMutation.isPending ? (
+                              <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <CreditCard className="h-8 w-8 text-indigo-600" />
+                            )}
+                          </div>
+                          <span className="text-base font-black text-slate-900 mb-1">Direct Pay</span>
+                          <span className="text-xs text-slate-500">
+                            {chapaMutation.isPending ? 'Initializing...' : 'Instant activation'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={chapaMutation.isPending}
+                          onClick={() => setPaymentMode('manual')}
+                          className="flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50/10 transition-all text-center group disabled:opacity-50"
+                        >
+                          <div className="h-16 w-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <UploadCloud className="h-8 w-8 text-indigo-600" />
+                          </div>
+                          <span className="text-base font-black text-slate-900 mb-1">Manual Pay</span>
+                          <span className="text-xs text-slate-500">Upload screenshot</span>
+                        </button>
                       </div>
+                    ) : paymentMode === 'direct' ? (
+                      <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500">
+                        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+                        <h3 className="text-xl font-black text-slate-900">Redirecting to Payment...</h3>
+                        <p className="text-sm text-slate-500 mt-2 text-center">
+                          A secure payment window is opening.
+                        </p>
+                        
+                        <button 
+                          onClick={() => { setPaymentMode(null); }}
+                          className="mt-8 text-indigo-600 font-bold hover:underline"
+                        >
+                          Cancel and go back
+                        </button>
+                      </div>
+                    ) : paymentMode === 'manual' && (
+                      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex items-center justify-between mb-4">
+                          <button 
+                            type="button" 
+                            onClick={() => { setPaymentMode(null); setPaymentMethod(null); }}
+                            className="text-sm font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                          >
+                            <ArrowLeft size={16} /> Change Method
+                          </button>
+                          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Manual Upload</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('telebirr')}
+                            className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                              paymentMethod === 'telebirr'
+                                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                : 'border-gray-100 text-gray-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            <img src="/asset/telebirr-logo.png" alt="Telebirr" className="h-10 w-10 object-contain mb-2" />
+                            <span className="text-[10px] font-bold">Telebirr</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('cbe_birr')}
+                            className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                              paymentMethod === 'cbe_birr'
+                                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                : 'border-gray-100 text-gray-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            <img src="/asset/cbe-logo.png" alt="CBE Birr" className="h-10 w-10 object-contain mb-2" />
+                            <span className="text-[10px] font-bold">CBE Birr</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('ebirr')}
+                            className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                              paymentMethod === 'ebirr'
+                                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                : 'border-gray-100 text-gray-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            <img src="/asset/ebirr-logo.png" alt="E-Birr" className="h-10 w-10 object-contain mb-2" />
+                            <span className="text-[10px] font-bold">E-Birr</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="max-w-lg mx-auto">

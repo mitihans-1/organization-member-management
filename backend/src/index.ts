@@ -14,6 +14,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import helpRoutes from './routes/helpRoutes';
 import faydaRoutes from './routes/faydaRoutes';
 import customAttributeRoutes from './routes/customAttributeRoutes';
+import chapaRoutes from './routes/chapaRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,6 +41,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/custom-attributes', customAttributeRoutes);
+app.use('/api/chapa', chapaRoutes);
 
 app.get('/', (req, res) => {
   res.send('Organization Membership Management API');

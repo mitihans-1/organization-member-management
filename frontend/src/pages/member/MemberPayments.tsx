@@ -3,20 +3,23 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { Payment, Event } from '../../types';
 import { CreditCard, UploadCloud, Plus, X, ArrowLeft, Smartphone, ChevronDown, Check } from 'lucide-react';
 import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
 const MemberPayments: React.FC = () => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string>('other');
+  const [paymentMode, setPaymentMode] = useState<'direct' | 'manual' | null>(null);
   const [formData, setFormData] = useState<{
     reason: string;
     amount: string;
-    payment_method: '' | 'telebirr' | 'cbe_birr';
+    payment_method: '' | 'telebirr' | 'cbe_birr' | 'ebirr' | 'chapa';
     manual_transaction_id: string;
   }>({
     reason: '',
@@ -31,6 +34,19 @@ const MemberPayments: React.FC = () => {
   const [ocrErrorMsg, setOcrErrorMsg] = useState('');
   /** First modal screen: Telebirr / CBE overview (only after user clicks Make payment). */
   const [showPaymentIntro, setShowPaymentIntro] = useState(false);
+  /** Manual mode: Second screen (select app) vs Third screen (upload receipt) */
+  const [methodConfirmed, setMethodConfirmed] = useState(false);
+  const [isChapaLoaded, setIsChapaLoaded] = useState(!!((window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout));
+
+  useEffect(() => {
+    if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
+      const script = document.createElement('script');
+      script.src = "https://js.chapa.co/v1/inline.js";
+      script.async = true;
+      script.onload = () => setIsChapaLoaded(true);
+      document.body.appendChild(script);
+    }
+  }, []);
 
   useBodyScrollLock(isModalOpen);
 
@@ -76,24 +92,138 @@ const MemberPayments: React.FC = () => {
     },
   });
 
+  const chapaMutation = useMutation({
+    mutationFn: async (data: { amount: string; reason: string; eventId?: string }) => {
+      // For now we'll just use a generic event initialization or create a new endpoint for general payments
+      const endpoint = data.eventId ? '/chapa/initialize/event' : '/chapa/initialize/plan'; // Fallback
+      const res = await api.post(endpoint, {
+        planId: !data.eventId ? 'general-payment' : undefined, // Placeholder
+        eventId: data.eventId,
+        amount: data.amount,
+        reason: data.reason
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      console.log('Payment initialization success, response data:', data);
+      if (data.status === 'success') {
+        const startPay = () => {
+          const chapa = (window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout;
+          const publicKey = import.meta.env.VITE_CHAPA_PUBLIC_KEY;
+          
+          console.log('Chapa SDK detection:', {
+            Chapa: !!(window as any).Chapa, 
+            chapa: !!(window as any).chapa, 
+            ChapaCheckout: !!(window as any).ChapaCheckout,
+            publicKey: !!publicKey 
+          });
+
+          // PREFER REDIRECT: Use checkout_url immediately to avoid SDK hanging issues
+          if (data.data?.checkout_url) {
+            console.log('Redirecting to checkout URL:', data.data.checkout_url);
+            window.location.href = data.data.checkout_url;
+            return;
+          }
+
+          // FALLBACK TO INLINE: Only if redirect URL is missing
+          if (chapa && publicKey) {
+            console.log('Launching Chapa payment modal as fallback...');
+            
+            const paymentData = {
+              public_key: publicKey,
+              tx_ref: data.tx_ref || `gen-${Date.now()}`,
+              amount: formData.amount,
+              currency: 'ETB',
+              email: user?.email || '',
+              first_name: user?.name?.split(' ')[0] || 'User',
+              last_name: user?.name?.split(' ').slice(1).join(' ') || 'Name',
+              title: formData.reason,
+              description: `Payment for ${organization?.name || 'Organization'}`,
+              callback_url: `${import.meta.env.VITE_API_URL}/chapa/webhook`,
+              return_url: `${window.location.origin}/member/payments?tx_ref=${data.tx_ref}`,
+              customization: {
+                title: formData.reason,
+                description: `Payment for ${organization?.name || 'Organization'}`,
+              },
+              onSuccess: () => {
+                console.log('Chapa: Payment successful');
+                closeModal();
+                queryClient.invalidateQueries({ queryKey: ['payments'] });
+              },
+              onClose: () => {
+                console.log('Chapa: Modal closed');
+                setPaymentMode(null);
+              },
+              onError: (err: any) => {
+                console.error('Chapa Error:', err);
+                setPaymentError('Payment failed to initialize.');
+                setPaymentMode(null);
+              }
+            };
+
+            if (typeof chapa === 'function') {
+               try {
+                 const instance = new chapa(paymentData);
+                 if (instance.open) instance.open();
+                 else if (instance.pay) instance.pay();
+               } catch (e) {
+                 console.error('Failed to initialize Chapa class:', e);
+                 setPaymentMode(null);
+               }
+            } else if (chapa.pay) {
+              chapa.pay(paymentData);
+            }
+          } else {
+            console.error('No checkout URL and no SDK found');
+            setPaymentError('Payment initialization failed. Please try again.');
+            setPaymentMode(null);
+          }
+        };
+
+        // Execute immediately if we have a checkout_url
+        if (data.data?.checkout_url) {
+          startPay();
+        } else {
+          // Only wait for SDK if we don't have a redirect URL
+          if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
+            setTimeout(startPay, 1000);
+          } else {
+            startPay();
+          }
+        }
+      } else {
+        setPaymentMode(null);
+        setPaymentError(data.message || 'Chapa initialization failed.');
+      }
+    },
+    onError: (error: any) => {
+      setPaymentMode(null);
+      setPaymentError(error.response?.data?.message || error.message || 'Failed to initialize Chapa payment');
+    }
+  });
+
   const closeModal = () => {
     setIsModalOpen(false);
     setShowPaymentIntro(false);
+    setPaymentMode(null);
     setSelectedEventId('other');
     setFormData({ reason: '', amount: '', payment_method: '', manual_transaction_id: '' });
     setReceiptFile(null);
     setPaymentError(null);
     setDetailsConfirmed(false);
+    setMethodConfirmed(false);
     setRequiresManualEntry(false);
     setOcrErrorMsg('');
   };
 
   const openFreshPaymentModal = useCallback(() => {
+    setPaymentMode(null);
     setSelectedEventId('other');
     setFormData({ reason: '', amount: '', payment_method: '', manual_transaction_id: '' });
     setReceiptFile(null);
     setPaymentError(null);
     setDetailsConfirmed(false);
+    setMethodConfirmed(false);
     setRequiresManualEntry(false);
     setOcrErrorMsg('');
     setShowPaymentIntro(true);
@@ -218,13 +348,13 @@ const MemberPayments: React.FC = () => {
       {isModalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
-            style={{ zIndex: 2147483000 }}
+            className="fixed inset-0 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm z-[9999]"
+            onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="member-payment-dialog-title"
           >
-          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <div className="flex items-center gap-3">
                 {!showPaymentIntro && (
@@ -233,6 +363,10 @@ const MemberPayments: React.FC = () => {
                     onClick={() => {
                       if (!detailsConfirmed) {
                         setShowPaymentIntro(true);
+                        return;
+                      }
+                      if (methodConfirmed) {
+                        setMethodConfirmed(false);
                         return;
                       }
                       if (formData.payment_method) {
@@ -253,11 +387,13 @@ const MemberPayments: React.FC = () => {
                 <h3 id="member-payment-dialog-title" className="text-xl font-black text-gray-900">
                   {showPaymentIntro
                     ? 'Make a payment'
-                    : !detailsConfirmed
-                      ? 'Payment details'
-                      : !formData.payment_method
-                        ? 'Choose payment method'
-                        : 'Upload payment receipt'}
+                    : paymentMode === 'direct'
+                      ? 'Direct Payment Details'
+                      : !detailsConfirmed
+                        ? 'Manual Payment Details'
+                        : !methodConfirmed
+                          ? 'Choose Payment App'
+                          : 'Upload Receipt'}
                 </h3>
               </div>
               <button
@@ -277,108 +413,91 @@ const MemberPayments: React.FC = () => {
               )}
 
               {showPaymentIntro ? (
-                <div className="space-y-6">
-                  <div className="overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-5 sm:px-8">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-lg font-black text-white sm:text-xl">Telebirr &amp; CBE Birr</p>
-                        <p className="mt-1 max-w-2xl text-sm text-indigo-100">
-                          Send dues or fees using <strong className="text-white">Telebirr</strong> or{' '}
-                          <strong className="text-white">CBE Birr</strong>. Next you will enter the reason and amount,
-                          pick your app, then upload your confirmation screenshot for your admin to review.
-                        </p>
+                <div className="space-y-8">
+                  <div className="text-center max-w-2xl mx-auto">
+                    <h2 className="text-3xl font-black text-slate-900 mb-2">Choose Payment Method</h2>
+                    <p className="text-slate-500">Select how you would like to make your payment.</p>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                    {/* Direct Payment Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentMode('direct');
+                        setShowPaymentIntro(false);
+                        setFormData(prev => ({ ...prev, payment_method: 'chapa' }));
+                      }}
+                      className="group flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 bg-white hover:border-indigo-600 hover:shadow-xl transition-all text-center"
+                    >
+                      <div className="h-20 w-20 rounded-2xl bg-indigo-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <Smartphone className="h-10 w-10 text-indigo-600" />
                       </div>
-                      <Smartphone className="hidden h-12 w-12 shrink-0 text-white/40 sm:block" aria-hidden />
-                    </div>
-                  </div>
-                  {payeePhone ? (
-                    <p className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                      <span className="font-bold">Receiving number </span>
-                      {orgName ? <span className="text-amber-900/80">({orgName}) </span> : null}
-                      <span className="mt-1 block font-mono text-base font-black tracking-wide text-amber-950">
-                        {payeePhone}
-                      </span>
-                      <span className="mt-1 block text-xs font-medium text-amber-900/85">
-                        Send your payment to this number in the app you choose in the next steps.
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      Your organization has not published a receiving number yet. You can still continue; your admin
-                      may confirm manually.
-                    </p>
-                  )}
-                  <p className="text-center text-sm font-bold text-slate-800">Supported methods</p>
-                  <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
+                      <h3 className="text-xl font-black text-slate-900 mb-2">Direct Payment</h3>
+                      <p className="text-sm text-slate-500 leading-relaxed">
+                        Pay instantly using Chapa (Telebirr, CBE Birr, cards). No screenshot needed.
+                      </p>
+                      <div className="mt-6 flex items-center gap-2 text-indigo-600 font-bold text-sm">
+                        <span>Pay Instantly</span>
+                        <Check className="h-4 w-4" />
+                      </div>
+                    </button>
+
+                    {/* Manual Upload Option */}
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, payment_method: 'telebirr' })}
-                      className={`flex flex-col items-center rounded-2xl border-2 p-6 text-center transition-all hover:shadow-md ${
-                        formData.payment_method === 'telebirr'
-                          ? 'border-indigo-600 bg-indigo-50/50'
-                          : 'border-slate-200 bg-slate-50/80 hover:border-indigo-300'
-                      }`}
+                      onClick={() => {
+                        setPaymentMode('manual');
+                        setShowPaymentIntro(false);
+                      }}
+                      className="group flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 bg-white hover:border-amber-600 hover:shadow-xl transition-all text-center"
                     >
-                      <img src="/asset/telebirr-logo.png" alt="" className="mb-3 h-20 w-20 object-contain" />
-                      <span className="text-lg font-black text-slate-900">Telebirr</span>
-                      <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                        Pay in the Telebirr app, then upload the success screen. We read your transaction details when
-                        the image is clear.
+                      <div className="h-20 w-20 rounded-2xl bg-amber-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <UploadCloud className="h-10 w-10 text-amber-600" />
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 mb-2">Manual Upload</h3>
+                      <p className="text-sm text-slate-500 leading-relaxed">
+                        Pay in your app first, then upload a screenshot for admin verification.
                       </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, payment_method: 'cbe_birr' })}
-                      className={`flex flex-col items-center rounded-2xl border-2 p-6 text-center transition-all hover:shadow-md ${
-                        formData.payment_method === 'cbe_birr'
-                          ? 'border-indigo-600 bg-indigo-50/50'
-                          : 'border-slate-200 bg-slate-50/80 hover:border-indigo-300'
-                      }`}
-                    >
-                      <img src="/asset/cbe-logo.png" alt="" className="mb-3 h-20 w-20 object-contain" />
-                      <span className="text-lg font-black text-slate-900">CBE Birr</span>
-                      <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                        Pay with CBE Birr and upload the confirmation screen showing amount and reference.
-                      </p>
+                      <div className="mt-6 flex items-center gap-2 text-amber-600 font-bold text-sm">
+                        <span>Upload Receipt</span>
+                        <Check className="h-4 w-4" />
+                      </div>
                     </button>
                   </div>
-                  {formData.payment_method && (
-                    <div className="flex justify-center pt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <button
-                        type="button"
-                        onClick={() => setShowPaymentIntro(false)}
-                        className="rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-indigo-500"
-                      >
-                        Continue to payment details
-                      </button>
-                    </div>
-                  )}
                 </div>
-              ) : !detailsConfirmed ? (
-                <div className="max-w-lg mx-auto">
-                  <p className="mb-8 text-gray-600 text-center text-sm leading-relaxed">
-                    Tell your organization what this payment is for and how much you sent. You will choose Telebirr or
-                    CBE Birr next, then upload the confirmation screenshot.
-                  </p>
+              ) : !detailsConfirmed || paymentMode === 'direct' ? (
+                <div className="max-w-lg mx-auto min-h-[400px]">
+                  <div className="text-center mb-8">
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">
+                      {paymentMode === 'direct' ? 'Direct Payment' : 'Manual Payment'} Details
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      {paymentMode === 'direct' 
+                        ? "Confirm the amount and click the button to pay instantly via Chapa."
+                        : "Tell your organization what this payment is for and how much you sent."}
+                    </p>
+                  </div>
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">What are you paying for?</label>
-                      <div className="space-y-3">
+                      <div className="relative">
                         <select
                           value={selectedEventId}
                           onChange={(e) => {
                             const val = e.target.value;
                             setSelectedEventId(val);
                             if (val === 'other') {
-                              setFormData({ ...formData, reason: '', amount: '' });
+                              setFormData(prev => ({ ...prev, reason: '', amount: '' }));
                             } else {
                               const ev = paidEvents.find((event) => event.id === val);
                               if (ev) {
-                                setFormData({
-                                  ...formData,
+                                setFormData(prev => ({
+                                  ...prev,
                                   reason: `Event: ${ev.title}`,
                                   amount: String(ev.price || ''),
-                                });
+                                }));
                               }
                             }
                           }}
@@ -391,6 +510,7 @@ const MemberPayments: React.FC = () => {
                             </option>
                           ))}
                         </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                       </div>
                     </div>
 
@@ -401,7 +521,7 @@ const MemberPayments: React.FC = () => {
                           type="text"
                           required
                           value={formData.reason}
-                          onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                          onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
                           className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
                           placeholder="e.g. Monthly dues, donation, fee"
                         />
@@ -417,7 +537,7 @@ const MemberPayments: React.FC = () => {
                         step="0.01"
                         value={formData.amount}
                         readOnly={selectedEventId !== 'other'}
-                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                        onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                         className={`w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all ${
                           selectedEventId !== 'other' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''
                         }`}
@@ -429,19 +549,34 @@ const MemberPayments: React.FC = () => {
                         </p>
                       )}
                     </div>
+
+                    {paymentMode === 'manual' && (
+                       <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                        <p className="text-xs font-bold text-amber-900 mb-2 uppercase tracking-wider text-center">Manual Payment</p>
+                      </div>
+                    )}
+
                     <button
                       type="button"
-                      disabled={!formData.reason || !formData.amount}
+                      disabled={!formData.reason || !formData.amount || chapaMutation.isPending}
                       onClick={() => {
-                        setDetailsConfirmed(true);
+                        if (paymentMode === 'direct') {
+                          chapaMutation.mutate({
+                            amount: formData.amount,
+                            reason: formData.reason,
+                            eventId: selectedEventId !== 'other' ? selectedEventId : undefined
+                          });
+                        } else {
+                          setDetailsConfirmed(true);
+                        }
                       }}
-                      className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors mt-6"
+                      className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors mt-6 shadow-lg shadow-indigo-200"
                     >
-                      Continue
+                      {paymentMode === 'direct' ? (chapaMutation.isPending ? 'Initializing...' : 'Pay with Chapa') : 'Continue'}
                     </button>
                   </div>
                 </div>
-              ) : !formData.payment_method ? (
+              ) : !methodConfirmed ? (
                 <div className="max-w-3xl mx-auto">
                   <p className="mb-2 text-center text-gray-900 font-bold">How would you like to pay?</p>
                   <p className="mb-8 text-gray-600 text-center text-sm">
@@ -460,7 +595,11 @@ const MemberPayments: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, payment_method: 'telebirr' })}
-                      className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:border-indigo-400 hover:shadow-lg transition-all bg-white text-center"
+                      className={`p-6 border-2 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:shadow-lg transition-all text-center ${
+                        formData.payment_method === 'telebirr' 
+                          ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600/20' 
+                          : 'border-gray-200 bg-white hover:border-indigo-400'
+                      }`}
                     >
                       <img
                         src="/asset/telebirr-logo.png"
@@ -476,7 +615,11 @@ const MemberPayments: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, payment_method: 'cbe_birr' })}
-                      className="p-6 border-2 border-gray-200 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:border-indigo-400 hover:shadow-lg transition-all bg-white text-center"
+                      className={`p-6 border-2 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:shadow-lg transition-all text-center ${
+                        formData.payment_method === 'cbe_birr' 
+                          ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600/20' 
+                          : 'border-gray-200 bg-white hover:border-indigo-400'
+                      }`}
                     >
                       <img
                         src="/asset/cbe-logo.png"
@@ -488,6 +631,36 @@ const MemberPayments: React.FC = () => {
                         Pay with CBE Birr and capture the confirmation screen showing amount and reference.
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, payment_method: 'ebirr' })}
+                      className={`p-6 border-2 rounded-2xl flex-1 flex flex-col items-center gap-3 hover:shadow-lg transition-all text-center ${
+                        formData.payment_method === 'ebirr' 
+                          ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600/20' 
+                          : 'border-gray-200 bg-white hover:border-indigo-400'
+                      }`}
+                    >
+                      <img
+                        src="/asset/ebirr-logo.png"
+                        alt="E-Birr"
+                        className="w-20 h-20 object-contain"
+                      />
+                      <span className="font-black text-lg text-gray-800">E-Birr</span>
+                      <span className="text-xs text-gray-500 leading-relaxed">
+                        Pay using E-Birr and upload the confirmation screenshot for verification.
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="mt-8 flex justify-center">
+                    <button
+                      type="button"
+                      disabled={!formData.payment_method}
+                      onClick={() => setMethodConfirmed(true)}
+                      className="px-10 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors shadow-lg shadow-indigo-200"
+                    >
+                      Continue to payment detail
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -495,13 +668,21 @@ const MemberPayments: React.FC = () => {
                   <div className="flex items-center justify-center gap-3 mb-6">
                     <img
                       src={
-                        formData.payment_method === 'telebirr' ? '/asset/telebirr-logo.png' : '/asset/cbe-logo.png'
+                        formData.payment_method === 'telebirr' 
+                          ? '/asset/telebirr-logo.png' 
+                          : formData.payment_method === 'cbe_birr'
+                          ? '/asset/cbe-logo.png'
+                          : '/asset/ebirr-logo.png'
                       }
                       alt=""
                       className="w-10 h-10 object-contain"
                     />
                     <h4 className="text-xl font-black text-gray-800">
-                      {formData.payment_method === 'telebirr' ? 'Telebirr payment' : 'CBE Birr payment'}
+                      {formData.payment_method === 'telebirr' 
+                        ? 'Telebirr payment' 
+                        : formData.payment_method === 'cbe_birr'
+                        ? 'CBE Birr payment'
+                        : 'E-Birr payment'}
                     </h4>
                   </div>
 
@@ -517,15 +698,23 @@ const MemberPayments: React.FC = () => {
                     <div>
                       <span className="text-indigo-600 font-semibold">Method: </span>
                       <span className="font-medium uppercase tracking-wide">
-                        {formData.payment_method === 'telebirr' ? 'Telebirr' : 'CBE Birr'}
+                        {formData.payment_method === 'telebirr' 
+                          ? 'Telebirr' 
+                          : formData.payment_method === 'cbe_birr'
+                          ? 'CBE Birr'
+                          : 'E-Birr'}
                       </span>
                     </div>
                   </div>
 
                   <p className="mb-4 text-gray-800 text-sm font-medium bg-amber-50 border border-amber-100 p-4 rounded-lg">
                     Transfer exactly <strong className="text-amber-950">{formData.amount} ETB</strong> using{' '}
-                    {formData.payment_method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} to your organization&apos;s
-                    number:
+                    {formData.payment_method === 'telebirr' 
+                      ? 'Telebirr' 
+                      : formData.payment_method === 'cbe_birr'
+                      ? 'CBE Birr'
+                      : 'E-Birr'}{' '}
+                    to your organization&apos;s number:
                     <strong className="text-xl tracking-wider text-amber-900 mt-2 block font-mono">
                       {payeePhone || '[Your admin has not set a receiving number yet]'}
                     </strong>

@@ -204,42 +204,36 @@ const Blogs: React.FC = () => {
             placeholder="Search posts..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
         </div>
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-gray-600 font-medium shrink-0">Status:</span>
-            <select
-            title='status'
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium bg-white min-w-0 max-w-full"
-            >
-              <option value="All">All</option>
-              {BLOG_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-gray-600 font-medium shrink-0">Category:</span>
-            <select
-            title='category'
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium bg-white min-w-0 max-w-full"
-            >
-              <option value="All">All</option>
-              {categoryOptionsForFilter.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <select
+            title="status form"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
+          >
+            <option value="All">All Status</option>
+            {BLOG_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select
+            title="category form"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
+          >
+            <option value="All">All Categories</option>
+            {categoryOptionsForFilter.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

@@ -4,16 +4,17 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaClient } from '@prisma/client';
 import { sendOtpEmail, sendResetPasswordEmail } from '../services/emailService';
+import { JWT_SECRET } from '../config/jwtConfig';
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-import { JWT_SECRET } from '../config/jwtConfig';
 
 // Helper to generate 6-digit OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export const register = async (req: Request, res: Response) => {
   try {
+    console.log('Registration Attempt:', req.body.email, req.body.role);
     const {
       name,
       email,
@@ -32,12 +33,24 @@ export const register = async (req: Request, res: Response) => {
           : null;
           
     if (!role || roleRaw === 'SuperAdmin') {
+      console.warn('Registration Blocked: Invalid role', roleRaw);
       return res.status(400).json({ message: 'Invalid role. Register as Organization Admin or Member only.' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+      console.warn('Registration Blocked: User already exists', email);
       return res.status(400).json({ message: 'User already exists' });
+    }
+
+    if (role === 'member' && (!organization_id || !organization_id.trim())) {
+      console.warn('Registration Blocked: Member missing organization_id');
+      return res.status(400).json({ message: 'Please select an organization to join.' });
+    }
+
+    if (role === 'orgAdmin' && (!organization_name?.trim() || !organization_type?.trim())) {
+      console.warn('Registration Blocked: OrgAdmin missing name/type');
+      return res.status(400).json({ message: 'Organization name and type are required' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -100,6 +113,7 @@ export const register = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const { email, otp_code } = req.body;
+    console.log('OTP Verification Attempt:', email, otp_code);
 
     if (!email || !otp_code) {
       return res.status(400).json({ message: 'Email and OTP code are required' });
@@ -112,18 +126,22 @@ export const verifyOtp = async (req: Request, res: Response) => {
       // Check if user is already verified and in User table
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
+        console.warn('OTP Verification Blocked: Already verified', email);
         return res.status(400).json({ message: 'Email is already verified. Please log in.' });
       }
+      console.warn('OTP Verification Blocked: Pending user not found', email);
       return res.status(404).json({ message: 'Registration not found or expired. Please register again.' });
     }
 
     if (new Date() > pendingUser.expiresAt) {
+      console.warn('OTP Verification Blocked: OTP expired', email);
       await (prisma as any).pendingUser.delete({ where: { id: pendingUser.id } });
       return res.status(400).json({ message: 'OTP has expired. Please register again.' });
     }
 
     const isValid = await bcrypt.compare(otp_code, pendingUser.otp_code);
     if (!isValid) {
+      console.warn('OTP Verification Blocked: Invalid code', email);
       return res.status(400).json({ message: 'Invalid OTP code.' });
     }
 
@@ -152,6 +170,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     } else {
       const org = await prisma.organization.findUnique({ where: { id: pendingUser.organization_id! } });
       if (!org) {
+        console.error('OTP Verification Error: Target organization missing', pendingUser.organization_id);
         return res.status(400).json({ message: 'Target organization no longer exists. Please register again.' });
       }
       user = await prisma.user.create({
@@ -167,12 +186,14 @@ export const verifyOtp = async (req: Request, res: Response) => {
         },
       });
     }
+
     // Delete the pending user record
     await (prisma as any).pendingUser.delete({ where: { id: pendingUser.id } });
 
     // Log the user in
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
 
+    console.log('OTP Verification Successful:', email);
     res.status(200).json({
       message: 'Email verified and account created successfully',
       token,
