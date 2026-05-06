@@ -12,18 +12,23 @@ const PAYMENTS_UPGRADE_PLAN = 'omms_payments_upgrade_plan_id';
 const UpgradePlan: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: plans } = useQuery({
+  const { data: plans, isLoading } = useQuery({
     queryKey: ['plans'],
     queryFn: () => api.get('/plans').then((r) => r.data),
   });
 
   const list = plans?.length
     ? plans
-    : [
-        { id: '1', name: 'Basic', price: 0, billing_cycle: 'monthly', max_members: 5 },
-        { id: '2', name: 'Pro', price: 25, billing_cycle: 'monthly', max_members: 500 },
-        { id: '3', name: 'Enterprise', price: 50, billing_cycle: 'yearly', max_members: 5000 },
-      ];
+    : [];
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-bold">Loading available plans...</p>
+      </div>
+    );
+  }
 
   const currentName = user?.plan?.name ?? 'Basic';
 

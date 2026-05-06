@@ -12,8 +12,9 @@ const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
  */
 export const initializePlanPayment = async (req: any, res: Response) => {
   try {
-    const { planId, amount, reason } = req.body;
+    const { planId, amount, reason, phoneNumber, mode } = req.body;
     const userId = req.user.userId;
+    const isInline = mode === 'inline';
 
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({ message: 'Invalid User ID format' });
@@ -43,7 +44,7 @@ export const initializePlanPayment = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'Payment amount could not be determined.' });
     }
 
-    const tx_ref = `p-${Date.now()}`;
+    const tx_ref = `p-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
     const callback_url = `${process.env.BACKEND_URL}/api/chapa/webhook`;
     const return_url = `${process.env.FRONTEND_URL}/org-admin/payments?tx_ref=${tx_ref}`;
@@ -69,25 +70,30 @@ export const initializePlanPayment = async (req: any, res: Response) => {
         chapaData.callback_url = callback_url;
     }
 
-    // Clean phone number: remove everything except digits and +
-    if (user.phone) {
-        const cleanPhone = user.phone.replace(/[^\d+]/g, '');
+    // Use provided phoneNumber or fall back to user's phone
+    const phoneToUse = phoneNumber || user.phone;
+    if (phoneToUse) {
+        const cleanPhone = phoneToUse.replace(/[^\d+]/g, '');
         if (cleanPhone) chapaData.phone_number = cleanPhone;
     }
 
-    console.log('Initializing Chapa Payment with data:', JSON.stringify(chapaData, null, 2));
+    console.log(`Initializing Chapa Payment (mode: ${mode || 'standard'}) with data:`, JSON.stringify(chapaData, null, 2));
 
-    let response;
-    try {
-      response = await chapaService.initializePayment(chapaData);
-      console.log('Chapa Service Response:', JSON.stringify(response, null, 2));
-    } catch (chapaErr: any) {
-      console.error('Error calling Chapa Service:', chapaErr.message);
-      return res.status(400).json({ 
-        message: 'Chapa initialization failed', 
-        error: chapaErr.message,
-        details: chapaErr.response?.data
-      });
+    let response: any = { status: 'success' };
+    if (!isInline) {
+        try {
+          response = await chapaService.initializePayment(chapaData);
+          console.log('Chapa Service Response:', JSON.stringify(response, null, 2));
+        } catch (chapaErr: any) {
+          console.error('Error calling Chapa Service:', chapaErr.message);
+          return res.status(400).json({ 
+            message: 'Chapa initialization failed', 
+            error: chapaErr.message,
+            details: chapaErr.response?.data
+          });
+        }
+    } else {
+        console.log('Skipping Chapa API call for inline mode - frontend SDK will handle it');
     }
 
     // Create a pending payment record
@@ -124,8 +130,9 @@ export const initializePlanPayment = async (req: any, res: Response) => {
  */
 export const initializeEventPayment = async (req: any, res: Response) => {
   try {
-    const { eventId } = req.body;
+    const { eventId, phoneNumber, mode } = req.body;
     const userId = req.user.userId;
+    const isInline = mode === 'inline';
 
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({ message: 'Invalid User ID format' });
@@ -141,7 +148,7 @@ export const initializeEventPayment = async (req: any, res: Response) => {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event || !event.price) return res.status(404).json({ message: 'Event or price not found' });
 
-    const tx_ref = `e-${Date.now()}`;
+    const tx_ref = `e-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const callback_url = `${process.env.BACKEND_URL}/api/chapa/webhook`;
     const return_url = `${process.env.FRONTEND_URL}/member/payments?tx_ref=${tx_ref}`;
 
@@ -166,22 +173,29 @@ export const initializeEventPayment = async (req: any, res: Response) => {
         chapaData.callback_url = callback_url;
     }
 
-    if (user.phone) {
-        const cleanPhone = user.phone.replace(/[^\d+]/g, '');
+    const phoneToUse = phoneNumber || user.phone;
+    if (phoneToUse) {
+        const cleanPhone = phoneToUse.replace(/[^\d+]/g, '');
         if (cleanPhone) chapaData.phone_number = cleanPhone;
     }
 
-    let response;
-    try {
-      response = await chapaService.initializePayment(chapaData);
-      console.log('Chapa Event Response:', JSON.stringify(response, null, 2));
-    } catch (chapaErr: any) {
-      console.error('Error calling Chapa Service for Event:', chapaErr.message);
-      return res.status(400).json({ 
-        message: 'Chapa initialization failed', 
-        error: chapaErr.message,
-        details: chapaErr.response?.data
-      });
+    console.log(`Initializing Chapa Event Payment (mode: ${mode || 'standard'}) with data:`, JSON.stringify(chapaData, null, 2));
+
+    let response: any = { status: 'success' };
+    if (!isInline) {
+        try {
+          response = await chapaService.initializePayment(chapaData);
+          console.log('Chapa Event Response:', JSON.stringify(response, null, 2));
+        } catch (chapaErr: any) {
+          console.error('Error calling Chapa Service for Event:', chapaErr.message);
+          return res.status(400).json({ 
+            message: 'Chapa initialization failed', 
+            error: chapaErr.message,
+            details: chapaErr.response?.data
+          });
+        }
+    } else {
+        console.log('Skipping Chapa API call for inline event payment - frontend SDK will handle it');
     }
 
     // Create a pending event payment record

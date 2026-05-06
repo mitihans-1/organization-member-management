@@ -27,6 +27,7 @@ const MemberPayments: React.FC = () => {
     payment_method: '',
     manual_transaction_id: '',
   });
+  const [directPhone, setDirectPhone] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [detailsConfirmed, setDetailsConfirmed] = useState(false);
@@ -37,6 +38,8 @@ const MemberPayments: React.FC = () => {
   /** Manual mode: Second screen (select app) vs Third screen (upload receipt) */
   const [methodConfirmed, setMethodConfirmed] = useState(false);
   const [isChapaLoaded, setIsChapaLoaded] = useState(!!((window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout));
+
+  const [isChapaFormInitializing, setIsChapaFormInitializing] = useState(false);
 
   useEffect(() => {
     if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
@@ -93,14 +96,16 @@ const MemberPayments: React.FC = () => {
   });
 
   const chapaMutation = useMutation({
-    mutationFn: async (data: { amount: string; reason: string; eventId?: string }) => {
+    mutationFn: async (data: { amount: string; reason: string; eventId?: string; phoneNumber?: string }) => {
       // For now we'll just use a generic event initialization or create a new endpoint for general payments
       const endpoint = data.eventId ? '/chapa/initialize/event' : '/chapa/initialize/plan'; // Fallback
       const res = await api.post(endpoint, {
         planId: !data.eventId ? 'general-payment' : undefined, // Placeholder
         eventId: data.eventId,
         amount: data.amount,
-        reason: data.reason
+        reason: data.reason,
+        phoneNumber: data.phoneNumber,
+        mode: (window as any).ChapaCheckout ? 'inline' : 'standard'
       });
       return res.data;
     },
@@ -118,61 +123,70 @@ const MemberPayments: React.FC = () => {
             publicKey: !!publicKey 
           });
 
-          // PREFER REDIRECT: Use checkout_url immediately to avoid SDK hanging issues
-          if (data.data?.checkout_url) {
-            console.log('Redirecting to checkout URL:', data.data.checkout_url);
-            window.location.href = data.data.checkout_url;
-            return;
-          }
-
-          // FALLBACK TO INLINE: Only if redirect URL is missing
+          // INLINE EMBEDDED: Try inline first if SDK is available
           if (chapa && publicKey) {
-            console.log('Launching Chapa payment modal as fallback...');
+            const finalAmount = parseFloat(formData.amount);
+            if (isNaN(finalAmount) || finalAmount <= 0) {
+              console.error('Invalid amount for Chapa initialization:', formData.amount);
+              if (data.data?.checkout_url) window.location.href = data.data.checkout_url;
+              return;
+            }
+
+            console.log('Initializing Chapa Embedded Form...');
+            setIsChapaFormInitializing(true);
             
-            const paymentData = {
+            const checkoutOptions = {
               public_key: publicKey,
-              tx_ref: data.tx_ref || `gen-${Date.now()}`,
-              amount: formData.amount,
+              tx_ref: data.tx_ref,
+              amount: String(finalAmount),
               currency: 'ETB',
               email: user?.email || '',
               first_name: user?.name?.split(' ')[0] || 'User',
               last_name: user?.name?.split(' ').slice(1).join(' ') || 'Name',
-              title: formData.reason,
-              description: `Payment for ${organization?.name || 'Organization'}`,
               callback_url: `${import.meta.env.VITE_API_URL}/chapa/webhook`,
               return_url: `${window.location.origin}/member/payments?tx_ref=${data.tx_ref}`,
               customization: {
-                title: formData.reason,
+                title: formData.reason || 'Payment',
                 description: `Payment for ${organization?.name || 'Organization'}`,
               },
-              onSuccess: () => {
-                console.log('Chapa: Payment successful');
+              onSuccessfulPayment: (res: any) => {
+                console.log('Chapa: Payment successful', res);
                 closeModal();
                 queryClient.invalidateQueries({ queryKey: ['payments'] });
               },
               onClose: () => {
-                console.log('Chapa: Modal closed');
+                console.log('Chapa: Form closed');
                 setPaymentMode(null);
               },
-              onError: (err: any) => {
-                console.error('Chapa Error:', err);
-                setPaymentError('Payment failed to initialize.');
-                setPaymentMode(null);
+              onPaymentFailure: (err: any) => {
+                console.error('Chapa Payment Error:', err);
               }
             };
 
-            if (typeof chapa === 'function') {
-               try {
-                 const instance = new chapa(paymentData);
-                 if (instance.open) instance.open();
-                 else if (instance.pay) instance.pay();
-               } catch (e) {
-                 console.error('Failed to initialize Chapa class:', e);
-                 setPaymentMode(null);
-               }
-            } else if (chapa.pay) {
-              chapa.pay(paymentData);
+            try {
+              const CheckoutClass = (window as any).ChapaCheckout || chapa;
+              if (typeof CheckoutClass === 'function') {
+                const checkout = new CheckoutClass(checkoutOptions);
+                setTimeout(() => {
+                  try {
+                    checkout.initialize('chapa-inline-form');
+                    setIsChapaFormInitializing(false);
+                  } catch (initErr) {
+                    console.error('Initialization error:', initErr);
+                    if (data.data?.checkout_url) window.location.href = data.data.checkout_url;
+                  }
+                }, 100);
+                return;
+              }
+            } catch (e) {
+              console.error('Embedded form initialization failed:', e);
             }
+          }
+
+          // REDIRECT FALLBACK: If embedded form fails or SDK is missing
+          if (data.data?.checkout_url) {
+            console.log('Redirecting to Chapa checkout...');
+            window.location.href = data.data.checkout_url;
           } else {
             console.error('No checkout URL and no SDK found');
             setPaymentError('Payment initialization failed. Please try again.');
@@ -180,17 +194,8 @@ const MemberPayments: React.FC = () => {
           }
         };
 
-        // Execute immediately if we have a checkout_url
-        if (data.data?.checkout_url) {
-          startPay();
-        } else {
-          // Only wait for SDK if we don't have a redirect URL
-          if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
-            setTimeout(startPay, 1000);
-          } else {
-            startPay();
-          }
-        }
+        // Try to start immediately
+        startPay();
       } else {
         setPaymentMode(null);
         setPaymentError(data.message || 'Chapa initialization failed.');
@@ -208,6 +213,7 @@ const MemberPayments: React.FC = () => {
     setPaymentMode(null);
     setSelectedEventId('other');
     setFormData({ reason: '', amount: '', payment_method: '', manual_transaction_id: '' });
+    setDirectPhone('');
     setReceiptFile(null);
     setPaymentError(null);
     setDetailsConfirmed(false);
@@ -220,6 +226,7 @@ const MemberPayments: React.FC = () => {
     setPaymentMode(null);
     setSelectedEventId('other');
     setFormData({ reason: '', amount: '', payment_method: '', manual_transaction_id: '' });
+    setDirectPhone('');
     setReceiptFile(null);
     setPaymentError(null);
     setDetailsConfirmed(false);
@@ -435,7 +442,7 @@ const MemberPayments: React.FC = () => {
                       </div>
                       <h3 className="text-xl font-black text-slate-900 mb-2">Direct Payment</h3>
                       <p className="text-sm text-slate-500 leading-relaxed">
-                        Pay instantly using Chapa (Telebirr, CBE Birr, cards). No screenshot needed.
+                        Instant activation via Telebirr, CBE Birr or Card. No receipt needed.
                       </p>
                       <div className="mt-6 flex items-center gap-2 text-indigo-600 font-bold text-sm">
                         <span>Pay Instantly</span>
@@ -457,7 +464,7 @@ const MemberPayments: React.FC = () => {
                       </div>
                       <h3 className="text-xl font-black text-slate-900 mb-2">Manual Upload</h3>
                       <p className="text-sm text-slate-500 leading-relaxed">
-                        Pay in your app first, then upload a screenshot for admin verification.
+                        Pay in your preferred app first, then upload a screenshot for verification.
                       </p>
                       <div className="mt-6 flex items-center gap-2 text-amber-600 font-bold text-sm">
                         <span>Upload Receipt</span>
@@ -466,16 +473,14 @@ const MemberPayments: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : !detailsConfirmed || paymentMode === 'direct' ? (
+              ) : paymentMode === 'direct' ? (
                 <div className="max-w-lg mx-auto min-h-[400px]">
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-black text-slate-900 mb-2">
-                      {paymentMode === 'direct' ? 'Direct Payment' : 'Manual Payment'} Details
+                      Direct Payment Details
                     </h2>
                     <p className="text-sm text-slate-500">
-                      {paymentMode === 'direct' 
-                        ? "Confirm the amount and click the button to pay instantly via Chapa."
-                        : "Tell your organization what this payment is for and how much you sent."}
+                      Enter details to pay instantly via Chapa.
                     </p>
                   </div>
 
@@ -543,36 +548,143 @@ const MemberPayments: React.FC = () => {
                         }`}
                         placeholder="Enter amount"
                       />
-                      {selectedEventId !== 'other' && (
-                        <p className="mt-1 text-[10px] text-gray-400">
-                          Amount is fixed for the selected event.
-                        </p>
-                      )}
                     </div>
-
-                    {paymentMode === 'manual' && (
-                       <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-100">
-                        <p className="text-xs font-bold text-amber-900 mb-2 uppercase tracking-wider text-center">Manual Payment</p>
-                      </div>
-                    )}
 
                     <button
                       type="button"
-                      disabled={!formData.reason || !formData.amount || chapaMutation.isPending}
+                      disabled={
+                        !formData.reason || 
+                        !formData.amount || 
+                        chapaMutation.isPending
+                      }
                       onClick={() => {
-                        if (paymentMode === 'direct') {
-                          chapaMutation.mutate({
-                            amount: formData.amount,
-                            reason: formData.reason,
-                            eventId: selectedEventId !== 'other' ? selectedEventId : undefined
-                          });
-                        } else {
-                          setDetailsConfirmed(true);
-                        }
+                        chapaMutation.mutate({
+                          amount: formData.amount,
+                          reason: formData.reason,
+                          eventId: selectedEventId !== 'other' ? selectedEventId : undefined
+                        });
+                      }}
+                      className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-all mt-6 shadow-lg shadow-indigo-200"
+                    >
+                      {chapaMutation.isPending ? 'Initializing...' : 'Pay Instantly'}
+                    </button>
+                    
+                    {chapaMutation.isSuccess && (
+                      <div className="mt-8 animate-in fade-in duration-500 relative min-h-[400px]">
+                         {/* Loader overlay - separate from the Chapa container to avoid React DOM conflicts */}
+                         {isChapaFormInitializing && (
+                           <div className="absolute inset-0 flex flex-col items-center justify-center py-12 bg-white/80 z-20 rounded-3xl">
+                               <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+                               <h3 className="text-xl font-black text-slate-900">Initializing Secure Checkout...</h3>
+                               <p className="text-sm text-slate-500 mt-2 text-center px-4">
+                                 Preparing the payment form. Please wait.
+                               </p>
+                           </div>
+                         )}
+                         
+                         {/* This container will hold the Chapa Inline form rendered by their SDK */}
+                         <div id="chapa-inline-form" className="min-h-[400px] border border-slate-100 rounded-3xl p-4 bg-slate-50/30"></div>
+                      </div>
+                    )}
+
+                    {!chapaMutation.isSuccess && (
+                       <div className="flex justify-center mt-6">
+                          <button 
+                            onClick={() => { setPaymentMode(null); setFormData(prev => ({ ...prev, payment_method: '' })); }}
+                            className="text-slate-500 text-sm font-bold hover:text-slate-700 transition-colors"
+                          >
+                            Cancel and go back
+                          </button>
+                       </div>
+                    )}
+                  </div>
+                </div>
+              ) : !detailsConfirmed ? (
+                <div className="max-w-lg mx-auto min-h-[400px]">
+                  <div className="text-center mb-8">
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">
+                      Manual Payment Details
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      Tell your organization what this payment is for and how much you sent.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">What are you paying for?</label>
+                      <div className="relative">
+                        <select
+                          value={selectedEventId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedEventId(val);
+                            if (val === 'other') {
+                              setFormData(prev => ({ ...prev, reason: '', amount: '' }));
+                            } else {
+                              const ev = paidEvents.find((event) => event.id === val);
+                              if (ev) {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  reason: `Event: ${ev.title}`,
+                                  amount: String(ev.price || ''),
+                                }));
+                              }
+                            }
+                          }}
+                          className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none bg-white pr-10"
+                        >
+                          <option value="other">Other reason (Type below)</option>
+                          {paidEvents.map((ev) => (
+                            <option key={ev.id} value={ev.id}>
+                              {ev.title} — {ev.price} ETB
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                      </div>
+                    </div>
+
+                    {selectedEventId === 'other' && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Payment reason</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.reason}
+                          onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+                          className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                          placeholder="e.g. Monthly dues, donation, fee"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Amount (ETB)</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        step="0.01"
+                        value={formData.amount}
+                        readOnly={selectedEventId !== 'other'}
+                        onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                        className={`w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all ${
+                          selectedEventId !== 'other' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''
+                        }`}
+                        placeholder="Enter amount"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!formData.reason || !formData.amount}
+                      onClick={() => {
+                        setDetailsConfirmed(true);
                       }}
                       className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl disabled:opacity-50 transition-colors mt-6 shadow-lg shadow-indigo-200"
                     >
-                      {paymentMode === 'direct' ? (chapaMutation.isPending ? 'Initializing...' : 'Pay with Chapa') : 'Continue'}
+                      Continue
                     </button>
                   </div>
                 </div>

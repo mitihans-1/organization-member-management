@@ -5,11 +5,25 @@ const prisma = new PrismaClient();
 
 export const getSystemConfig = async (_req: Request, res: Response) => {
   try {
-    let config = await (prisma as any).systemConfig.findFirst();
+    // Safely check if systemConfig exists on prisma client
+    const systemConfigModel = (prisma as any).systemConfig || (prisma as any).system_configs;
+    
+    if (!systemConfigModel) {
+        console.error('SystemConfig model not found on Prisma client');
+        return res.status(200).json({
+            platformName: 'OMMS',
+            telebirrPhone: '0911234567',
+            cbeBirrPhone: '0911234568',
+            paymentInstructions: 'Please transfer to our bank accounts.',
+            showLiveChat: false
+        });
+    }
+
+    let config = await systemConfigModel.findFirst();
     
     // If no config exists, create the default one
     if (!config) {
-      config = await (prisma as any).systemConfig.create({
+      config = await systemConfigModel.create({
         data: {
           platformName: 'OMMS',
           supportEmail: 'support@omms.com',
@@ -28,8 +42,9 @@ export const getSystemConfig = async (_req: Request, res: Response) => {
     }
     
     res.status(200).json(config);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching system config', error });
+  } catch (error: any) {
+    console.error('Error in getSystemConfig:', error);
+    res.status(500).json({ message: 'Error fetching system config', error: error.message || error });
   }
 };
 
@@ -43,10 +58,16 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
       facebookUrl, telegramUrl, linkedinUrl
     } = req.body;
 
-    let config = await (prisma as any).systemConfig.findFirst();
+    const systemConfigModel = (prisma as any).systemConfig || (prisma as any).system_configs;
+    
+    if (!systemConfigModel) {
+        return res.status(400).json({ message: 'SystemConfig model not found on Prisma client' });
+    }
+
+    let config = await systemConfigModel.findFirst();
 
     if (config) {
-      config = await (prisma as any).systemConfig.update({
+      config = await systemConfigModel.update({
         where: { id: config.id },
         data: {
           platformName: platformName ?? config.platformName,
@@ -67,7 +88,7 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
         },
       });
     } else {
-      config = await (prisma as any).systemConfig.create({
+      config = await systemConfigModel.create({
         data: {
           platformName: platformName || 'OMMS',
           supportEmail: supportEmail || 'support@omms.com',
@@ -89,7 +110,8 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
     }
 
     res.status(200).json(config);
-  } catch (error) {
-    res.status(500).json({ message: 'Error updating system config', error });
+  } catch (error: any) {
+    console.error('Error in updateSystemConfig:', error);
+    res.status(500).json({ message: 'Error updating system config', error: error.message || error });
   }
 };

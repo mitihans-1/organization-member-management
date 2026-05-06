@@ -19,6 +19,7 @@ import {
   Inbox,
   Loader2,
   Menu,
+  Zap,
   X as CloseIcon,
 } from 'lucide-react';
 
@@ -27,6 +28,7 @@ const nav = [
   { to: '/super-admin/organizations', label: 'Organizations', icon: Building2 },
   { to: '/super-admin/org-admins', label: 'OrgAdmins', icon: UserCog },
   { to: '/super-admin/members', label: 'Members', icon: Users },
+  { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap },
   { to: '/super-admin/payments', label: 'Payments', icon: CreditCard },
   { to: '/super-admin/system-config', label: 'System Config', icon: Settings },
 ];

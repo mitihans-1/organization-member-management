@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Plan } from '../types';
-import { CheckCircle, Plus, X, Search, UploadCloud, ArrowLeft, CreditCard } from 'lucide-react';
+import { CheckCircle, Plus, X, Search, UploadCloud, ArrowLeft, CreditCard, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
@@ -26,8 +26,11 @@ const Payments: React.FC = () => {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<'direct' | 'manual' | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | 'ebirr' | 'chapa' | null>(null);
+  const [directPhone, setDirectPhone] = useState('');
+  const [directAmount, setDirectAmount] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isChapaLoaded, setIsChapaLoaded] = useState(!!((window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout));
+  const [isChapaFormInitializing, setIsChapaFormInitializing] = useState(false);
 
   useEffect(() => {
     if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
@@ -57,8 +60,11 @@ const Payments: React.FC = () => {
 
   const resetUpgradeWizardFields = useCallback(() => {
     setSelectedPlanId(null);
+    setPaymentMode(null);
     setPaymentMethod(null);
     setReceiptFile(null);
+    setDirectPhone('');
+    setDirectAmount('');
     setRequiresManualEntry(false);
     setManualTransactionId('');
     setOcrErrorMsg('');
@@ -198,8 +204,12 @@ const Payments: React.FC = () => {
   });
 
   const chapaMutation = useMutation({
-    mutationFn: async (planId: string) => {
-      const res = await api.post('/chapa/initialize/plan', { planId });
+    mutationFn: async (data: { planId: string; phoneNumber?: string }) => {
+      const res = await api.post('/chapa/initialize/plan', { 
+        planId: data.planId,
+        phoneNumber: data.phoneNumber,
+        mode: (window as any).ChapaCheckout ? 'inline' : 'standard'
+      });
       return res.data;
     },
     onSuccess: (data) => {
@@ -216,80 +226,83 @@ const Payments: React.FC = () => {
             publicKey: !!publicKey 
           });
 
-          // PREFER REDIRECT: If we have a checkout_url, use it immediately to avoid SDK issues
-          if (data.data?.checkout_url) {
-            console.log('Redirecting to checkout URL:', data.data.checkout_url);
-            window.location.href = data.data.checkout_url;
-            return;
-          }
-
-          // FALLBACK TO INLINE: Only if redirect URL is missing
+          // INLINE EMBEDDED: Use the ChapaCheckout class to render in-platform
           if (chapa && publicKey) {
-            const plan = plans?.find(p => p.id === selectedPlanId);
-            console.log('Launching Chapa payment modal as fallback...');
+            const plan = plans?.find(p => String(p.id) === String(selectedPlanId));
+            const finalAmount = plan?.price || 0;
+
+            if (finalAmount <= 0) {
+              console.error('Invalid amount for Chapa initialization:', finalAmount);
+              if (data.data?.checkout_url) window.location.href = data.data.checkout_url;
+              return;
+            }
+
+            console.log('Initializing Chapa Embedded Form...');
+            setIsChapaFormInitializing(true);
             
-            const paymentData = {
+            const checkoutOptions = {
               public_key: publicKey,
-              tx_ref: data.tx_ref || `plan-${Date.now()}`,
-              amount: plan?.price || 0,
+              tx_ref: data.tx_ref,
+              amount: String(finalAmount),
               currency: 'ETB',
               email: user?.email || '',
               first_name: user?.name?.split(' ')[0] || 'User',
               last_name: user?.name?.split(' ').slice(1).join(' ') || 'Name',
-              title: `Upgrade to ${plan?.name || 'Plan'}`,
-              description: `Subscription for ${user?.organization_name || 'Organization'}`,
               callback_url: `${import.meta.env.VITE_API_URL}/chapa/webhook`,
               return_url: `${window.location.origin}/org-admin/payments?tx_ref=${data.tx_ref}`,
               customization: {
-                title: `Upgrade to ${plan?.name || 'Plan'}`,
-                description: `Subscription for ${user?.organization_name || 'Organization'}`,
+                title: 'Plan Upgrade',
+                description: `Upgrade to ${plan?.name || 'Plan'}`,
               },
-              onSuccess: () => {
-                console.log('Chapa: Payment successful');
+              onSuccessfulPayment: (res: any) => {
+                console.log('Chapa: Payment successful', res);
                 closeUpgradeModal();
                 queryClient.invalidateQueries({ queryKey: ['payments'] });
               },
               onClose: () => {
-                console.log('Chapa: Modal closed');
+                console.log('Chapa: Form closed');
                 setPaymentMode(null);
               },
-              onError: (err: any) => {
-                console.error('Chapa Error:', err);
-                alert('Payment failed to initialize.');
-                setPaymentMode(null);
+              onPaymentFailure: (err: any) => {
+                console.error('Chapa Payment Error:', err);
               }
             };
 
-            if (typeof chapa === 'function') {
-               try {
-                 const instance = new chapa(paymentData);
-                 if (instance.open) instance.open();
-                 else if (instance.pay) instance.pay();
-               } catch (e) {
-                 console.error('Failed to initialize Chapa class:', e);
-                 setPaymentMode(null);
-               }
-            } else if (chapa.pay) {
-              chapa.pay(paymentData);
+            try {
+              // The SDK typically exposes ChapaCheckout
+              const CheckoutClass = (window as any).ChapaCheckout || chapa;
+              if (typeof CheckoutClass === 'function') {
+                const checkout = new CheckoutClass(checkoutOptions);
+                
+                // Wait a tiny bit for the container to definitely be in the DOM
+                setTimeout(() => {
+                  try {
+                    checkout.initialize('chapa-inline-form');
+                    setIsChapaFormInitializing(false);
+                  } catch (initErr) {
+                    console.error('Initialization error:', initErr);
+                    if (data.data?.checkout_url) window.location.href = data.data.checkout_url;
+                  }
+                }, 100);
+                return;
+              }
+            } catch (e) {
+              console.error('Embedded form initialization failed:', e);
             }
+          }
+
+          // REDIRECT FALLBACK: If embedded form fails or SDK is missing
+          if (data.data?.checkout_url) {
+            console.log('Redirecting to Chapa checkout...');
+            window.location.href = data.data.checkout_url;
           } else {
-            console.error('No checkout URL and no SDK found');
-            alert('Payment initialization failed. Please try again.');
+            alert('Payment initialization failed.');
             setPaymentMode(null);
           }
         };
 
-        // Execute immediately if we have a checkout_url
-        if (data.data?.checkout_url) {
-          startPay();
-        } else {
-          // Only wait for SDK if we don't have a redirect URL
-          if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
-            setTimeout(startPay, 1000);
-          } else {
-            startPay();
-          }
-        }
+        // Try to start immediately
+        startPay();
       } else {
         setPaymentMode(null);
         alert(data.message || 'Chapa initialization failed.');
@@ -710,7 +723,36 @@ const Payments: React.FC = () => {
                   </p>
                 </div>
               ) : selectedPlanId ? (
-                !paymentMethod ? (
+                paymentMode === 'direct' ? (
+                  <div className="animate-in fade-in duration-500">
+                     <div className="relative min-h-[400px]">
+                        {/* Loader overlay - separate from the Chapa container to avoid React DOM conflicts */}
+                        {isChapaFormInitializing && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center py-12 bg-white/80 z-20 rounded-3xl">
+                              <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+                              <h3 className="text-xl font-black text-slate-900">Initializing Secure Checkout...</h3>
+                              <p className="text-sm text-slate-500 mt-2 text-center px-4">
+                                Preparing the payment form. Please wait.
+                              </p>
+                          </div>
+                        )}
+                        
+                        {/* This container will hold the Chapa Inline form rendered by their SDK */}
+                        <div id="chapa-inline-form" className="min-h-[400px] border border-slate-100 rounded-3xl p-4 bg-slate-50/30"></div>
+                     </div>
+                     
+                     {!chapaMutation.isSuccess && (
+                        <div className="flex justify-center mt-6">
+                           <button 
+                             onClick={() => { setPaymentMode(null); setPaymentMethod(null); }}
+                             className="text-slate-500 text-sm font-bold hover:text-slate-700 transition-colors"
+                           >
+                             Cancel and go back
+                           </button>
+                        </div>
+                     )}
+                  </div>
+                ) : !paymentMethod ? (
                   <div className="space-y-6">
                     {!paymentMode ? (
                       <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -719,7 +761,8 @@ const Payments: React.FC = () => {
                           disabled={chapaMutation.isPending}
                           onClick={() => {
                             setPaymentMode('direct');
-                            if (selectedPlanId) chapaMutation.mutate(selectedPlanId);
+                            setPaymentMethod('chapa');
+                            if (selectedPlanId) chapaMutation.mutate({ planId: selectedPlanId });
                           }}
                           className="flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50/10 transition-all text-center group disabled:opacity-50"
                         >
@@ -727,40 +770,27 @@ const Payments: React.FC = () => {
                             {chapaMutation.isPending ? (
                               <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                             ) : (
-                              <CreditCard className="h-8 w-8 text-indigo-600" />
+                              <Smartphone className="h-8 w-8 text-indigo-600" />
                             )}
                           </div>
                           <span className="text-base font-black text-slate-900 mb-1">Direct Pay</span>
-                          <span className="text-xs text-slate-500">
-                            {chapaMutation.isPending ? 'Initializing...' : 'Instant activation'}
-                          </span>
+                          <p className="text-[11px] text-slate-500 max-w-[150px] leading-tight">
+                            {chapaMutation.isPending ? 'Initializing...' : 'Instant activation via Telebirr, CBE Birr or Card. No receipt needed.'}
+                          </p>
                         </button>
                         <button
                           type="button"
                           disabled={chapaMutation.isPending}
                           onClick={() => setPaymentMode('manual')}
-                          className="flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50/10 transition-all text-center group disabled:opacity-50"
+                          className="flex flex-col items-center p-8 rounded-3xl border-2 border-slate-100 hover:border-amber-600 hover:bg-amber-50/10 transition-all text-center group disabled:opacity-50"
                         >
-                          <div className="h-16 w-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <UploadCloud className="h-8 w-8 text-indigo-600" />
+                          <div className="h-16 w-16 rounded-2xl bg-amber-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <UploadCloud className="h-8 w-8 text-amber-600" />
                           </div>
                           <span className="text-base font-black text-slate-900 mb-1">Manual Pay</span>
-                          <span className="text-xs text-slate-500">Upload screenshot</span>
-                        </button>
-                      </div>
-                    ) : paymentMode === 'direct' ? (
-                      <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500">
-                        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-                        <h3 className="text-xl font-black text-slate-900">Redirecting to Payment...</h3>
-                        <p className="text-sm text-slate-500 mt-2 text-center">
-                          A secure payment window is opening.
-                        </p>
-                        
-                        <button 
-                          onClick={() => { setPaymentMode(null); }}
-                          className="mt-8 text-indigo-600 font-bold hover:underline"
-                        >
-                          Cancel and go back
+                          <p className="text-[11px] text-slate-500 max-w-[150px] leading-tight">
+                            Pay using your preferred app first, then upload a screenshot for verification.
+                          </p>
                         </button>
                       </div>
                     ) : paymentMode === 'manual' && (
