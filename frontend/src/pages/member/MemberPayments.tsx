@@ -41,16 +41,6 @@ const MemberPayments: React.FC = () => {
 
   const [isChapaFormInitializing, setIsChapaFormInitializing] = useState(false);
 
-  useEffect(() => {
-    if (!(window as any).Chapa && !(window as any).chapa && !(window as any).ChapaCheckout) {
-      const script = document.createElement('script');
-      script.src = "https://js.chapa.co/v1/inline.js";
-      script.async = true;
-      script.onload = () => setIsChapaLoaded(true);
-      document.body.appendChild(script);
-    }
-  }, []);
-
   useBodyScrollLock(isModalOpen);
 
   const { data: payments, isLoading } = useQuery<Payment[]>({
@@ -116,11 +106,12 @@ const MemberPayments: React.FC = () => {
           const chapa = (window as any).Chapa || (window as any).chapa || (window as any).ChapaCheckout;
           const publicKey = import.meta.env.VITE_CHAPA_PUBLIC_KEY;
           
-          console.log('Chapa SDK detection:', {
+          console.log('Chapa SDK detection:', { 
             Chapa: !!(window as any).Chapa, 
             chapa: !!(window as any).chapa, 
             ChapaCheckout: !!(window as any).ChapaCheckout,
-            publicKey: !!publicKey 
+            keyLoaded: !!publicKey,
+            keyPrefix: publicKey?.substring(0, 12)
           });
 
           // INLINE EMBEDDED: Try inline first if SDK is available
@@ -132,19 +123,26 @@ const MemberPayments: React.FC = () => {
               return;
             }
 
-            console.log('Initializing Chapa Embedded Form...');
+            console.log('Initializing Chapa Embedded Form with key:', publicKey.substring(0, 10) + '...');
             setIsChapaFormInitializing(true);
             
             const checkoutOptions = {
-              public_key: publicKey,
+              public_key: publicKey.trim(),
+              publicKey: publicKey.trim(),
+              key: publicKey.trim(),
               tx_ref: data.tx_ref,
+              txRef: data.tx_ref,
               amount: String(finalAmount),
               currency: 'ETB',
               email: user?.email || '',
               first_name: user?.name?.split(' ')[0] || 'User',
+              firstName: user?.name?.split(' ')[0] || 'User',
               last_name: user?.name?.split(' ').slice(1).join(' ') || 'Name',
+              lastName: user?.name?.split(' ').slice(1).join(' ') || 'Name',
               callback_url: `${import.meta.env.VITE_API_URL}/chapa/webhook`,
+              callbackUrl: `${import.meta.env.VITE_API_URL}/chapa/webhook`,
               return_url: `${window.location.origin}/member/payments?tx_ref=${data.tx_ref}`,
+              returnUrl: `${window.location.origin}/member/payments?tx_ref=${data.tx_ref}`,
               customization: {
                 title: formData.reason || 'Payment',
                 description: `Payment for ${organization?.name || 'Organization'}`,
@@ -159,27 +157,60 @@ const MemberPayments: React.FC = () => {
                 setPaymentMode(null);
               },
               onPaymentFailure: (err: any) => {
-                console.error('Chapa Payment Error:', err);
+                console.error('Chapa Payment Error (Full Object):', err);
+                if (typeof err === 'string') {
+                    alert('Chapa Error: ' + err);
+                } else if (err?.message) {
+                    alert('Chapa Error: ' + err.message);
+                } else {
+                    alert('Chapa Error: Charge failed to initiate. Check console for details.');
+                }
               }
             };
 
             try {
-              const CheckoutClass = (window as any).ChapaCheckout || chapa;
-              if (typeof CheckoutClass === 'function') {
-                const checkout = new CheckoutClass(checkoutOptions);
-                setTimeout(() => {
-                  try {
-                    checkout.initialize('chapa-inline-form');
+              const attemptInit = (attempts = 0) => {
+                const container = document.getElementById('chapa-inline-form');
+                if (container) {
+                  container.innerHTML = ''; // Clear container before init
+                  const CheckoutClass = (window as any).ChapaCheckout || chapa;
+                  if (!CheckoutClass) {
+                    console.error('Chapa SDK not loaded');
                     setIsChapaFormInitializing(false);
-                  } catch (initErr) {
-                    console.error('Initialization error:', initErr);
-                    if (data.data?.checkout_url) window.location.href = data.data.checkout_url;
+                    if (data.data?.checkout_url) {
+                      window.location.href = data.data.checkout_url;
+                    } else {
+                      setPaymentError('Chapa SDK not loaded');
+                    }
+                    return;
                   }
-                }, 100);
-                return;
-              }
+                  if (typeof CheckoutClass === 'function') {
+                    const checkout = new CheckoutClass(checkoutOptions);
+                    try {
+                      checkout.initialize('chapa-inline-form');
+                      setIsChapaFormInitializing(false);
+                    } catch (initErr) {
+                      console.error('SDK Initialization Call Failed:', initErr);
+                      setIsChapaFormInitializing(false);
+                      if (data.data?.checkout_url) {
+                        window.location.href = data.data.checkout_url;
+                      } else {
+                        setPaymentError('Failed to initialize payment form. Please try again.');
+                      }
+                    }
+                  }
+                } else if (attempts < 20) {
+                  setTimeout(() => attemptInit(attempts + 1), 100);
+                } else {
+                  console.error('chapa-inline-form container not found');
+                  setIsChapaFormInitializing(false);
+                  setPaymentError('Payment container could not be loaded.');
+                }
+              };
+              attemptInit();
+              return;
             } catch (e) {
-              console.error('Embedded form initialization failed:', e);
+              console.error('Embedded form logic error:', e);
             }
           }
 
@@ -923,5 +954,5 @@ const MemberPayments: React.FC = () => {
     </div>
   );
 };
-
 export default MemberPayments;
+

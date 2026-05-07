@@ -5,11 +5,11 @@ const prisma = new PrismaClient();
 
 export const getSystemConfig = async (_req: Request, res: Response) => {
   try {
-    // Safely check if systemConfig exists on prisma client
-    const systemConfigModel = (prisma as any).systemConfig || (prisma as any).system_configs;
+    // Standard Prisma property name for SystemConfig model
+    const systemConfigModel = (prisma as any).systemConfig;
     
     if (!systemConfigModel) {
-        console.error('SystemConfig model not found on Prisma client');
+        console.warn('SystemConfig model not found on Prisma client. Ensure "npx prisma generate" has been run.');
         return res.status(200).json({
             platformName: 'OMMS',
             telebirrPhone: '0911234567',
@@ -58,10 +58,10 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
       facebookUrl, telegramUrl, linkedinUrl
     } = req.body;
 
-    const systemConfigModel = (prisma as any).systemConfig || (prisma as any).system_configs;
+    const systemConfigModel = (prisma as any).systemConfig;
     
     if (!systemConfigModel) {
-        return res.status(400).json({ message: 'SystemConfig model not found on Prisma client' });
+        return res.status(400).json({ message: 'SystemConfig model not found on Prisma client. Run "npx prisma generate".' });
     }
 
     let config = await systemConfigModel.findFirst();

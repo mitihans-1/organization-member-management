@@ -174,7 +174,7 @@ const Events: React.FC = () => {
     }));
     if (rows.length === 0) return;
 
-    const headers = Object.keys(rows[0]);
+    const headers = Object.keys(rows[0] || {});
     const csv = [
       headers.join(','),
       ...rows.map((row) =>

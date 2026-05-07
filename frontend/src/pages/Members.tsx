@@ -65,10 +65,10 @@ const Members: React.FC = () => {
     mutationFn: async (data: any) => {
       const response = await api.post('/members', data);
       const member = response.data;
-      if (Object.keys(customFieldValues).length > 0) {
+      if (Object.keys(customFieldValues || {}).length > 0) {
         await customAttributeService.updateMemberValues(
           member.id,
-          Object.entries(customFieldValues).map(([attrId, value]) => ({
+          Object.entries(customFieldValues || {}).map(([attrId, value]) => ({
             attributeId: attrId,
             value,
           }))
@@ -90,10 +90,10 @@ const Members: React.FC = () => {
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; member: any }) => {
       const response = await api.put(`/members/${data.id}`, data.member);
-      if (Object.keys(customFieldValues).length > 0) {
+      if (Object.keys(customFieldValues || {}).length > 0) {
         await customAttributeService.updateMemberValues(
           data.id,
-          Object.entries(customFieldValues).map(([attrId, value]) => ({
+          Object.entries(customFieldValues || {}).map(([attrId, value]) => ({
             attributeId: attrId,
             value,
           }))
@@ -148,7 +148,7 @@ const Members: React.FC = () => {
       JoinDate: m.join_date ? new Date(m.join_date).toISOString() : '',
       Organization: m.organization_name || '',
     }));
-    const headers = Object.keys(rows[0]);
+    const headers = Object.keys(rows[0] || {});
     const csv = [
       headers.join(','),
       ...rows.map((row) =>
