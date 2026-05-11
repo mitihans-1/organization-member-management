@@ -48,6 +48,7 @@ export const createOrganization = async (req: any, res: Response) => {
         organizationId: organizationRow.id,
         role: 'orgAdmin',
         plan_id: plan_id ? plan_id : undefined,
+        is_verified: true,
       },
     });
 

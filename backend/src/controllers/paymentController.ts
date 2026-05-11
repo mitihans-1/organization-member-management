@@ -627,8 +627,8 @@ export const confirmEventPayment = async (req: any, res: Response) => {
         await prisma.event.update({
           where: { id: event.id },
           data: {
-            attendeesIds: {
-              push: payment.user_id
+            attendees: {
+              connect: { id: payment.user_id }
             }
           }
         }).catch(() => {});

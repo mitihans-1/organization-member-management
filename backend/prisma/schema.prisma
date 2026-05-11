@@ -5,12 +5,12 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model PendingUser {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                String   @id @default(cuid())
   name              String
   email             String   @unique
   password          String
@@ -26,7 +26,7 @@ model PendingUser {
 }
 
 model Organization {
-  id               String                      @id @default(auto()) @map("_id") @db.ObjectId
+  id               String                      @id @default(cuid())
   name             String
   type             String
   createdAt        DateTime                    @default(now())
@@ -35,7 +35,7 @@ model Organization {
   events           Event[]
   users            User[]
   customAttributes CustomAttributeDefinition[]
-  plan_id          String?                     @db.ObjectId
+  plan_id          String?
   plan_expiry      DateTime?
   plan             Plan?                       @relation(fields: [plan_id], references: [id])
   payment_phone    String?
@@ -44,12 +44,12 @@ model Organization {
 }
 
 model User {
-  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  id                    String                 @id @default(cuid())
   name                  String
   email                 String                 @unique
   phone                 String?
   role                  String                 @default("orgAdmin")
-  organizationId        String?                @db.ObjectId
+  organizationId        String?
   organization_name     String?
   organization_type     String?
   password              String
@@ -59,7 +59,7 @@ model User {
   sex                   String?
   join_date             DateTime?
   address               String?
-  plan_id               String?                @db.ObjectId
+  plan_id               String?
   plan_expiry           DateTime?
   fayda_id              String?
   is_fayda_verified     Boolean                @default(false)
@@ -75,14 +75,13 @@ model User {
   organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   blogs                 Blog[]                 @relation("BlogAuthor")
   
-  attendedEventsIds     String[]               @db.ObjectId
-  attendedEvents        Event[]                @relation("EventAttendees", fields: [attendedEventsIds], references: [id])
+  attendedEvents        Event[]                @relation("EventAttendees")
 
   @@map("users")
 }
 
 model SystemConfig {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  id               String   @id @default(cuid())
   platformName     String   @default("OMMS")
   supportEmail     String   @default("support@omms.com")
   maintenanceMode  Boolean  @default(false)
@@ -110,11 +109,11 @@ model SystemConfig {
 }
 
 model CustomAttributeDefinition {
-  id             String                 @id @default(auto()) @map("_id") @db.ObjectId
+  id             String                 @id @default(cuid())
   name           String
   type           String                 // "text", "number", "date", "boolean"
   required       Boolean                @default(false)
-  organizationId String                 @db.ObjectId
+  organizationId String
   organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   values         MemberAttributeValue[]
 
@@ -122,9 +121,9 @@ model CustomAttributeDefinition {
 }
 
 model MemberAttributeValue {
-  id          String                    @id @default(auto()) @map("_id") @db.ObjectId
-  memberId    String                    @db.ObjectId
-  attributeId String                    @db.ObjectId
+  id          String                    @id @default(cuid())
+  memberId    String
+  attributeId String
   value       String
   member      User                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   attribute   CustomAttributeDefinition @relation(fields: [attributeId], references: [id], onDelete: Cascade)
@@ -134,8 +133,8 @@ model MemberAttributeValue {
 }
 
 model Notification {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
+  id        String   @id @default(cuid())
+  userId    String
   title     String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -145,7 +144,7 @@ model Notification {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(cuid())
   email     String   @unique
   token     String
   expiresAt DateTime
@@ -155,8 +154,8 @@ model PasswordResetToken {
 }
 
 model OtpToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @unique @db.ObjectId
+  id        String   @id @default(cuid())
+  userId    String   @unique
   otp_code  String
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -166,7 +165,7 @@ model OtpToken {
 }
 
 model Member {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id          String    @id @default(cuid())
   name        String
   email       String    @unique
   role        String?
@@ -174,7 +173,7 @@ model Member {
   join_date   DateTime?
   last_active DateTime?
   photo       String?
-  user_id     String    @db.ObjectId
+  user_id     String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   user        User      @relation(fields: [user_id], references: [id])
@@ -183,7 +182,7 @@ model Member {
 }
 
 model Plan {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @id @default(cuid())
   name          String
   price         Float
   billing_cycle String
@@ -200,9 +199,9 @@ model Plan {
 }
 
 model Payment {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  user_id          String   @db.ObjectId
-  plan_id          String?  @db.ObjectId
+  id               String   @id @default(cuid())
+  user_id          String
+  plan_id          String?
   amount           Float
   payment_method   String
   status           String
@@ -221,13 +220,13 @@ model Payment {
   reference_type   String?
   reference_id     String?
 
-  organization_id  String?  @db.ObjectId
+  organization_id  String?
 
   @@map("payments")
 }
 
 model Blog {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  id             String        @id @default(cuid())
   title          String
   content        String
   image          String?
@@ -235,10 +234,10 @@ model Blog {
   category       String        @default("general")
   tags           String?
   readTime       Int?
-  author_id      String        @db.ObjectId
+  author_id      String
   author         User          @relation("BlogAuthor", fields: [author_id], references: [id])
 
-  organizationId String?       @db.ObjectId
+  organizationId String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
@@ -249,7 +248,7 @@ model Blog {
 }
 
 model Event {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  id             String        @id @default(cuid())
   title          String
   description    String
   date           DateTime
@@ -261,15 +260,14 @@ model Event {
   capacity       Int?
   virtualLink    String?
   contactEmail   String?
-  organizationId String?       @db.ObjectId
+  organizationId String?
   price          Float?
   payment_required Boolean    @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   organizations  Organization? @relation(fields: [organizationId], references: [id])
 
-  attendeesIds   String[]      @db.ObjectId
-  attendees      User[]        @relation("EventAttendees", fields: [attendeesIds], references: [id])
+  attendees      User[]        @relation("EventAttendees")
 
   @@map("events")
 }

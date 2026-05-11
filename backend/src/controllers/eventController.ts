@@ -128,34 +128,28 @@ export const registerForEvent = async (req: any, res: Response) => {
     }
 
     // Check if already registered
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { attendedEventsIds: true }
+    const alreadyRegistered = await prisma.event.findFirst({
+      where: {
+        id: id,
+        attendees: {
+          some: { id: userId }
+        }
+      }
     });
 
-    if (user?.attendedEventsIds.includes(id)) {
+    if (alreadyRegistered) {
       return res.status(400).json({ message: 'You are already registered for this event.' });
     }
 
-    // Add user to event attendees and event to user's attended events
-    await prisma.$transaction([
-      prisma.event.update({
-        where: { id: id },
-        data: {
-          attendeesIds: {
-            push: userId
-          }
+    // Add user to event attendees
+    await prisma.event.update({
+      where: { id: id },
+      data: {
+        attendees: {
+          connect: { id: userId }
         }
-      }),
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          attendedEventsIds: {
-            push: id
-          }
-        }
-      })
-    ]);
+      }
+    });
 
     res.status(200).json({ message: 'Successfully registered for event' });
   } catch (error) {

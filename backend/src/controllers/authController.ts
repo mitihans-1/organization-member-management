@@ -5,6 +5,8 @@ import { OAuth2Client } from 'google-auth-library';
 import { PrismaClient } from '@prisma/client';
 import { sendOtpEmail, sendResetPasswordEmail } from '../services/emailService';
 import { JWT_SECRET } from '../config/jwtConfig';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -59,8 +61,7 @@ export const register = async (req: Request, res: Response) => {
     const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
     // Store in PendingUser instead of User
-    // Using type assertion to bypass temporary Prisma Client generation lock
-    await (prisma as any).pendingUser.upsert({
+    await prisma.pendingUser.upsert({
       where: { email },
       update: {
         name,
@@ -120,7 +121,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     }
 
     // Look for the user in PendingUser instead of User
-    const pendingUser = await (prisma as any).pendingUser.findUnique({ where: { email } });
+    const pendingUser = await prisma.pendingUser.findUnique({ where: { email } });
     
     if (!pendingUser) {
       // Check if user is already verified and in User table
@@ -135,7 +136,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
     if (new Date() > pendingUser.expiresAt) {
       console.warn('OTP Verification Blocked: OTP expired', email);
-      await (prisma as any).pendingUser.delete({ where: { id: pendingUser.id } });
+      await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
       return res.status(400).json({ message: 'OTP has expired. Please register again.' });
     }
 
@@ -188,7 +189,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     }
 
     // Delete the pending user record
-    await (prisma as any).pendingUser.delete({ where: { id: pendingUser.id } });
+    await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
 
     // Log the user in
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
@@ -212,7 +213,7 @@ export const resendOtp = async (req: Request, res: Response) => {
 
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
-    const pendingUser = await (prisma as any).pendingUser.findUnique({ where: { email } });
+    const pendingUser = await prisma.pendingUser.findUnique({ where: { email } });
     if (!pendingUser) {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) return res.status(400).json({ message: 'User is already verified' });
@@ -224,7 +225,7 @@ export const resendOtp = async (req: Request, res: Response) => {
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
 
-    await (prisma as any).pendingUser.update({
+    await prisma.pendingUser.update({
       where: { id: pendingUser.id },
       data: {
         otp_code: hashedOtp,
@@ -248,7 +249,7 @@ export const login = async (req: Request, res: Response) => {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       // Check if it's a pending registration
-      const pendingUser = await (prisma as any).pendingUser.findUnique({ where: { email } });
+      const pendingUser = await prisma.pendingUser.findUnique({ where: { email } });
       if (pendingUser) {
         return res.status(403).json({ 
           message: 'Your registration is pending verification. Please verify your email with the OTP sent.', 
@@ -298,24 +299,74 @@ export const getProfile = async (req: any, res: Response) => {
 
 export const updateProfile = async (req: any, res: Response) => {
   try {
-    const { name, email, phone, address, organization_name, organization_type, sex, join_date } = req.body;
+    console.log('Update Profile Request Body:', req.body);
+    console.log('Update Profile File:', req.file);
+
+    const { name, email, phone, address, organization_name, organization_type, sex, join_date, remove_photo } = req.body;
+    
+    // Get current user to check for existing photo
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { profile_photo_path: true }
+    });
+
+    let profile_photo_path = currentUser?.profile_photo_path;
+
+    // Handle photo removal
+    if (remove_photo === 'true' || remove_photo === true) {
+      if (profile_photo_path) {
+        const fullPath = path.resolve(profile_photo_path);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+      profile_photo_path = null;
+    } 
+    // Handle new photo upload
+    else if (req.file) {
+      // Delete old photo if it exists
+      if (profile_photo_path) {
+        const fullPath = path.resolve(profile_photo_path);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+      profile_photo_path = req.file.path;
+    }
+
+    const updateData: any = {
+      name,
+      email,
+      phone,
+      address,
+      organization_name,
+      organization_type,
+      sex,
+      profile_photo_path: profile_photo_path,
+    };
+
+    if (join_date && join_date.trim() !== '') {
+      const parsedDate = new Date(join_date);
+      if (!isNaN(parsedDate.getTime())) {
+        updateData.join_date = parsedDate;
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id: req.user.userId },
-      data: {
-        name,
-        email,
-        phone,
-        address,
-        organization_name,
-        organization_type,
-        sex,
-        join_date: join_date ? new Date(join_date) : undefined,
-      },
+      data: updateData,
     });
+
     const { password, ...userWithoutPassword } = user;
     res.status(200).json(userWithoutPassword);
   } catch (error: any) {
     console.error('Update Profile Error:', error);
+    
+    // Handle unique constraint errors (e.g. email already exists)
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'A user with this email already exists.' });
+    }
+    
     res.status(500).json({ message: 'Error updating profile', error: error.message });
   }
 };

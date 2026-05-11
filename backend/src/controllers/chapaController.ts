@@ -5,7 +5,7 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+const isValidId = (id: string) => typeof id === 'string' && id.length > 0;
 
 /**
  * Initialize a Chapa payment for a Plan (Organization Upgrade)
@@ -16,7 +16,7 @@ export const initializePlanPayment = async (req: any, res: Response) => {
     const userId = req.user.userId;
     const isInline = mode === 'inline';
 
-    if (!userId || !isValidObjectId(userId)) {
+    if (!userId || !isValidId(userId)) {
       return res.status(400).json({ message: 'Invalid User ID format' });
     }
 
@@ -31,7 +31,7 @@ export const initializePlanPayment = async (req: any, res: Response) => {
     let finalTitle = reason || 'Plan Upgrade';
 
     if (planId && planId !== 'general-payment') {
-      if (!isValidObjectId(planId)) {
+      if (!isValidId(planId)) {
         return res.status(400).json({ message: 'Invalid Plan ID format' });
       }
       const plan = await prisma.plan.findUnique({ where: { id: planId } });
@@ -134,11 +134,11 @@ export const initializeEventPayment = async (req: any, res: Response) => {
     const userId = req.user.userId;
     const isInline = mode === 'inline';
 
-    if (!userId || !isValidObjectId(userId)) {
+    if (!userId || !isValidId(userId)) {
       return res.status(400).json({ message: 'Invalid User ID format' });
     }
 
-    if (!eventId || !isValidObjectId(eventId)) {
+    if (!eventId || !isValidId(eventId)) {
       return res.status(400).json({ message: 'Invalid Event ID format' });
     }
 
@@ -309,35 +309,27 @@ async function processSuccessfulTransaction(tx_ref: string) {
   } 
   // 2. Check if it's an Event Payment
   else if (tx_ref.startsWith('e-')) {
-    const eventPayment = await (prisma as any).eventPayment.findFirst({
-      where: { transactionId: tx_ref, status: 'pending' },
+    const eventPayment = await prisma.payment.findFirst({
+      where: { transaction_id: tx_ref, status: 'pending' },
     });
 
-    if (eventPayment) {
+    if (eventPayment && eventPayment.reference_id) {
       await prisma.$transaction([
-        (prisma as any).eventPayment.update({
+        prisma.payment.update({
           where: { id: eventPayment.id },
           data: { status: 'completed' },
         }),
-        prisma.user.update({
-          where: { id: eventPayment.userId },
-          data: {
-            attendedEventsIds: {
-              push: eventPayment.eventId,
-            },
-          },
-        }),
         prisma.event.update({
-          where: { id: eventPayment.eventId },
+          where: { id: eventPayment.reference_id },
           data: {
-            attendeesIds: {
-              push: eventPayment.userId,
-            },
-          },
+            attendees: {
+              connect: { id: eventPayment.user_id }
+            }
+          }
         }),
         prisma.notification.create({
           data: {
-            userId: eventPayment.userId,
+            userId: eventPayment.user_id,
             title: `Ticket purchase successful! You are now registered for the event.`,
           },
         }),
