@@ -47,7 +47,10 @@ export const sendOtpEmail = async (to: string, otpCode: string, name: string) =>
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('OTP Email successfully sent to %s: %s', to, info.messageId);
+    console.log('-----------------------------------------');
+    console.log(`OTP Email successfully sent to ${to}`);
+    console.log(`OTP CODE: ${otpCode}`);
+    console.log('-----------------------------------------');
     
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));

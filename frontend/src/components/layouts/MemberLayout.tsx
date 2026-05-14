@@ -88,8 +88,16 @@ const MemberLayout: React.FC = () => {
         </nav>
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-800 font-bold text-xs border border-sky-200">
-              {user?.name?.charAt(0)}
+            <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-800 font-bold text-xs border border-sky-200 overflow-hidden">
+              {user?.profile_photo_path ? (
+                <img 
+                  src={`http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                user?.name?.charAt(0)
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-gray-900 truncate">{user?.name}</p>

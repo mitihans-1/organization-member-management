@@ -40,3 +40,6 @@ frontend/public/imageevent/
 frontend/public/imagemember/
 frontend/public/imageorgan/
 backend/mongodb_local/
+backend/uploads/
+backend/scratch/
+RUNNING.md

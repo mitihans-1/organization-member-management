@@ -445,8 +445,9 @@ const Members: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <img
                         src={
-                          member.profile_photo_path ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=e0e7ff&color=3730a3`
+                          member.profile_photo_path 
+                            ? `http://localhost:5000/${member.profile_photo_path.replace(/\\/g, '/')}`
+                            : `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=e0e7ff&color=3730a3`
                         }
                         alt=""
                         className="w-10 h-10 rounded-full object-cover ring-1 ring-gray-100"

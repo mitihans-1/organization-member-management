@@ -309,14 +309,25 @@ const SuperAdminLayout: React.FC = () => {
                 <button
                   title="user menu"
                   type="button"
-                  className="inline-flex items-center gap-2 text-sm font-bold text-gray-800 rounded-xl px-2 py-1.5 hover:bg-gray-50"
+                  className="inline-flex items-center gap-3 text-sm font-bold text-gray-800 rounded-xl px-2 py-1.5 hover:bg-gray-50 transition-colors"
                   aria-expanded="true"
                   aria-haspopup="true"
                   aria-controls={userId}
                   id={`${userId}-trigger`}
                   onClick={() => toggle('user')}
                 >
-                  {user?.name}
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={
+                        user?.profile_photo_path 
+                          ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
+                      }
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="hidden sm:inline">{user?.name}</span>
                   <ChevronDown
                     size={16}
                     className="text-gray-400 transition-transform rotate-180"
@@ -326,14 +337,25 @@ const SuperAdminLayout: React.FC = () => {
                 <button
                   title="user menu"
                   type="button"
-                  className="inline-flex items-center gap-2 text-sm font-bold text-gray-800 rounded-xl px-2 py-1.5 hover:bg-gray-50"
+                  className="inline-flex items-center gap-3 text-sm font-bold text-gray-800 rounded-xl px-2 py-1.5 hover:bg-gray-50 transition-colors"
                   aria-expanded="false"
                   aria-haspopup="true"
                   aria-controls={userId}
                   id={`${userId}-trigger`}
                   onClick={() => toggle('user')}
                 >
-                  {user?.name}
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={
+                        user?.profile_photo_path 
+                          ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
+                      }
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="hidden sm:inline">{user?.name}</span>
                   <ChevronDown
                     size={16}
                     className="text-gray-400 transition-transform"

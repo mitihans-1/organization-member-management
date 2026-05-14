@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { User as UserIcon, Mail, Phone, MapPin, Building, Briefcase, Camera, Save } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, MapPin, Building, Briefcase, Camera, Save, X } from 'lucide-react';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 
 const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { pathname } = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isOrgProfile =
     pathname.startsWith('/org-admin/profile') || pathname.startsWith('/org/profile');
+    
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -20,11 +22,31 @@ const Profile: React.FC = () => {
     sex: user?.sex || '',
     join_date: user?.join_date ? new Date(user?.join_date).toISOString().split('T')[0] : '',
   });
+
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+      setRemovePhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setRemovePhoto(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,13 +55,43 @@ const Profile: React.FC = () => {
     setMessage({ type: '', content: '' });
 
     try {
-      await api.put('/auth/profile', formData);
+      const data = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          data.append(key, value);
+        }
+      });
+
+      if (photoFile) {
+        data.append('profile_photo', photoFile);
+      }
+
+      if (removePhoto) {
+        data.append('remove_photo', 'true');
+      }
+
+      const response = await api.put('/auth/profile', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      updateUser(response.data);
       setMessage({ type: 'success', content: 'Profile updated successfully!' });
+      setPhotoFile(null);
+      setRemovePhoto(false);
     } catch (err: any) {
       setMessage({ type: 'error', content: err.response?.data?.message || 'Failed to update profile' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const getProfilePhoto = () => {
+    if (photoPreview) return photoPreview;
+    if (removePhoto) return `https://ui-avatars.com/api/?name=${user?.name}&background=ecf39e&color=132a13`;
+    if (user?.profile_photo_path) {
+      return `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`;
+    }
+    return `https://ui-avatars.com/api/?name=${user?.name}&background=ecf39e&color=132a13`;
   };
 
   return (
@@ -61,13 +113,35 @@ const Profile: React.FC = () => {
            <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100 flex flex-col items-center text-center space-y-6">
               <div className="relative group">
                  <img
-                    src={user?.profile_photo_path || `https://ui-avatars.com/api/?name=${user?.name}&background=ecf39e&color=132a13`}
+                    src={getProfilePhoto()}
                     alt="Profile"
-                    className="w-32 h-32 rounded-[2rem] border-4 border-white shadow-xl ring-1 ring-gray-100 group-hover:scale-105 transition-all duration-500"
+                    className="w-32 h-32 rounded-[2rem] border-4 border-white shadow-xl ring-1 ring-gray-100 group-hover:scale-105 transition-all duration-500 object-cover"
                  />
-                 <button title="Change photo" type="button" className="absolute -bottom-2 -right-2 bg-brand-medium text-white p-3 rounded-2xl shadow-lg hover:bg-brand-light transition-all">
+                 <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/*"
+                 />
+                 <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Change photo" 
+                    type="button" 
+                    className="absolute -bottom-2 -right-2 bg-brand-medium text-white p-3 rounded-2xl shadow-lg hover:bg-brand-light transition-all"
+                 >
                     <Camera size={20} />
                  </button>
+                 {(user?.profile_photo_path || photoPreview) && !removePhoto && (
+                   <button 
+                      onClick={handleRemovePhoto}
+                      title="Remove photo" 
+                      type="button" 
+                      className="absolute -top-2 -right-2 bg-red-500 text-white p-2 rounded-xl shadow-lg hover:bg-red-600 transition-all"
+                   >
+                      <X size={16} />
+                   </button>
+                 )}
               </div>
               <div>
                  <h2 className="text-xl font-black text-brand-dark">{user?.name}</h2>
