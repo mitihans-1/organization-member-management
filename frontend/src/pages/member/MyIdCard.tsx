@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useReactToPrint } from 'react-to-print';
 import { Printer, Download, CreditCard, UploadCloud } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PrintPage1Back, PrintPage2Front } from '../../components/id-card/IdCardTemplates';
 
 export const MyIdCard = () => {
   const { user } = useAuth();
@@ -44,6 +45,8 @@ export const MyIdCard = () => {
   
   const handlePrintAction = useReactToPrint({
     contentRef: printRef,
+    documentTitle: 'My_ID_Card',
+    pageStyle: `@page { size: auto; margin: 0mm; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`,
     onAfterPrint: () => {
       if (data?.card) {
         api.post('/id-cards/print-log', { idCardId: data.card.id }).catch(console.error);
@@ -154,80 +157,41 @@ export const MyIdCard = () => {
 
   // Render GENERATED Card
   return (
-    <div className="max-w-4xl mx-auto mt-8 flex flex-col md:flex-row gap-8">
+    <div className="max-w-6xl mx-auto mt-8 flex flex-col xl:flex-row gap-8">
       {/* Left side: Card Preview */}
-      <div className="flex-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
-        <div
-          ref={printRef}
-          className="w-full max-w-[320px] bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 flex flex-col items-center text-center relative overflow-hidden"
-          style={{ minHeight: '480px' }}
-        >
-          {/* Header Banner */}
-          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-indigo-600 to-purple-700"></div>
-          
-          <div className="z-10 mt-3 w-full flex justify-between items-center text-white font-bold px-2 gap-2">
-            <div className="flex items-center gap-1.5 w-full">
-              <span className="text-[11px] truncate">{card.organization?.name}</span>
-              <span className="text-[11px] text-white/90 font-medium uppercase tracking-wider whitespace-nowrap">Identification Card</span>
-            </div>
-            <span className="bg-white/20 px-2 py-0.5 text-[10px] rounded-full border border-white/30 backdrop-blur-sm shrink-0">v{card.version}</span>
-          </div>
-
-          <div className="w-28 h-28 rounded-full border-4 border-white bg-gray-200 z-10 mt-6 overflow-hidden shadow-lg">
-            <img 
-              src={card.user?.profile_photo_path || `https://ui-avatars.com/api/?name=${encodeURIComponent(card.user?.name || '')}&background=e0e7ff&color=3730a3`} 
-              alt="Profile" 
-              className="w-full h-full object-cover"
-            />
-          </div>
-          
-          <div className="z-10 mt-4 w-full">
-            <h3 className="font-black text-gray-900 text-xl tracking-tight leading-tight">
-              <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold block mb-0.5">NAME:</span> 
-              {card.user?.name}
-            </h3>
-            <p className="text-sm text-indigo-600 font-bold uppercase tracking-widest mt-1">{card.user?.role}</p>
-            
-            <div className="flex flex-col items-center mt-3 text-[10px] text-gray-700 gap-0.5">
-              {card.user?.sex && <div className="flex gap-1.5"><span className="font-bold text-gray-400 uppercase tracking-widest">GENDER:</span> <span className="font-semibold uppercase">{card.user.sex}</span></div>}
-              {card.user?.address && <div className="flex gap-1.5"><span className="font-bold text-gray-400 uppercase tracking-widest">COUNTRY:</span> <span className="font-semibold uppercase">{card.user.address}</span></div>}
-              {card.user?.phone && <div className="flex gap-1.5"><span className="font-bold text-gray-400 uppercase tracking-widest">PHONE:</span> <span className="font-bold font-mono">{card.user.phone}</span></div>}
-              <div className="flex gap-1.5"><span className="font-bold text-gray-400 uppercase tracking-widest">GIVEN:</span> <span className="font-semibold uppercase">{new Date(card.generatedAt).toLocaleDateString()}</span></div>
-              <div className="flex gap-1.5">
-                <span className="font-bold text-gray-400 uppercase tracking-widest">EXPIRES:</span> 
-                <span className="font-semibold uppercase">
-                  {card.expiresAt ? new Date(card.expiresAt).toLocaleDateString() : new Date(new Date(card.generatedAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 p-3 bg-white rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.05)] border border-gray-100">
-            <QRCodeSVG
-              value={`${window.location.origin}/verify/${card.qrToken}`}
-              size={120}
-              level="H"
-            />
-          </div>
-
-          <div className="mt-auto pt-6 w-full text-xs text-gray-400 font-mono flex justify-center items-end tracking-widest">
-            {card.cardNumber}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 mt-8 w-full max-w-[320px]">
-          {card.printCount > 0 && (
-            <div className="text-xs text-orange-600 font-bold text-center bg-orange-50 py-2 rounded-xl border border-orange-100">
-              Already printed. Request a replacement if lost.
-            </div>
-          )}
+      <div className="flex-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center overflow-hidden">
+        
+        <div className="w-full flex justify-between items-center mb-6 max-w-[648px]">
+          <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Your Official ID Card</h4>
           <button 
             onClick={handlePrintAction}
             disabled={card.printCount > 0}
-            className="w-full bg-white border-2 border-indigo-100 text-indigo-600 font-bold py-3 px-4 rounded-xl hover:bg-indigo-50 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-indigo-600 text-white border-none font-bold py-2 px-4 rounded-xl hover:bg-indigo-500 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
           >
-            <Printer size={18} /> Print Card
+            <Printer size={16} /> {card.printCount > 0 ? 'Already Printed' : 'Print Card'}
           </button>
+        </div>
+
+        {card.printCount > 0 && (
+          <div className="w-full max-w-[648px] mb-6 p-4 bg-orange-50 border border-orange-200 text-orange-700 rounded-xl text-sm font-bold flex items-center justify-center">
+            You have already printed your ID card. Request a replacement if lost.
+          </div>
+        )}
+
+        <div className="w-full overflow-x-auto pb-8 flex justify-center custom-scrollbar">
+          {/* Wrapper for scaling on smaller screens without affecting print */}
+          <div className="transform scale-[0.5] sm:scale-[0.6] md:scale-75 lg:scale-90 xl:scale-100 origin-top">
+            <div ref={printRef} className="flex flex-col gap-[30px] print:gap-0">
+              <div className="relative group">
+                <div className="absolute -top-6 left-0 text-xs font-bold text-gray-400 print:hidden">PAGE 1 (BACK SIDE)</div>
+                <PrintPage1Back card={card} />
+              </div>
+              <div className="relative group mt-8 print:mt-0">
+                <div className="absolute -top-6 left-0 text-xs font-bold text-gray-400 print:hidden">PAGE 2 (FRONT SIDE)</div>
+                <PrintPage2Front card={card} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

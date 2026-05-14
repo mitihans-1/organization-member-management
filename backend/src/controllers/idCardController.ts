@@ -61,6 +61,20 @@ export const requestIdCard = async (req: any, res: Response) => {
       }
     });
 
+    // Notify organization admins
+    const orgAdmins = await prisma.user.findMany({
+      where: { organizationId: user.organizationId, role: 'orgAdmin' }
+    });
+
+    if (orgAdmins.length > 0) {
+      await prisma.notification.createMany({
+        data: orgAdmins.map(admin => ({
+          userId: admin.id,
+          title: `New ID Card request from ${user.name}`
+        }))
+      });
+    }
+
     res.status(201).json({ message: 'Request submitted successfully.', data: newRequest });
   } catch (error) {
     console.error(error);
@@ -79,7 +93,14 @@ export const getMyIdCard = async (req: any, res: Response) => {
           select: { name: true, email: true, profile_photo_path: true, role: true, join_date: true, phone: true, sex: true, address: true }
         },
         organization: {
-          select: { name: true }
+          select: { 
+            name: true,
+            users: {
+              where: { role: 'orgAdmin' },
+              select: { profile_photo_path: true },
+              take: 1
+            }
+          }
         }
       }
     });
@@ -142,16 +163,31 @@ export const getRequests = async (req: any, res: Response) => {
     const admin = await prisma.user.findUnique({ where: { id: userId } });
     if (!admin?.organizationId) return res.status(403).json({ message: 'No organization access' });
 
-    const requests = await prisma.idCardRequest.findMany({
+    const requestsRaw = await prisma.idCardRequest.findMany({
       where: { organizationId: admin.organizationId },
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true, sex: true, address: true, profile_photo_path: true } }
-      },
       orderBy: { createdAt: 'desc' }
     });
 
+    // Manually fetch users to avoid Prisma "Inconsistent query result" error
+    // if a user was deleted but their request remained in the database.
+    const userIds = [...new Set(requestsRaw.map(r => r.userId))];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true, phone: true, sex: true, address: true, profile_photo_path: true }
+    });
+
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    const requests = requestsRaw
+      .map(r => ({
+        ...r,
+        user: userMap.get(r.userId) || null
+      }))
+      .filter(r => r.user !== null); // Filter out requests for deleted users
+
     res.status(200).json(requests);
   } catch (error) {
+    console.error('getRequests error:', error);
     res.status(500).json({ message: 'Error fetching requests', error });
   }
 };
@@ -201,6 +237,14 @@ export const approveRequest = async (req: any, res: Response) => {
       data: {
         requestStatus: 'GENERATED',
         approvedByOrgAdminId: adminId,
+      }
+    });
+
+    // Notify the member
+    await prisma.notification.create({
+      data: {
+        userId: request.userId,
+        title: 'Your ID Card has been approved and generated.'
       }
     });
 
@@ -254,16 +298,42 @@ export const getGeneratedCards = async (req: any, res: Response) => {
     const admin = await prisma.user.findUnique({ where: { id: userId } });
     if (!admin?.organizationId) return res.status(403).json({ message: 'No organization access' });
 
-    const cards = await prisma.idCard.findMany({
+    const cardsRaw = await prisma.idCard.findMany({
       where: { organizationId: admin.organizationId },
       include: {
-        user: { select: { name: true, email: true, phone: true, sex: true, address: true, profile_photo_path: true, role: true } }
+        organization: {
+          select: {
+            name: true,
+            users: {
+              where: { role: 'orgAdmin' },
+              select: { profile_photo_path: true },
+              take: 1
+            }
+          }
+        }
       },
       orderBy: { generatedAt: 'desc' }
     });
 
+    // Manually fetch users to avoid Prisma "Inconsistent query result" error
+    const userIds = [...new Set(cardsRaw.map(c => c.userId))];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true, phone: true, sex: true, address: true, profile_photo_path: true, role: true }
+    });
+
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    const cards = cardsRaw
+      .map(c => ({
+        ...c,
+        user: userMap.get(c.userId) || null
+      }))
+      .filter(c => c.user !== null);
+
     res.status(200).json(cards);
   } catch (error) {
+    console.error('getGeneratedCards error:', error);
     res.status(500).json({ message: 'Error fetching generated cards', error });
   }
 };
