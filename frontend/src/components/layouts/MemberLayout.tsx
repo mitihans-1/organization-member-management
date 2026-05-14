@@ -18,6 +18,7 @@ const nav = [
   { to: '/member/profile', label: 'Profile', icon: User },
   { to: '/member/events', label: 'Events', icon: Calendar },
   { to: '/member/blog', label: 'Blog', icon: FileText },
+  { to: '/member/id-card', label: 'My ID Card', icon: CreditCard },
   { to: '/member/payments', label: 'Payments', icon: CreditCard },
 ];
 
