@@ -172,24 +172,24 @@ const Dashboard: React.FC = () => {
       )}
 
       {statsLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-32 rounded-2xl bg-white border border-gray-100 animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 rounded-3xl bg-white border border-gray-100 animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
-          {statsCards.map((card) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {statsCards.slice(0, 4).map((card) => {
             const Icon = card.icon;
             return (
               <div
                 key={card.label}
-                className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex items-start justify-between gap-4"
+                className="bg-white rounded-3xl border border-gray-100 p-6 flex items-center justify-between gap-4"
               >
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{card.label}</p>
-                  <p className="text-3xl font-black text-gray-900 mt-2">{card.value}</p>
-                  <div className="text-xs mt-2">{card.sub}</div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{card.label}</p>
+                  <p className="text-3xl font-black text-gray-900">{card.value}</p>
+                  <div className="text-xs mt-1">{card.sub}</div>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
                   <Icon size={22} strokeWidth={2} />

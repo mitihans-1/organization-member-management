@@ -17,6 +17,7 @@ import customAttributeRoutes from './routes/customAttributeRoutes';
 import chapaRoutes from './routes/chapaRoutes';
 import idCardRoutes from './routes/idCardRoutes';
 import serviceRoutes from './modules/services/routes/serviceRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,6 +47,7 @@ app.use('/api/custom-attributes', customAttributeRoutes);
 app.use('/api/chapa', chapaRoutes);
 app.use('/api/id-cards', idCardRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.get('/', (req, res) => {
   res.send('Organization Membership Management API');

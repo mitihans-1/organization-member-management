@@ -15,13 +15,14 @@ import {
 } from 'lucide-react';
 
 const nav = [
-  { to: '/member/dashboard', label: 'Overview', icon: LayoutGrid, end: true },
-  { to: '/member/profile', label: 'Profile', icon: User },
-  { to: '/member/events', label: 'Events', icon: Calendar },
-  { to: '/member/services', label: 'Services', icon: Briefcase },
-  { to: '/member/blog', label: 'Blog', icon: FileText },
-  { to: '/member/id-card', label: 'My ID Card', icon: CreditCard },
-  { to: '/member/payments', label: 'Payments', icon: CreditCard },
+  { to: '/member/dashboard', label: 'Overview', icon: LayoutGrid, end: true, color: 'text-sky-500' },
+  { to: '/member/profile', label: 'Profile', icon: User, color: 'text-indigo-500' },
+  { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500' },
+  { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500' },
+  { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
+  { to: '/member/reports', label: 'My Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },
+  { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
 ];
 
 const MemberLayout: React.FC = () => {
@@ -79,11 +80,13 @@ const MemberLayout: React.FC = () => {
                 to={item.to}
                 onClick={closeSidebar}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'text-gray-600 hover:bg-gray-50'
+                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
                 }`}
               >
-                <Icon size={18} />
-                {item.label}
+                <Icon size={18} className={active ? '' : (item as any).color} />
+                <span className={active ? 'text-white' : 'text-gray-600'}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}

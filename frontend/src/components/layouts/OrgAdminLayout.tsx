@@ -18,14 +18,15 @@ import {
 
 /** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
 const nav = [
-  { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/org-admin/members', label: 'Member Management', icon: Users },
-  { to: '/org-admin/events', label: 'Event Management', icon: Calendar },
-  { to: '/org-admin/services', label: 'Service Management', icon: Briefcase },
-  { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true },
-  { to: '/org-admin/payments', label: 'Payments', icon: CreditCard },
-  { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle },
-  { to: '/org-admin/settings', label: 'Settings', icon: Settings },
+  { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-indigo-500' },
+  { to: '/org-admin/members', label: 'Member Management', icon: Users, color: 'text-blue-500' },
+  { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500' },
+  { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
+  { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },
+  { to: '/org-admin/reports', label: 'Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
+  { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500' },
+  { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500' },
 ];
 
 const OrgAdminLayout: React.FC = () => {
@@ -91,14 +92,14 @@ const OrgAdminLayout: React.FC = () => {
                 className={`flex items-start gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all leading-snug ${
                   active
                     ? 'bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-50 border border-transparent'
+                    : 'hover:bg-gray-50 border border-transparent'
                 }`}
               >
                 <Icon
                   size={20}
-                  className={`shrink-0 mt-0.5 ${active ? 'text-indigo-600' : 'text-gray-400'}`}
+                  className={`shrink-0 mt-0.5 ${active ? 'text-indigo-600' : (item as any).color}`}
                 />
-                <span className={(item as { narrow?: boolean }).narrow ? 'text-[13px]' : ''}>
+                <span className={`${active ? 'text-indigo-700' : 'text-gray-600'} ${(item as { narrow?: boolean }).narrow ? 'text-[13px]' : ''}`}>
                   {item.label}
                 </span>
               </Link>

@@ -24,13 +24,14 @@ import {
 } from 'lucide-react';
 
 const nav = [
-  { to: '/super-admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/super-admin/organizations', label: 'Organizations', icon: Building2 },
-  { to: '/super-admin/org-admins', label: 'OrgAdmins', icon: UserCog },
-  { to: '/super-admin/members', label: 'Members', icon: Users },
-  { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap },
-  { to: '/super-admin/payments', label: 'Payments', icon: CreditCard },
-  { to: '/super-admin/system-config', label: 'System Config', icon: Settings },
+  { to: '/super-admin', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-sky-400' },
+  { to: '/super-admin/organizations', label: 'Organizations', icon: Building2, color: 'text-blue-400' },
+  { to: '/super-admin/org-admins', label: 'OrgAdmins', icon: UserCog, color: 'text-indigo-400' },
+  { to: '/super-admin/members', label: 'Members', icon: Users, color: 'text-green-400' },
+  { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap, color: 'text-amber-400' },
+  { to: '/super-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-400' },
+  { to: '/super-admin/reports', label: 'Reports', icon: Inbox, color: 'text-rose-400' },
+  { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-slate-400' },
 ];
 
 const SuperAdminLayout: React.FC = () => {
@@ -155,7 +156,7 @@ const SuperAdminLayout: React.FC = () => {
                   active ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={18} className={active ? '' : (item as any).color} />
                 {item.label}
               </Link>
             );

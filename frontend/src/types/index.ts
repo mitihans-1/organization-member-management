@@ -267,3 +267,38 @@ export interface NotificationCenter {
   relatedType?: string;
   createdAt: string;
 }
+
+// ==========================================
+// REPORT MODULE - Types
+// ==========================================
+export type ReportStatus = 'open' | 'in_progress' | 'resolved';
+export type ReportPriority = 'low' | 'medium' | 'high';
+export type ReportType = 'member_to_org' | 'org_to_superadmin';
+
+export interface Report {
+  id: string;
+  title: string;
+  description: string;
+  status: ReportStatus;
+  priority: ReportPriority;
+  reportType: ReportType;
+  accepted: boolean;
+  response?: string;
+  attachment?: string;
+  memberId?: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  member?: User;
+  organization?: {
+    id: string;
+    name: string;
+    type: string;
+  };
+}
+
+export interface OrgAdminReportsResponse {
+  memberReports: Report[];
+  orgReports: Report[];
+}
+

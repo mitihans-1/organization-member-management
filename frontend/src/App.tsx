@@ -15,6 +15,9 @@ import SuperAdminAddAdmin from './pages/super-admin/SuperAdminAddAdmin';
 import SuperAdminMembers from './pages/super-admin/SuperAdminMembers';
 import SuperAdminPayments from './pages/super-admin/SuperAdminPayments';
 import PlanManagement from './pages/super-admin/PlanManagement';
+import SuperAdminReports from './pages/super-admin/SuperAdminReports';
+import MemberReports from './pages/member/MemberReports';
+import OrgReports from './pages/OrgReports';
 // System configuration
 import SystemConfig from './pages/super-admin/SystemConfig';
 
@@ -95,6 +98,7 @@ const App: React.FC = () => {
               <Route path="members" element={<SuperAdminMembers />} />
               <Route path="plans" element={<PlanManagement />} />
               <Route path="payments" element={<SuperAdminPayments />} />
+              <Route path="reports" element={<SuperAdminReports />} />
               <Route path="system-config" element={<SystemConfig />} />
             </Route>
 
@@ -118,6 +122,7 @@ const App: React.FC = () => {
               <Route path="profile" element={<Profile />} />
               <Route path="upgrade" element={<UpgradePlan />} />
               <Route path="settings" element={<OrgSettings />} />
+              <Route path="reports" element={<OrgReports />} />
             </Route>
 
             <Route path="/org/*" element={<OrgLegacyRedirect />} />
@@ -138,6 +143,7 @@ const App: React.FC = () => {
               <Route path="blog" element={<MemberBlog />} />
               <Route path="id-card" element={<MyIdCard />} />
               <Route path="payments" element={<MemberPayments />} />
+              <Route path="reports" element={<MemberReports />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

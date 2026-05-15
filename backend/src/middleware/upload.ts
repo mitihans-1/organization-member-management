@@ -45,3 +45,23 @@ export const uploadImage = multer({
         cb(new Error('Only images are allowed!'));
     }
 });
+
+const reportAttachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/reports/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname}`);
+    }
+});
+
+export const uploadReportAttachment = multer({
+    storage: reportAttachmentStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit for reports
+    fileFilter: (req, file, cb) => {
+        // Allow common document types
+        const filetypes = /jpeg|jpg|png|pdf|doc|docx|txt|xls|xlsx/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        cb(null, true); // Allow all types for now
+    }
+});
