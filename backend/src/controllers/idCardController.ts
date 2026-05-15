@@ -216,7 +216,31 @@ export const approveRequest = async (req: any, res: Response) => {
       orderBy: { version: 'desc' }
     });
     const newVersion = previousCard ? previousCard.version + 1 : 1;
-    const cardNumber = `ID-${Date.now().toString().slice(-6)}-${request.userId.slice(-4)}`;
+    const { formatConfig } = req.body;
+    let cardNumber = '';
+    
+    if (formatConfig) {
+      const { prefix = '', length = 6, includeNumbers = true, includeLetters = true, includeHyphens = false, suffix = '' } = formatConfig;
+      let charset = '';
+      if (includeNumbers) charset += '0123456789';
+      if (includeLetters) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if (!charset) charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // Fallback
+      
+      let randomPart = '';
+      for (let i = 0; i < length; i++) {
+        randomPart += charset.charAt(Math.floor(Math.random() * charset.length));
+      }
+
+      if (includeHyphens && randomPart.length > 3) {
+        // Insert a hyphen every 3-4 characters for readability
+        randomPart = randomPart.match(new RegExp('.{1,4}', 'g'))?.join('-') || randomPart;
+      }
+
+      cardNumber = `${prefix}${randomPart}${suffix}`;
+    } else {
+      cardNumber = `ID-${Date.now().toString().slice(-6)}-${request.userId.slice(-4)}`;
+    }
+    
     const qrToken = crypto.randomUUID();
 
     const newCard = await prisma.idCard.create({
@@ -472,7 +496,7 @@ export const verifyPublicQR = async (req: any, res: Response) => {
 export const updateCardDetails = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { expiresAt, name, role, sex, phone, address } = req.body;
+    const { expiresAt, name, role, sex, phone, address, cardNumber, generatedAt } = req.body;
     const admin = await prisma.user.findUnique({ where: { id: req.user.userId } });
 
     if (!admin || !admin.organizationId || admin.role !== 'orgAdmin') {
@@ -484,10 +508,14 @@ export const updateCardDetails = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'ID Card not found' });
     }
 
-    // Update the ID Card expiration date
+    // Update the ID Card expiration date, card number, and generation date
     const updatedCard = await prisma.idCard.update({
       where: { id },
-      data: { expiresAt: expiresAt ? new Date(expiresAt) : null }
+      data: { 
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        ...(cardNumber ? { cardNumber } : {}),
+        ...(generatedAt ? { generatedAt: new Date(generatedAt) } : {})
+      }
     });
 
     // Update the User profile

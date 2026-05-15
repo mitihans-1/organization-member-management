@@ -25,6 +25,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Members from './pages/Members';
 import Events from './pages/Events';
+import OrgServices from './pages/OrgServices';
 import Blogs from './pages/Blogs';
 import Payments from './pages/Payments';
 import Profile from './pages/Profile';
@@ -34,11 +35,13 @@ import OrgSettings from './pages/org/OrgSettings';
 
 import MemberOverview from './pages/member/MemberOverview';
 import MemberEvents from './pages/member/MemberEvents';
+import MemberServices from './pages/member/MemberServices';
 import MemberBlog from './pages/member/MemberBlog';
 import MemberPayments from './pages/member/MemberPayments';
 
 import Home from './pages/Home';
 import About from './pages/About';
+import PlatformFeatures from './pages/PlatformFeatures';
 import Services from './pages/Services';
 import Contact from './pages/Contact';
 import PublicEvents from './pages/PublicEvents';
@@ -57,6 +60,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
+            <Route path="/platform-features" element={<PlatformFeatures />} />
             <Route path="/services" element={<Services />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/events" element={<PublicEvents />} />
@@ -108,6 +112,7 @@ const App: React.FC = () => {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="members" element={<Members />} />
               <Route path="events" element={<Events />} />
+              <Route path="services" element={<OrgServices />} />
               <Route path="blogs" element={<Blogs />} />
               <Route path="payments" element={<Payments />} />
               <Route path="profile" element={<Profile />} />
@@ -129,6 +134,7 @@ const App: React.FC = () => {
               <Route path="dashboard" element={<MemberOverview />} />
               <Route path="profile" element={<Profile />} />
               <Route path="events" element={<MemberEvents />} />
+              <Route path="services" element={<MemberServices />} />
               <Route path="blog" element={<MemberBlog />} />
               <Route path="id-card" element={<MyIdCard />} />
               <Route path="payments" element={<MemberPayments />} />

@@ -245,6 +245,95 @@ async function main() {
     console.log('Sample events seeded');
   }
 
+  const serviceCount = await prisma.service.count();
+  if (serviceCount === 0) {
+    const predefinedServices = [
+      {
+        title: 'Community Tools',
+        description: 'Access to community engagement tools including forums, polls, and discussion boards to foster member interaction.',
+        category: 'general',
+        status: 'Active',
+        owner: 'Platform Admin',
+        department: 'Community Management',
+        duration: 'Ongoing',
+        slaHours: 48,
+        isPredefined: true,
+      },
+      {
+        title: 'Member Directory',
+        description: 'Searchable directory of all organization members with contact information and profiles for networking.',
+        category: 'support',
+        status: 'Active',
+        owner: 'Platform Admin',
+        department: 'Member Services',
+        duration: 'Ongoing',
+        slaHours: 24,
+        isPredefined: true,
+      },
+      {
+        title: 'Document Library',
+        description: 'Secure storage and sharing of important documents, templates, and resources for organization members.',
+        category: 'training',
+        status: 'Active',
+        owner: 'Platform Admin',
+        department: 'Knowledge Management',
+        duration: 'Ongoing',
+        slaHours: 72,
+        isPredefined: true,
+      },
+      {
+        title: 'Event Management',
+        description: 'Complete event planning and management tools including registration, ticketing, and attendee tracking.',
+        category: 'general',
+        status: 'Active',
+        owner: 'Platform Admin',
+        department: 'Events Team',
+        duration: 'Ongoing',
+        slaHours: 24,
+        isPredefined: true,
+      },
+      {
+        title: 'Member Support',
+        description: 'Dedicated support desk for member inquiries, technical issues, and general assistance.',
+        category: 'support',
+        status: 'Active',
+        owner: 'Support Team',
+        department: 'Customer Support',
+        duration: '24/7',
+        slaHours: 12,
+        isPredefined: true,
+      },
+      {
+        title: 'Analytics Dashboard',
+        description: 'Real-time analytics and reporting on member engagement, event attendance, and service usage.',
+        category: 'general',
+        status: 'Active',
+        owner: 'Platform Admin',
+        department: 'Analytics',
+        duration: 'Ongoing',
+        slaHours: 48,
+        isPredefined: true,
+      },
+    ];
+
+    for (const service of predefinedServices) {
+      await prisma.service.create({
+        data: {
+          title: service.title,
+          description: service.description,
+          category: service.category,
+          status: service.status,
+          owner: service.owner,
+          department: service.department,
+          duration: service.duration,
+          slaHours: service.slaHours,
+          isPredefined: service.isPredefined,
+        },
+      });
+    }
+    console.log('Predefined platform services seeded');
+  }
+
   console.log('Seed finished.');
   console.log('  SuperAdmin:', superEmail, '(SEED_SUPERADMIN_PASSWORD)');
   console.log('  Demo org admin:', demoEmail, '(SEED_DEMO_ORG_ADMIN_PASSWORD)');

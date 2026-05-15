@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X as CloseIcon,
+  Briefcase,
 } from 'lucide-react';
 
 /** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
@@ -20,6 +21,7 @@ const nav = [
   { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/org-admin/members', label: 'Member Management', icon: Users },
   { to: '/org-admin/events', label: 'Event Management', icon: Calendar },
+  { to: '/org-admin/services', label: 'Service Management', icon: Briefcase },
   { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true },
   { to: '/org-admin/payments', label: 'Payments', icon: CreditCard },
   { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle },

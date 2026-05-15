@@ -19,9 +19,15 @@ const GuestNavbar: React.FC = () => {
       <Link to="/about" className={navLinkClass} onClick={() => setOpen(false)}>
         About
       </Link>
-      <Link to="/services" className={navLinkClass} onClick={() => setOpen(false)}>
-        Services
-      </Link>
+      {user?.role === 'orgAdmin' ? (
+        <Link to="/platform-features" className={navLinkClass} onClick={() => setOpen(false)}>
+          Platform Features
+        </Link>
+      ) : (
+        <Link to="/services" className={navLinkClass} onClick={() => setOpen(false)}>
+          Services
+        </Link>
+      )}
       <Link to="/events" className={navLinkClass} onClick={() => setOpen(false)}>
         Events
       </Link>

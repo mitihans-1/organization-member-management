@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
-import { Event } from '../types';
+import { Service } from '../types';
 import {
   Plus,
   Search,
@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
   List,
-  Calendar as CalendarIcon,
+  Briefcase,
   Download,
   Filter,
   MoreVertical,
@@ -17,91 +17,77 @@ import {
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
-import EventDetailsModal from '../components/EventDetailsModal';
 
 const PAGE_SIZE = 6;
 
-const Events: React.FC = () => {
+const OrgServices: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'orgAdmin' || user?.role === 'SuperAdmin';
-  const [view, setView] = useState<'list' | 'calendar'>('list');
   const [searchTerm, setSearchTerm] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
-  const [startDateFilter, setStartDateFilter] = useState('');
-  const [endDateFilter, setEndDateFilter] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [formData, setFormData] = useState({
     title: '',
+    code: '',
     description: '',
-    date: '',
-    end_date: '',
-    location: '',
-    organizer: '',
-    registrationDeadline: '',
+    owner: '',
+    department: '',
+    duration: '',
+    requiredDocuments: '',
+    eligibilityRules: '',
     image: '',
-    status: 'draft',
+    status: 'Active',
     category: 'general',
-    capacity: '',
-    virtualLink: '',
     contactEmail: '',
     price: '',
     payment_required: false,
+    isPredefined: false,
   });
-  const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
+  const [viewingService, setViewingService] = useState<Service | null>(null);
 
   const queryClient = useQueryClient();
   useBodyScrollLock(isModalOpen);
 
-  const { data: events, isLoading } = useQuery<Event[]>({
-    queryKey: ['events'],
-    queryFn: () => api.get('/events').then((res) => res.data),
+  const { data: services, isLoading } = useQuery<Service[]>({
+    queryKey: ['services'],
+    queryFn: () => api.get('/services').then((res) => res.data),
   });
 
   const createMutation = useMutation({
-    mutationFn: (newEvent: any) => api.post('/events', newEvent),
+    mutationFn: (newService: any) => api.post('/services', newService),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
       closeModal();
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (updatedEvent: any) => api.put(`/events/${updatedEvent.id}`, updatedEvent),
+    mutationFn: (updatedService: any) => api.put(`/services/${updatedService.id}`, updatedService),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
       closeModal();
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/events/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
+    mutationFn: (id: string) => api.delete(`/services/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['services'] }),
   });
 
   const filtered = useMemo(() => {
-    const list = events ?? [];
+    const list = services ?? [];
     const q = searchTerm.trim().toLowerCase();
-    const locationQ = locationFilter.trim().toLowerCase();
-    return list.filter((e) => {
+    return list.filter((s) => {
       const textMatch =
         !q ||
-        e.title.toLowerCase().includes(q) ||
-        (e.description && e.description.toLowerCase().includes(q)) ||
-        (e.location && e.location.toLowerCase().includes(q));
-
-      const locationMatch = !locationQ || (e.location || '').toLowerCase().includes(locationQ);
-
-      const eventDate = new Date(e.date);
-      const startMatch = !startDateFilter || eventDate >= new Date(`${startDateFilter}T00:00:00`);
-      const endMatch = !endDateFilter || eventDate <= new Date(`${endDateFilter}T23:59:59`);
-
-      return textMatch && locationMatch && startMatch && endMatch;
+        s.title.toLowerCase().includes(q) ||
+        (s.description && s.description.toLowerCase().includes(q));
+      return textMatch;
     });
-  }, [events, searchTerm, locationFilter, startDateFilter, endDateFilter]);
+  }, [services, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -110,37 +96,38 @@ const Events: React.FC = () => {
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, pageSafe]);
 
-  const openModal = (event?: Event) => {
-    if (event) {
-      setEditingEvent(event);
+  const openModal = (service?: Service) => {
+    if (service) {
+      setEditingService(service);
+      const docs = (service as any).requiredDocuments;
       setFormData({
-        title: event.title,
-        description: event.description,
-        date: new Date(event.date).toISOString().split('T')[0],
-        end_date: event.end_date ? new Date(event.end_date).toISOString().split('T')[0] : '',
-        location: event.location || '',
-        organizer: (event as any).organizer || '',
-        registrationDeadline: (event as any).registrationDeadline ? new Date((event as any).registrationDeadline).toISOString().split('T')[0] : '',
-        image: event.image || '',
-        status: event.status || 'draft',
-        category: event.category || 'general',
-        capacity: event.capacity ? String(event.capacity) : '',
-        virtualLink: event.virtualLink || '',
-        contactEmail: event.contactEmail || '',
-        price: event.price !== undefined && event.price !== null ? String(event.price) : '',
-        payment_required: (event as any).payment_required || false,
+        title: service.title,
+        code: (service as any).code || '',
+        description: service.description,
+        owner: (service as any).owner || '',
+        department: (service as any).department || '',
+        duration: (service as any).duration || '',
+        requiredDocuments: Array.isArray(docs) ? docs.join(', ') : (docs || ''),
+        eligibilityRules: (service as any).eligibilityRules || '',
+        image: service.image || '',
+        status: service.status || 'Active',
+        category: service.category || 'general',
+        contactEmail: service.contactEmail || '',
+        price: service.price !== undefined && service.price !== null ? String(service.price) : '',
+        payment_required: (service as any).payment_required || false,
+        isPredefined: (service as any).isPredefined || false,
       });
     } else {
-      setEditingEvent(null);
-      setFormData({ title: '', description: '', date: '', end_date: '', location: '', organizer: '', registrationDeadline: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false });
+      setEditingService(null);
+      setFormData({ title: '', code: '', description: '', owner: '', department: '', duration: '', requiredDocuments: '', eligibilityRules: '', image: '', status: 'Active', category: 'general', contactEmail: '', price: '', payment_required: false, isPredefined: false });
     }
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setEditingEvent(null);
-    setFormData({ title: '', description: '', date: '', end_date: '', location: '', organizer: '', registrationDeadline: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false });
+    setEditingService(null);
+    setFormData({ title: '', code: '', description: '', owner: '', department: '', duration: '', requiredDocuments: '', eligibilityRules: '', image: '', status: 'Active', category: 'general', contactEmail: '', price: '', payment_required: false, isPredefined: false });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -152,8 +139,8 @@ const Events: React.FC = () => {
       payload.price = null;
       payload.payment_required = false;
     }
-    if (editingEvent) {
-      updateMutation.mutate({ ...payload, id: editingEvent.id });
+    if (editingService) {
+      updateMutation.mutate({ ...payload, id: editingService.id });
     } else {
       createMutation.mutate(payload);
     }
@@ -169,12 +156,10 @@ const Events: React.FC = () => {
   };
 
   const exportToCsv = () => {
-    const rows = filtered.map((event) => ({
-      Title: event.title,
-      Description: event.description || '',
-      Date: new Date(event.date).toISOString(),
-      Location: event.location || '',
-      Image: event.image || '',
+    const rows = filtered.map((service) => ({
+      Title: service.title,
+      Description: service.description || '',
+      Image: service.image || '',
     }));
     if (rows.length === 0) return;
 
@@ -192,7 +177,7 @@ const Events: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `events-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `services-export-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -200,169 +185,91 @@ const Events: React.FC = () => {
   const listBody = (
     <>
       <div className="p-4 md:p-5 border-b border-gray-100 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
-        <div className="flex rounded-xl border border-gray-200 p-1 bg-gray-50 w-fit">
-          <button
-            type="button"
-            onClick={() => setView('list')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold ${
-              view === 'list' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-white'
-            }`}
-          >
-            <List size={16} />
-            List View
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('calendar')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold ${
-              view === 'calendar'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-white'
-            }`}
-          >
-            <CalendarIcon size={16} />
-            Calendar View
-          </button>
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="search"
+            placeholder="Search services..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
+          />
         </div>
-        <div className="flex flex-1 flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
-          <div className="relative flex-1 min-w-0 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="search"
-              placeholder="Search events..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={exportToCsv}
-              disabled={filtered.length === 0}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 w-full sm:w-auto justify-center"
-            >
-              <Download size={16} />
-              Export
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsFilterOpen((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 w-full sm:w-auto justify-center"
-            >
-              <Filter size={16} />
-              Filter
-            </button>
-          </div>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={exportToCsv}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 w-full sm:w-auto justify-center"
+          >
+            <Download size={16} />
+            Export
+          </button>
         </div>
       </div>
-      {isFilterOpen && (
-        <div className="px-4 md:px-5 pb-4 border-b border-gray-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <input
-              type="text"
-              placeholder="Filter by location"
-              value={locationFilter}
-              onChange={(e) => {
-                setLocationFilter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-            />
-            <input
-              type="date"
-              value={startDateFilter}
-              onChange={(e) => {
-                setStartDateFilter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-            />
-            <input
-              type="date"
-              value={endDateFilter}
-              onChange={(e) => {
-                setEndDateFilter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setLocationFilter('');
-                setStartDateFilter('');
-                setEndDateFilter('');
-                setPage(1);
-              }}
-              className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      )}
 
-      {view === 'calendar' ? (
-        <div className="p-10 text-center text-gray-500 text-sm">
-          Calendar view: switch to <strong>List View</strong> for full table management. (Connect a calendar
-          component here later.)
-        </div>
-      ) : isLoading ? (
-        <div className="p-12 text-center text-gray-400">Loading events...</div>
+      {isLoading ? (
+        <div className="p-12 text-center text-gray-400">Loading services...</div>
       ) : (
         <>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50/80 text-gray-500 text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-3">Event</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Date &amp; Time</th>
-                  <th className="px-4 py-3">Location</th>
+                  <th className="px-4 py-3">Service</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Subscribers</th>
                   <th className="px-4 py-3 w-12">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-gray-400">
-                      No events found
+                    <td colSpan={4} className="px-4 py-12 text-center text-gray-400">
+                      No services found
                     </td>
                   </tr>
                 ) : (
-                  paged.map((event) => {
+                  paged.map((service) => {
                     return (
-                      <tr key={event.id} className="hover:bg-gray-50/80">
+                      <tr key={service.id} className="hover:bg-gray-50/80">
                         <td className="px-4 py-4">
-                          <p 
-                            className="font-bold text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
-                            onClick={() => setViewingEvent(event)}
-                            title="Click to view full details"
-                          >
-                            {event.title}
-                          </p>
-                          {event.description ? (
-                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{event.description}</p>
-                          ) : null}
+                          <div className="flex items-start gap-2">
+                            <div>
+                              <p 
+                                className="font-bold text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
+                                onClick={() => setViewingService(service)}
+                                title="Click to view full details"
+                              >
+                                {service.title}
+                              </p>
+                              {service.description ? (
+                                <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{service.description}</p>
+                              ) : null}
+                            </div>
+                            {(service as any).isPredefined && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100 px-2.5 py-0.5 text-[10px] font-semibold">
+                                Platform
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-4 py-4 text-gray-700 whitespace-nowrap font-mono text-xs">
-                          {new Date(event.date).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-4 text-gray-700">{event.location || '—'}</td>
                         <td className="px-4 py-4">
-                          <span className={`inline-flex rounded-full px-3 py-0.5 text-xs font-semibold border capitalize ${
-                            event.status === 'draft' ? 'bg-gray-50 text-gray-700 border-gray-100' :
-                            event.status === 'upcoming' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                            event.status === 'ongoing' ? 'bg-green-50 text-green-700 border-green-100' :
-                            event.status === 'completed' ? 'bg-purple-50 text-purple-700 border-purple-100' :
-                            'bg-red-50 text-red-700 border-red-100'
+                          <span className={`inline-flex rounded-full px-3 py-0.5 text-xs font-semibold border ${
+                            service.status === 'Active' ? 'bg-green-50 text-green-700 border-green-100' :
+                            service.status === 'Suspended' ? 'bg-orange-50 text-orange-700 border-orange-100' :
+                            service.status === 'Archived' ? 'bg-gray-50 text-gray-700 border-gray-100' :
+                            service.status === 'Under Maintenance' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
+                            'bg-sky-50 text-sky-700 border-sky-100'
                           }`}>
-                            {event.status || '—'}
+                            {service.status || '—'}
                           </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-gray-700">{service._count?.subscribers || 0}</span>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-1 justify-end relative">
@@ -371,7 +278,7 @@ const Events: React.FC = () => {
                                 <button
                                   type="button"
                                   title="Edit"
-                                  onClick={() => openModal(event)}
+                                  onClick={() => openModal(service)}
                                   className="p-2 rounded-lg hover:bg-gray-100"
                                 >
                                   <Edit2 size={16} />
@@ -379,7 +286,7 @@ const Events: React.FC = () => {
                                 <button
                                   type="button"
                                   title="Delete"
-                                  onClick={() => deleteMutation.mutate(event.id)}
+                                  onClick={() => deleteMutation.mutate(service.id)}
                                   className="p-2 rounded-lg hover:bg-gray-100 text-red-500"
                                 >
                                   <Trash2 size={16} />
@@ -389,33 +296,33 @@ const Events: React.FC = () => {
                             <button
                               type="button"
                               onClick={() =>
-                                setOpenActionMenuId((prev) => (prev === event.id ? null : event.id))
+                                setOpenActionMenuId((prev) => (prev === service.id ? null : service.id))
                               }
                               className="p-2 rounded-lg hover:bg-gray-100"
                             >
                               <MoreVertical size={16} />
                             </button>
-                            {openActionMenuId === event.id && (
+                            {openActionMenuId === service.id && (
                               <div className="absolute right-0 top-10 z-10 w-40 rounded-xl border border-gray-100 bg-white shadow-lg py-1">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setOpenActionMenuId(null);
-                                    openModal(event);
+                                    openModal(service);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                 >
-                                  Edit Event
+                                  Edit Service
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setOpenActionMenuId(null);
-                                    deleteMutation.mutate(event.id);
+                                    deleteMutation.mutate(service.id);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                                 >
-                                  Delete Event
+                                  Delete Service
                                 </button>
                               </div>
                             )}
@@ -432,7 +339,7 @@ const Events: React.FC = () => {
             <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
               <p>
                 Showing {(pageSafe - 1) * PAGE_SIZE + 1} to {Math.min(pageSafe * PAGE_SIZE, filtered.length)}{' '}
-                of {filtered.length} events
+                of {filtered.length} services
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -476,8 +383,8 @@ const Events: React.FC = () => {
   return (
     <div className="space-y-0 font-poppins">
       <OrgAdminPageHeader
-        title="Event Management"
-        subtitle="Create and manage organization events"
+        title="Service Management"
+        subtitle="Create and manage organization services"
         actions={
           <button
             type="button"
@@ -485,7 +392,7 @@ const Events: React.FC = () => {
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-500"
           >
             <Plus size={18} />
-            Create Event
+            Create Service
           </button>
         }
       />
@@ -496,14 +403,14 @@ const Events: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-black text-gray-900">{editingEvent ? 'Edit Event' : 'Create Event'}</h3>
+              <h3 className="text-lg font-black text-gray-900">{editingService ? 'Edit Service' : 'Create Service'}</h3>
               <button type="button" onClick={closeModal} className="p-2 rounded-lg hover:bg-gray-100">
                 <X size={20} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Title</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Title</label>
                 <input
                   type="text"
                   required
@@ -524,65 +431,78 @@ const Events: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Code</label>
                   <input
                     type="text"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="SVC-001"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Organizer</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Owner</label>
                   <input
                     type="text"
-                    value={formData.organizer}
-                    onChange={(e) => setFormData({ ...formData, organizer: e.target.value })}
+                    value={formData.owner}
+                    onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="John Doe"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Registration Deadline</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
                   <input
-                    type="date"
-                    value={formData.registrationDeadline}
-                    onChange={(e) => setFormData({ ...formData, registrationDeadline: e.target.value })}
+                    type="text"
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="Member Support"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Duration</label>
+                  <input
+                    type="text"
+                    value={formData.duration}
+                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                    placeholder="30 days"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Status</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Required Documents (comma-separated)</label>
+                <input
+                  type="text"
+                  value={formData.requiredDocuments}
+                  onChange={(e) => setFormData({ ...formData, requiredDocuments: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  placeholder="ID card, membership form"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Eligibility Rules</label>
+                <textarea
+                  rows={2}
+                  value={formData.eligibilityRules}
+                  onChange={(e) => setFormData({ ...formData, eligibilityRules: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                  placeholder="Must be active member for at least 3 months"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Availability Status</label>
                 <select
-                title='select events'
+                  title='select services'
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 >
-                  <option value="draft">Draft</option>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="ongoing">Ongoing</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                  <option value="Archived">Archived</option>
+                  <option value="Under Maintenance">Under Maintenance</option>
                 </select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -594,32 +514,11 @@ const Events: React.FC = () => {
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm capitalize"
                   >
                     <option value="general">General</option>
-                    <option value="workshop">Workshop</option>
-                    <option value="seminar">Seminar</option>
-                    <option value="virtual">Virtual</option>
-                    <option value="networking">Networking</option>
+                    <option value="support">Support</option>
+                    <option value="training">Training</option>
+                    <option value="consulting">Consulting</option>
+                    <option value="membership">Membership</option>
                   </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Capacity (Optional)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                    placeholder="Unlimited"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Virtual Link (Optional)</label>
-                  <input
-                    type="url"
-                    value={formData.virtualLink}
-                    onChange={(e) => setFormData({ ...formData, virtualLink: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                    placeholder="https://zoom.us/j/..."
-                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact Email (Optional)</label>
@@ -628,7 +527,7 @@ const Events: React.FC = () => {
                     value={formData.contactEmail}
                     onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                    placeholder="organizer@example.com"
+                    placeholder="support@example.com"
                   />
                 </div>
               </div>
@@ -640,12 +539,23 @@ const Events: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, payment_required: e.target.checked })}
                     className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-sm font-bold text-gray-700">Require payment to register</span>
+                  <span className="text-sm font-bold text-gray-700">Require payment to subscribe</span>
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isPredefined}
+                    onChange={(e) => setFormData({ ...formData, isPredefined: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-bold text-gray-700">Predefined Platform Service</span>
                 </label>
               </div>
               {formData.payment_required && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ticket Price (ETB)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Price (ETB)</label>
                   <input
                     type="number"
                     min="0"
@@ -708,25 +618,15 @@ const Events: React.FC = () => {
                   type="submit"
                   className="flex-1 rounded-xl bg-indigo-600 py-3 font-bold text-white"
                 >
-                  {editingEvent ? 'Update' : 'Create'}
+                  {editingService ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {viewingEvent && (
-        <EventDetailsModal
-          event={viewingEvent}
-          events={events}
-          onClose={() => setViewingEvent(null)}
-          showRegisterActions={false}
-        />
-      )}
     </div>
   );
 };
 
-
-export default Events;
+export default OrgServices;

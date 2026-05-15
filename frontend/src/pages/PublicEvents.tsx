@@ -15,6 +15,7 @@ import GuestNavbar from '../components/GuestNavbar';
 import GuestFooter from '../components/GuestFooter';
 import CoverImage from '../components/CoverImage';
 import EventDetailsModal from '../components/EventDetailsModal';
+import { useAuth } from '../context/AuthContext';
 
 function pad(n: number) {
   return String(n).padStart(2, '0');
@@ -53,6 +54,7 @@ const HOST_CHECKLIST = [
 
 const PublicEvents: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['public-events'],
@@ -91,7 +93,7 @@ const PublicEvents: React.FC = () => {
               >
                 <div 
                   className="relative h-52 sm:h-56 bg-brand-pale/20 shrink-0 cursor-pointer overflow-hidden group"
-                  onClick={() => setSelectedEvent(event)}
+                  onClick={() => user ? setSelectedEvent(event) : (event.organizationId ? navigate(`/register?org=${event.organizationId}`) : navigate('/register'))}
                 >
                   <CoverImage
                     stored={event.image}
@@ -104,7 +106,7 @@ const PublicEvents: React.FC = () => {
                 <div className="p-6 flex-1 flex flex-col">
                   <h2 
                     className="text-xl font-bold text-brand-dark leading-snug mb-4 cursor-pointer hover:text-brand-medium transition-colors"
-                    onClick={() => setSelectedEvent(event)}
+                    onClick={() => user ? setSelectedEvent(event) : (event.organizationId ? navigate(`/register?org=${event.organizationId}`) : navigate('/register'))}
                     title="Click to view full details"
                   >
                     {event.title}
@@ -156,15 +158,19 @@ const PublicEvents: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      if (event.organizationId) {
-                        navigate(`/register?org=${event.organizationId}`);
+                      if (user) {
+                        setSelectedEvent(event);
                       } else {
-                        navigate(`/register`);
+                        if (event.organizationId) {
+                          navigate(`/register?org=${event.organizationId}`);
+                        } else {
+                          navigate(`/register`);
+                        }
                       }
                     }}
                     className="w-full py-3 rounded-xl bg-brand-medium text-white font-bold text-sm hover:bg-brand-light transition-colors shadow-md shadow-brand-medium/25"
                   >
-                    Register Now
+                    {user ? 'View Details' : 'Register Now'}
                   </button>
                 </div>
               </article>

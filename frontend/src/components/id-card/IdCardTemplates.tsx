@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 export const LeftWave = () => (
   <div className="absolute left-0 top-0 h-full w-[120px] overflow-hidden pointer-events-none">
     <svg width="120" height="100%" viewBox="0 0 120 400" preserveAspectRatio="none">
-      <path d="M0,0 L80,0 C60,100 110,250 50,400 L0,400 Z" fill="#34ce55ff" />
+      <path d="M0,0 L80,0 C60,100 110,250 50,400 L0,400 Z" fill="#274a2eff" />
     </svg>
     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '10px 10px' }} />
   </div>

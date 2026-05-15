@@ -1,5 +1,5 @@
 import express from 'express';
-import { uploadPaymentReceipt, confirmPayment, getPayments, createPayment, getPaymentById, rejectPayment, revokePayment, createOrgPlanPayment, createEventPayment, getOrgPayments, confirmOrgPayment, rejectOrgPayment, confirmEventPayment, rejectEventPayment, uploadMemberPaymentReceipt, confirmMemberPayment, rejectMemberPayment } from '../controllers/paymentController';
+import { uploadPaymentReceipt, confirmPayment, getPayments, createPayment, getPaymentById, rejectPayment, revokePayment, createOrgPlanPayment, createEventPayment, getOrgPayments, confirmOrgPayment, rejectOrgPayment, confirmEventPayment, rejectEventPayment, uploadMemberPaymentReceipt, confirmMemberPayment, rejectMemberPayment, createServicePayment, confirmServicePayment, rejectServicePayment } from '../controllers/paymentController';
 import { uploadReceipt } from '../middleware/upload';
 import { authenticateToken } from '../middleware/authMiddleware';
 
@@ -22,11 +22,14 @@ router.post(
 
 router.post('/org-plan', authenticateToken, createOrgPlanPayment);
 router.post('/event', authenticateToken, createEventPayment);
+router.post('/service', authenticateToken, createServicePayment);
 router.get('/org/all', authenticateToken, getOrgPayments);
 router.put('/org/:id/confirm', authenticateToken, confirmOrgPayment);
 router.put('/org/:id/reject', authenticateToken, rejectOrgPayment);
 router.put('/event/:id/confirm', authenticateToken, confirmEventPayment);
 router.put('/event/:id/reject', authenticateToken, rejectEventPayment);
+router.put('/service/:id/confirm', authenticateToken, confirmServicePayment);
+router.put('/service/:id/reject', authenticateToken, rejectServicePayment);
 
 router.post('/member-to-org/upload-receipt', authenticateToken, uploadReceipt.single('receipt'), uploadMemberPaymentReceipt);
 router.put('/member-to-org/:id/confirm', authenticateToken, confirmMemberPayment);

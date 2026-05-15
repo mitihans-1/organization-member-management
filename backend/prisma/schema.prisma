@@ -5,12 +5,12 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model PendingUser {
-  id                String   @id @default(cuid())
+  id                String   @id @default(cuid()) @map("_id")
   name              String
   email             String   @unique
   password          String
@@ -33,12 +33,17 @@ model Organization {
   updatedAt        DateTime                    @updatedAt
   blogs            Blog[]
   events           Event[]
+  services         Service[]
   users            User[]
   customAttributes CustomAttributeDefinition[]
   plan_id          String?                     @db.ObjectId
   plan_expiry      DateTime?
   plan             Plan?                       @relation(fields: [plan_id], references: [id])
   payment_phone    String?
+
+  idCards               IdCard[]
+  idCardRequests        IdCardRequest[]
+  idCardVerificationLogs IdCardVerificationLog[]
 
   @@map("organizations")
 }
@@ -78,6 +83,13 @@ model User {
   attendedEventsIds     String[]               @db.ObjectId
   attendedEvents        Event[]                @relation("EventAttendees", fields: [attendedEventsIds], references: [id])
 
+  subscribedServicesIds String[]               @db.ObjectId
+  subscribedServices    Service[]              @relation("ServiceSubscribers", fields: [subscribedServicesIds], references: [id])
+
+  idCards               IdCard[]
+  idCardRequests        IdCardRequest[]
+  idCardVerificationLogs IdCardVerificationLog[]
+
   @@map("users")
 }
 
@@ -110,7 +122,7 @@ model SystemConfig {
 }
 
 model CustomAttributeDefinition {
-  id             String                 @id @default(cuid())
+  id             String                 @id @default(cuid()) @map("_id")
   name           String
   type           String // "text", "number", "date", "boolean"
   required       Boolean                @default(false)
@@ -122,7 +134,7 @@ model CustomAttributeDefinition {
 }
 
 model MemberAttributeValue {
-  id          String                    @id @default(cuid())
+  id          String                    @id @default(cuid()) @map("_id")
   memberId    String
   attributeId String
   value       String
@@ -134,7 +146,7 @@ model MemberAttributeValue {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   userId    String
   title     String
   read      Boolean  @default(false)
@@ -145,7 +157,7 @@ model Notification {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   email     String   @unique
   token     String
   expiresAt DateTime
@@ -155,7 +167,7 @@ model PasswordResetToken {
 }
 
 model OtpToken {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   userId    String   @unique
   otp_code  String
   expiresAt DateTime
@@ -166,7 +178,7 @@ model OtpToken {
 }
 
 model Member {
-  id          String    @id @default(cuid())
+  id          String    @id @default(cuid()) @map("_id")
   name        String
   email       String    @unique
   role        String?
@@ -200,7 +212,7 @@ model Plan {
 }
 
 model Payment {
-  id               String   @id @default(cuid())
+  id               String   @id @default(cuid()) @map("_id")
   user_id          String
   plan_id          String?
   amount           Float
@@ -248,30 +260,265 @@ model Blog {
   @@map("blogs")
 }
 
+// ==========================================
+// EVENT MODULE MODELS
+// ==========================================
 model Event {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
-  title          String
-  description    String
-  date           DateTime
-  end_date       DateTime?
-  location       String?
-  image          String?
-  status         String        @default("draft")
-  category       String        @default("general")
-  capacity       Int?
-  virtualLink    String?
-  contactEmail   String?
-  organizationId String?       @db.ObjectId
-  price          Float?
-  payment_required Boolean    @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  organizations  Organization? @relation(fields: [organizationId], references: [id])
+  id                    String            @id @default(auto()) @map("_id") @db.ObjectId
+  title                 String
+  description           String
+  date                  DateTime
+  end_date              DateTime?
+  location              String?
+  image                 String? // Keep for backward compatibility
+  organizer             String?
+  capacity              Int?
+  registrationDeadline  DateTime?
+  status                String            @default("Draft") // Draft | Upcoming | Ongoing | Completed | Cancelled
+  category              String            @default("general")
+  virtualLink           String?
+  contactEmail          String?
+  organizationId        String?           @db.ObjectId
+  price                 Float?
+  payment_required      Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  organizations         Organization?     @relation(fields: [organizationId], references: [id])
 
-  attendeesIds   String[]      @db.ObjectId
-  attendees      User[]        @relation("EventAttendees", fields: [attendeesIds], references: [id])
+  attendeesIds          String[]          @db.ObjectId
+  attendees             User[]            @relation("EventAttendees", fields: [attendeesIds], references: [id])
 
   @@map("events")
+}
+
+model EventParticipant {
+  id                    String            @id @default(cuid()) @map("_id")
+  eventId               String            @db.ObjectId
+  userId                String            @db.ObjectId
+  registrationStatus    String            @default("Pending") // Pending | Approved | Rejected | Cancelled
+  registeredAt          DateTime          @default(now())
+  approvedBy            String?
+  approvedAt            DateTime?
+  notes                 String?
+
+  @@map("event_participants")
+}
+
+model EventAttendance {
+  id                    String            @id @default(cuid()) @map("_id")
+  eventId               String            @db.ObjectId
+  userId                String            @db.ObjectId
+  checkedInAt           DateTime?
+  checkedOutAt          DateTime?
+  qrCode                String?
+  checkedInBy           String?
+
+  @@map("event_attendances")
+}
+
+model EventReport {
+  id                    String            @id @default(cuid()) @map("_id")
+  eventId               String            @db.ObjectId
+  title                 String
+  content               String
+  generatedBy           String
+  generatedAt           DateTime          @default(now())
+  filePath              String?
+
+  @@map("event_reports")
+}
+
+model EventMedia {
+  id                    String            @id @default(cuid()) @map("_id")
+  eventId               String            @db.ObjectId
+  mediaType             String // image | video | document
+  url                   String
+  caption               String?
+  uploadedBy            String
+  uploadedAt            DateTime          @default(now())
+
+  @@map("event_media")
+}
+
+model EventAnnouncement {
+  id                    String            @id @default(cuid()) @map("_id")
+  eventId               String            @db.ObjectId
+  title                 String
+  content               String
+  sentAt                DateTime          @default(now())
+  sentBy                String
+
+  @@map("event_announcements")
+}
+
+// ==========================================
+// SERVICE MODULE MODELS
+// ==========================================
+model ServiceCategory {
+  id                    String            @id @default(cuid()) @map("_id")
+  name                  String
+  description           String?
+  organizationId        String?           @db.ObjectId
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@map("service_categories")
+}
+
+model Service {
+  id                    String            @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String? // Was title before
+  title                 String // Keep for backward compatibility (maps to name)
+  code                  String?           // Unique service code
+  description           String
+  image                 String?           // Keep for backward compatibility
+  categoryId            String?           @db.ObjectId
+  categoryName          String?           @default("general") // Keep for backward compatibility
+  category              String?           @default("general") // Keep for backward compatibility (maps to categoryName)
+  owner                 String?
+  department            String?
+  status                String            @default("Active") // Active | Suspended | Archived | Under Maintenance
+  fee                   Float?
+  price                 Float?            // Keep for backward compatibility (maps to fee)
+  duration              String? // e.g., "30 days", "per request"
+  requiredDocuments     String[]          @default([])
+  eligibilityRules      String?
+  slaHours              Int?
+  renewalRule           String?
+  contactEmail          String?           // Keep for backward compatibility
+  organizationId        String?           @db.ObjectId
+  payment_required      Boolean           @default(false)
+  isPredefined          Boolean           @default(false) // true = global platform service, false = organization-specific
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  organizations         Organization?     @relation(fields: [organizationId], references: [id])
+
+  subscribersIds        String[]          @db.ObjectId
+  subscribers           User[]            @relation("ServiceSubscribers", fields: [subscribersIds], references: [id])
+
+  @@map("services")
+}
+
+model ServiceRequest {
+  id                    String            @id @default(cuid()) @map("_id")
+  requestNumber         String            @unique // Auto-generated request number
+  serviceId             String            @db.ObjectId
+  userId                String            @db.ObjectId
+  status                String            @default("Pending") // Pending | Under Review | Approved | Rejected | Completed
+  priority              String            @default("Normal") // Low | Normal | High | Urgent
+  description           String
+  submittedAt           DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  assignedTo            String?
+  assignedAt            DateTime?
+  completedAt           DateTime?
+  dueDate               DateTime?
+
+  @@map("service_requests")
+}
+
+model ServiceApproval {
+  id                    String            @id @default(cuid()) @map("_id")
+  requestId             String            @db.ObjectId
+  approverId            String            @db.ObjectId
+  status                String // Pending | Approved | Rejected
+  comments              String?
+  approvedAt            DateTime?
+  level                 Int // Approval level (1, 2, 3, etc.)
+
+  @@map("service_approvals")
+}
+
+model ServiceAttachment {
+  id                    String            @id @default(cuid()) @map("_id")
+  serviceId             String            @db.ObjectId
+  name                  String
+  url                   String
+  uploadedBy            String
+  uploadedAt            DateTime          @default(now())
+
+  @@map("service_attachments")
+}
+
+model ServiceRequestAttachment {
+  id                    String            @id @default(cuid()) @map("_id")
+  requestId             String            @db.ObjectId
+  name                  String
+  url                   String
+  uploadedBy            String
+  uploadedAt            DateTime          @default(now())
+
+  @@map("service_request_attachments")
+}
+
+model ServiceInternalNote {
+  id                    String            @id @default(cuid()) @map("_id")
+  requestId             String            @db.ObjectId
+  content               String
+  createdBy             String
+  createdAt             DateTime          @default(now())
+
+  @@map("service_internal_notes")
+}
+
+model ServiceFeedback {
+  id                    String            @id @default(cuid()) @map("_id")
+  serviceId             String            @db.ObjectId
+  userId                String            @db.ObjectId
+  rating                Int // 1-5
+  comments              String?
+  submittedAt           DateTime          @default(now())
+
+  @@map("service_feedbacks")
+}
+
+// ==========================================
+// ACTIVITY HISTORY & NOTIFICATIONS
+// ==========================================
+model ActivityHistory {
+  id                    String            @id @default(cuid()) @map("_id")
+  userId                String            @db.ObjectId
+  organizationId        String?           @db.ObjectId
+  type                  String // event | service | member | payment | etc.
+  action                String
+  details               String?
+  ipAddress             String?
+  userAgent             String?
+  timestamp             DateTime          @default(now())
+
+  @@map("activity_history")
+}
+
+model NotificationCenter {
+  id                    String            @id @default(cuid()) @map("_id")
+  userId                String            @db.ObjectId
+  organizationId        String?           @db.ObjectId
+  title                 String
+  content               String
+  type                  String // info | warning | success | error
+  isRead                Boolean           @default(false)
+  link                  String?
+  relatedId             String? // eventId, serviceId, requestId, etc.
+  relatedType           String?
+  createdAt             DateTime          @default(now())
+
+  @@map("notification_center")
+}
+
+model ServiceApprovalAuditLog {
+  id                    String            @id @default(cuid()) @map("_id")
+  requestId             String            @db.ObjectId
+  approvalId          String?           @db.ObjectId
+  action                String
+  actionBy              String            @db.ObjectId
+  oldStatus           String?
+  newStatus           String
+  comments              String?
+  ipAddress             String?
+  userAgent             String?
+  timestamp             DateTime          @default(now())
+
+  @@map("service_approval_audit_logs")
 }
 
 model IdCard {

@@ -272,6 +272,105 @@ export const verifyTransaction = async (req: Request, res: Response) => {
 };
 
 /**
+ * Initialize a Chapa payment for a Service Subscription
+ */
+export const initializeServicePayment = async (req: any, res: Response) => {
+  try {
+    const { serviceId, phoneNumber, mode } = req.body;
+    const userId = req.user.userId;
+    const isInline = mode === 'inline';
+
+    if (!userId || !isValidId(userId)) {
+      return res.status(400).json({ message: 'Invalid User ID format' });
+    }
+
+    if (!serviceId || !isValidId(serviceId)) {
+      return res.status(400).json({ message: 'Invalid Service ID format' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    if (!service || !service.price) return res.status(404).json({ message: 'Service or price not found' });
+
+    const tx_ref = `s-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const callback_url = `${process.env.BACKEND_URL}/api/chapa/webhook`;
+    const return_url = `${process.env.FRONTEND_URL}/member/payments?tx_ref=${tx_ref}`;
+
+    const firstName = user.name.split(' ')[0] || 'User';
+    const lastName = user.name.split(' ').slice(1).join(' ') || 'Name';
+
+    const chapaData: any = {
+      amount: service.price.toString(),
+      currency: 'ETB',
+      email: user.email,
+      first_name: firstName,
+      last_name: lastName,
+      tx_ref,
+      return_url,
+      customization: {
+        title: 'Service Subscription',
+      },
+    };
+
+    if (process.env.BACKEND_URL && !process.env.BACKEND_URL.includes('localhost')) {
+        chapaData.callback_url = callback_url;
+    }
+
+    const phoneToUse = phoneNumber || user.phone;
+    if (phoneToUse) {
+        const cleanPhone = phoneToUse.replace(/[^\d+]/g, '');
+        if (cleanPhone) chapaData.phone_number = cleanPhone;
+    }
+
+    console.log(`Initializing Chapa Service Payment (mode: ${mode || 'standard'}) with data:`, JSON.stringify(chapaData, null, 2));
+
+    let response: any = { status: 'success' };
+    if (!isInline) {
+        try {
+          response = await chapaService.initializePayment(chapaData);
+          console.log('Chapa Service Response:', JSON.stringify(response, null, 2));
+        } catch (chapaErr: any) {
+          console.error('Error calling Chapa Service for Service:', chapaErr.message);
+          return res.status(400).json({ 
+            message: 'Chapa initialization failed', 
+            error: chapaErr.message,
+            details: chapaErr.response?.data
+          });
+        }
+    } else {
+        console.log('Skipping Chapa API call for inline service payment - frontend SDK will handle it');
+    }
+
+    try {
+      await prisma.payment.create({
+        data: {
+          user_id: userId,
+          amount: service.price,
+          payment_method: 'chapa',
+          status: 'pending',
+          transaction_id: tx_ref,
+          reference_id: `Subscription for ${service.title}`,
+          reference_type: 'service',
+        },
+      });
+      console.log('Pending service payment record created in DB');
+    } catch (prismaErr: any) {
+      console.error('Error creating service payment record in Prisma:', prismaErr);
+    }
+
+    res.status(200).json({
+      ...response,
+      tx_ref
+    });
+  } catch (error: any) {
+    console.error('Unexpected Chapa Initialization Error (Service):', error);
+    res.status(500).json({ message: error.message || 'Internal server error during Chapa initialization' });
+  }
+};
+
+/**
  * Helper to process successful transaction
  */
 async function processSuccessfulTransaction(tx_ref: string) {
@@ -334,6 +433,44 @@ async function processSuccessfulTransaction(tx_ref: string) {
           },
         }),
       ]);
+    }
+  }
+  // 3. Check if it's a Service Payment
+  else if (tx_ref.startsWith('s-')) {
+    const servicePayment = await prisma.payment.findFirst({
+      where: { transaction_id: tx_ref, status: 'pending' },
+    });
+
+    if (servicePayment && servicePayment.reference_id) {
+      // We need to get the service ID - wait, how? Oh, right, we can use reference_type!
+      const service = await prisma.service.findFirst({
+        where: {
+          title: servicePayment.reference_id.replace('Subscription for ', '')
+        }
+      });
+
+      if (service) {
+        await prisma.$transaction([
+          prisma.payment.update({
+            where: { id: servicePayment.id },
+            data: { status: 'completed' },
+          }),
+          prisma.service.update({
+            where: { id: service.id },
+            data: {
+              subscribers: {
+                connect: { id: servicePayment.user_id }
+              }
+            }
+          }),
+          prisma.notification.create({
+            data: {
+              userId: servicePayment.user_id,
+              title: `Service subscription successful! You are now subscribed to "${service.title}".`,
+            },
+          }),
+        ]);
+      }
     }
   }
 }

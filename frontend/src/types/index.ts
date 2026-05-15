@@ -101,3 +101,169 @@ export interface Event {
   payment_required?: boolean;
   attendeesIds?: string[];
 }
+
+export interface Service {
+  id: string;
+  title: string;
+  description: string;
+  image?: string;
+  status?: string;
+  category?: string;
+  contactEmail?: string;
+  organizationId?: string;
+  _count?: { subscribers: number };
+  price?: number;
+  payment_required?: boolean;
+  subscribersIds?: string[];
+  isPredefined?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// EVENT MODULE - New Types
+// ==========================================
+export interface EventParticipant {
+  id: string;
+  eventId: string;
+  userId: string;
+  status: string;
+  registeredAt: string;
+}
+
+export interface EventAttendance {
+  id: string;
+  eventId: string;
+  participantId: string;
+  userId: string;
+  checkedIn: boolean;
+  checkInTime?: string;
+  checkOutTime?: string;
+  qrCode?: string;
+}
+
+export interface EventReport {
+  id: string;
+  eventId: string;
+  title: string;
+  content: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface EventMedia {
+  id: string;
+  eventId: string;
+  type: string;
+  url: string;
+  caption?: string;
+  uploadedAt: string;
+}
+
+export interface EventAnnouncement {
+  id: string;
+  eventId: string;
+  title: string;
+  content: string;
+  priority: string;
+  createdAt: string;
+}
+
+// ==========================================
+// SERVICE MODULE - New Types
+// ==========================================
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: string;
+}
+
+export interface ServiceRequest {
+  id: string;
+  serviceId: string;
+  userId: string;
+  requestNumber: string;
+  status: string;
+  priority: string;
+  notes?: string;
+  assignedTo?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceApproval {
+  id: string;
+  requestId: string;
+  approverId: string;
+  status: string;
+  comments?: string;
+  approvedAt?: string;
+}
+
+export interface ServiceAttachment {
+  id: string;
+  serviceId: string;
+  name: string;
+  type: string;
+  url: string;
+  required: boolean;
+}
+
+export interface ServiceInternalNote {
+  id: string;
+  requestId: string;
+  createdBy: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface ServiceFeedback {
+  id: string;
+  serviceId: string;
+  userId: string;
+  rating: number;
+  comments?: string;
+  submittedAt: string;
+}
+
+export interface ServiceApprovalAuditLog {
+  id: string;
+  requestId: string;
+  approvalId?: string;
+  action: string;
+  actionBy: string;
+  oldStatus?: string;
+  newStatus: string;
+  comments?: string;
+  timestamp: string;
+}
+
+// ==========================================
+// GENERAL - Activity & Notifications
+// ==========================================
+export interface ActivityHistory {
+  id: string;
+  userId: string;
+  organizationId?: string;
+  type: string;
+  action: string;
+  details?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+
+export interface NotificationCenter {
+  id: string;
+  userId: string;
+  organizationId?: string;
+  title: string;
+  content: string;
+  type: string;
+  isRead: boolean;
+  link?: string;
+  relatedId?: string;
+  relatedType?: string;
+  createdAt: string;
+}

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, CreditCard, CheckCircle } from 'lucide-react';
+import { Calendar, CreditCard, CheckCircle, Briefcase } from 'lucide-react';
+import { Service } from '../../types';
 
 const MemberOverview: React.FC = () => {
   const { user } = useAuth();
@@ -14,7 +15,14 @@ const MemberOverview: React.FC = () => {
     enabled: user?.role === 'member',
   });
 
+  const { data: services } = useQuery<Service[]>({
+    queryKey: ['services'],
+    queryFn: () => api.get('/services').then((r) => r.data),
+    enabled: user?.role === 'member',
+  });
+
   const upcoming = dash?.stats?.find((s: { label: string }) => s.label?.includes('Events'))?.value ?? '—';
+  const activeServices = services?.filter((s) => s.status === 'Active') ?? [];
 
   return (
     <div className="max-w-5xl space-y-8 font-poppins">
@@ -61,6 +69,35 @@ const MemberOverview: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-black text-slate-900 flex items-center gap-2">
+              <Briefcase size={20} className="text-sky-600" />
+              Available Services
+            </h2>
+            <Link to="/member/services" className="text-sm font-bold text-sky-600">
+              View all
+            </Link>
+          </div>
+          {activeServices.length > 0 ? (
+            <ul className="space-y-3 text-sm text-slate-700">
+              {activeServices.slice(0, 3).map((service) => (
+                <li key={service.id} className="flex justify-between border-b border-slate-100 pb-2 last:border-0">
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 block">{service.title}</span>
+                    <span className="text-xs text-slate-500">{service.status || 'Active'}</span>
+                  </div>
+                  <Link to="/member/services" className="text-sky-600 font-bold flex items-center">
+                    View
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">No services available yet.</p>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-black text-slate-900 flex items-center gap-2">
               <Calendar size={20} className="text-sky-600" />
               Upcoming events
             </h2>
@@ -83,32 +120,32 @@ const MemberOverview: React.FC = () => {
             </li>
           </ul>
         </div>
+      </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-black text-slate-900 flex items-center gap-2">
-              <CreditCard size={20} className="text-sky-600" />
-              Recent payments
-            </h2>
-            <Link to="/member/payments" className="text-sm font-bold text-sky-600">
-              View all
-            </Link>
-          </div>
-          <ul className="space-y-3 text-sm">
-            <li className="flex justify-between items-start border-b border-slate-100 pb-2">
-              <span className="text-slate-700">Annual membership</span>
-              <span className="text-emerald-600 font-bold flex items-center gap-1">
-                <CheckCircle size={14} /> Paid
-              </span>
-            </li>
-            <li className="flex justify-between items-start">
-              <span className="text-slate-700">Event registration</span>
-              <span className="text-emerald-600 font-bold flex items-center gap-1">
-                <CheckCircle size={14} /> Paid
-              </span>
-            </li>
-          </ul>
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-black text-slate-900 flex items-center gap-2">
+            <CreditCard size={20} className="text-sky-600" />
+            Recent payments
+          </h2>
+          <Link to="/member/payments" className="text-sm font-bold text-sky-600">
+            View all
+          </Link>
         </div>
+        <ul className="space-y-3 text-sm">
+          <li className="flex justify-between items-start border-b border-slate-100 pb-2">
+            <span className="text-slate-700">Annual membership</span>
+            <span className="text-emerald-600 font-bold flex items-center gap-1">
+              <CheckCircle size={14} /> Paid
+            </span>
+          </li>
+          <li className="flex justify-between items-start">
+            <span className="text-slate-700">Event registration</span>
+            <span className="text-emerald-600 font-bold flex items-center gap-1">
+              <CheckCircle size={14} /> Paid
+            </span>
+          </li>
+        </ul>
       </div>
     </div>
   );

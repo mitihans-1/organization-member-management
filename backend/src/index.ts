@@ -6,7 +6,7 @@ import memberRoutes from './routes/memberRoutes';
 import planRoutes from './routes/planRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import blogRoutes from './routes/blogRoutes';
-import eventRoutes from './routes/eventRoutes';
+import eventRoutes from './modules/events/routes/eventRoutes';
 import adminRoutes from './routes/adminRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import organizationRoutes from './routes/organizationRoutes';
@@ -16,6 +16,7 @@ import faydaRoutes from './routes/faydaRoutes';
 import customAttributeRoutes from './routes/customAttributeRoutes';
 import chapaRoutes from './routes/chapaRoutes';
 import idCardRoutes from './routes/idCardRoutes';
+import serviceRoutes from './modules/services/routes/serviceRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,6 +45,7 @@ app.use('/api/help', helpRoutes);
 app.use('/api/custom-attributes', customAttributeRoutes);
 app.use('/api/chapa', chapaRoutes);
 app.use('/api/id-cards', idCardRoutes);
+app.use('/api/services', serviceRoutes);
 
 app.get('/', (req, res) => {
   res.send('Organization Membership Management API');

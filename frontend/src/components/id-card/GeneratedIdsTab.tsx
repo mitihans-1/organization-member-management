@@ -33,7 +33,8 @@ export const GeneratedIdsTab = () => {
   const [selectedCard, setSelectedCard] = React.useState<any>(null);
   const [editCard, setEditCard] = React.useState<any>(null);
   const [formData, setFormData] = React.useState({
-    name: '', role: '', sex: '', phone: '', address: '', expiresAt: ''
+    name: '', role: '', sex: '', phone: '', address: '', expiresAt: '',
+    cardNumber: '', generatedAt: ''
   });
 
   const updateDetailsMutation = useMutation({
@@ -114,7 +115,9 @@ export const GeneratedIdsTab = () => {
                                   sex: card.user?.sex || '',
                                   phone: card.user?.phone || '',
                                   address: card.user?.address || '',
-                                  expiresAt: card.expiresAt ? new Date(card.expiresAt).toISOString().split('T')[0] : ''
+                                  expiresAt: card.expiresAt ? new Date(card.expiresAt).toISOString().split('T')[0] : '',
+                                  cardNumber: card.cardNumber || '',
+                                  generatedAt: card.generatedAt ? new Date(card.generatedAt).toISOString().split('T')[0] : ''
                                 });
                               }}
                               className="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100 text-xs font-bold transition-colors"
@@ -221,9 +224,19 @@ export const GeneratedIdsTab = () => {
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Address / Country</label>
                 <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Date of Issue</label>
+                  <input type="date" value={formData.generatedAt} onChange={e => setFormData({...formData, generatedAt: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Expiration Date</label>
+                  <input type="date" value={formData.expiresAt} onChange={e => setFormData({...formData, expiresAt: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+              </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Expiration Date</label>
-                <input type="date" value={formData.expiresAt} onChange={e => setFormData({...formData, expiresAt: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Member ID / Card No.</label>
+                <input type="text" value={formData.cardNumber} onChange={e => setFormData({...formData, cardNumber: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
             </div>
 
@@ -240,7 +253,8 @@ export const GeneratedIdsTab = () => {
                     id: editCard.id, 
                     data: {
                       ...formData,
-                      expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null
+                      expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
+                      generatedAt: formData.generatedAt ? new Date(formData.generatedAt).toISOString() : null
                     }
                   });
                 }}

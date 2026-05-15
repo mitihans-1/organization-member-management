@@ -6,6 +6,15 @@ import { Eye, ShieldAlert, X } from 'lucide-react';
 export const IdRequestsTab = () => {
   const queryClient = useQueryClient();
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [configModalRequest, setConfigModalRequest] = useState<any>(null);
+  const [formatConfig, setFormatConfig] = useState({
+    prefix: 'ID-',
+    length: 6,
+    includeNumbers: true,
+    includeLetters: true,
+    includeHyphens: false,
+    suffix: ''
+  });
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['idCardRequests'],
@@ -13,7 +22,8 @@ export const IdRequestsTab = () => {
   });
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/id-cards/requests/${id}/approve`),
+    mutationFn: ({ id, formatConfig }: { id: string; formatConfig: any }) => 
+      api.post(`/id-cards/requests/${id}/approve`, { formatConfig }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['idCardRequests'] });
       queryClient.invalidateQueries({ queryKey: ['generatedCards'] });
@@ -104,7 +114,7 @@ export const IdRequestsTab = () => {
                       )}
                       {req.requestStatus === 'PENDING' && (
                         <button
-                          onClick={() => approveMutation.mutate(req.id)}
+                          onClick={() => setConfigModalRequest(req)}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 text-xs font-bold"
                         >
                           Approve
@@ -198,7 +208,7 @@ export const IdRequestsTab = () => {
               {selectedRequest.requestStatus === 'PENDING' && (
                 <button
                   onClick={() => {
-                    approveMutation.mutate(selectedRequest.id);
+                    setConfigModalRequest(selectedRequest);
                     setSelectedRequest(null);
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-500 text-sm shadow-sm"
@@ -206,6 +216,103 @@ export const IdRequestsTab = () => {
                   Approve ID
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {configModalRequest && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="text-lg font-black text-gray-900">Configure ID Format</h3>
+              <button onClick={() => setConfigModalRequest(null)} className="p-2 rounded-lg hover:bg-gray-200 text-gray-500">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-5">
+              <p className="text-xs text-gray-500 font-medium">Define the format for {configModalRequest.user?.name}'s new ID card number.</p>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Prefix (Optional)</label>
+                <input 
+                  type="text" 
+                  value={formatConfig.prefix} 
+                  onChange={e => setFormatConfig({...formatConfig, prefix: e.target.value})}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                  placeholder="e.g. ORG-"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Random String Length: {formatConfig.length}</label>
+                <input 
+                  type="range" 
+                  min="4" max="12" 
+                  value={formatConfig.length} 
+                  onChange={e => setFormatConfig({...formatConfig, length: parseInt(e.target.value)})}
+                  className="w-full accent-indigo-600" 
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={formatConfig.includeNumbers} onChange={e => setFormatConfig({...formatConfig, includeNumbers: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
+                  <span className="text-sm font-semibold text-gray-700">Include Numbers (0-9)</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={formatConfig.includeLetters} onChange={e => setFormatConfig({...formatConfig, includeLetters: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
+                  <span className="text-sm font-semibold text-gray-700">Include Letters (A-Z)</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={formatConfig.includeHyphens} onChange={e => setFormatConfig({...formatConfig, includeHyphens: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
+                  <span className="text-sm font-semibold text-gray-700">Format with Hyphens</span>
+                </label>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Suffix (Optional)</label>
+                <input 
+                  type="text" 
+                  value={formatConfig.suffix} 
+                  onChange={e => setFormatConfig({...formatConfig, suffix: e.target.value})}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                  placeholder="e.g. -2026"
+                />
+              </div>
+              
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-center">
+                <span className="text-xs font-bold text-indigo-400 block mb-1 uppercase tracking-wider">Preview Example</span>
+                <span className="text-lg font-black text-indigo-900 tracking-widest font-mono">
+                  {formatConfig.prefix}
+                  {Array.from({ length: formatConfig.length }, () => {
+                    const c = formatConfig.includeLetters ? 'A' : (formatConfig.includeNumbers ? '1' : 'X');
+                    return c;
+                  }).join('').match(new RegExp(`.{1,${formatConfig.includeHyphens ? 4 : formatConfig.length}}`, 'g'))?.join(formatConfig.includeHyphens ? '-' : '')}
+                  {formatConfig.suffix}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-gray-100 flex gap-3 bg-gray-50/50">
+              <button 
+                onClick={() => setConfigModalRequest(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 text-sm"
+              >
+                Cancel
+              </button>
+              
+              <button
+                onClick={() => {
+                  approveMutation.mutate({ id: configModalRequest.id, formatConfig });
+                  setConfigModalRequest(null);
+                }}
+                disabled={approveMutation.isPending || (!formatConfig.includeLetters && !formatConfig.includeNumbers)}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 text-sm shadow-sm disabled:opacity-50"
+              >
+                {approveMutation.isPending ? 'Generating...' : 'Confirm & Generate ID'}
+              </button>
             </div>
           </div>
         </div>

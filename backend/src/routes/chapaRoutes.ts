@@ -7,6 +7,7 @@ const router = Router();
 // Initialize payments
 router.post('/initialize/plan', authenticateToken, chapaController.initializePlanPayment);
 router.post('/initialize/event', authenticateToken, chapaController.initializeEventPayment);
+router.post('/initialize/service', authenticateToken, chapaController.initializeServicePayment);
 
 // Verify transaction
 router.get('/verify/:tx_ref', authenticateToken, chapaController.verifyTransaction);
