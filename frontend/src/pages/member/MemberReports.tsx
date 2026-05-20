@@ -12,7 +12,10 @@ const AccordionReportCard: React.FC<{
 }> = ({ report, onEdit, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, accepted: boolean) => {
+    if (accepted) {
+      return <CheckCircle size={16} className="text-emerald-500" />;
+    }
     switch (status) {
       case 'resolved':
         return <CheckCircle size={16} className="text-emerald-500" />;
@@ -53,7 +56,7 @@ const AccordionReportCard: React.FC<{
         className="w-full p-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-4 flex-1">
-          {getStatusIcon(report.status)}
+          {getStatusIcon(report.status, report.accepted)}
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="font-bold text-gray-900">
@@ -258,7 +261,7 @@ const MemberReports: React.FC = () => {
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
           <div className="flex items-center gap-2 text-emerald-600">
             <CheckCheck size={18} />
-            <span className="text-xs font-bold uppercase">Updated</span>
+            <span className="text-xs font-bold uppercase">Resolved</span>
           </div>
           <p className="text-3xl font-black text-emerald-700 mt-3">{reportStats.resolved}</p>
         </div>

@@ -41,6 +41,7 @@ model Organization {
   plan             Plan?                       @relation(fields: [plan_id], references: [id])
   payment_phone    String?
 
+  conversations          Conversation[]
   idCards                IdCard[]
   idCardRequests         IdCardRequest[]
   idCardVerificationLogs IdCardVerificationLog[]
@@ -91,6 +92,9 @@ model User {
   idCardRequests         IdCardRequest[]
   idCardVerificationLogs IdCardVerificationLog[]
   reports                Report[]
+  conversations1         Conversation[]          @relation("ConversationParticipant1")
+  conversations2         Conversation[]          @relation("ConversationParticipant2")
+  sentMessages           Message[]
 
   @@map("users")
 }
@@ -607,4 +611,49 @@ model Report {
   organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@map("reports")
+}
+
+// ==========================================
+// CHAT SYSTEM MODELS
+// ==========================================
+model Conversation {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  type           String // "member_org" | "org_superadmin"
+  participant1Id String        @db.ObjectId
+  participant2Id String        @db.ObjectId
+  organizationId String?       @db.ObjectId
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  messages       Message[]
+  participant1   User          @relation("ConversationParticipant1", fields: [participant1Id], references: [id])
+  participant2   User          @relation("ConversationParticipant2", fields: [participant2Id], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  senderId       String       @db.ObjectId
+  content        String?
+  attachmentUrl  String?
+  attachmentType String? // image, file
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model TypingIndicator {
+  id             String   @id @default(cuid()) @map("_id")
+  conversationId String   @db.ObjectId
+  userId         String   @db.ObjectId
+  isTyping       Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  @@map("typing_indicators")
 }

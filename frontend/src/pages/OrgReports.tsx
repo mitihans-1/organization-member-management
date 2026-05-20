@@ -15,7 +15,10 @@ const AccordionReportCard: React.FC<{
 }> = ({ report, activeTab, onManage, onAccept, onReply }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, accepted: boolean) => {
+    if (accepted) {
+      return <CheckCircle size={16} className="text-emerald-500" />;
+    }
     switch (status) {
       case 'resolved':
         return <CheckCircle size={16} className="text-emerald-500" />;
@@ -55,7 +58,7 @@ const AccordionReportCard: React.FC<{
         className="w-full p-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-4 flex-1">
-          {getStatusIcon(report.status)}
+          {getStatusIcon(report.status, report.accepted)}
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="font-bold text-gray-900">
@@ -302,7 +305,10 @@ const OrgReports: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, accepted: boolean) => {
+    if (accepted) {
+      return <CheckCircle size={16} className="text-emerald-500" />;
+    }
     switch (status) {
       case 'resolved':
         return <CheckCircle size={16} className="text-emerald-500" />;
@@ -366,7 +372,7 @@ const OrgReports: React.FC = () => {
           <p className="text-3xl font-black text-amber-600 mt-2">{stats.inProgress}</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-          <p className="text-xs font-bold text-emerald-500 uppercase">Updated</p>
+          <p className="text-xs font-bold text-emerald-500 uppercase">Resolved</p>
           <p className="text-3xl font-black text-emerald-600 mt-2">{stats.resolved}</p>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import http from 'http';
+import { Server } from 'socket.io';
 import authRoutes from './routes/authRoutes';
 import memberRoutes from './routes/memberRoutes';
 import planRoutes from './routes/planRoutes';
@@ -18,8 +20,18 @@ import chapaRoutes from './routes/chapaRoutes';
 import idCardRoutes from './routes/idCardRoutes';
 import serviceRoutes from './modules/services/routes/serviceRoutes';
 import reportRoutes from './routes/reportRoutes';
+import chatRoutes from './routes/chatRoutes';
+import { PrismaClient } from '@prisma/client';
 
+const prisma = new PrismaClient();
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -27,10 +39,8 @@ app.use(express.json({ limit: '10mb' }));
 
 import path from 'path';
 
-// Serve uploaded receipts statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/fayda', faydaRoutes);
 app.use('/api/organizations', organizationRoutes);
@@ -48,11 +58,122 @@ app.use('/api/chapa', chapaRoutes);
 app.use('/api/id-cards', idCardRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/chat', chatRoutes);
+
+const userSocketMap = new Map<string, string>();
+
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  socket.on('join', (userId: string) => {
+    userSocketMap.set(userId, socket.id);
+    console.log(`User ${userId} joined with socket ${socket.id}`);
+  });
+
+  socket.on('sendMessage', async (data) => {
+    try {
+      const { conversationId, senderId, content, attachmentUrl, attachmentType } = data;
+      
+      const message = await prisma.message.create({
+        data: {
+          conversationId,
+          senderId,
+          content,
+          attachmentUrl,
+          attachmentType
+        },
+        include: {
+          sender: { select: { id: true, name: true, profile_photo_path: true } }
+        }
+      });
+
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() }
+      });
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId }
+      });
+
+      if (conversation) {
+        const recipientId = conversation.participant1Id === senderId 
+          ? conversation.participant2Id 
+          : conversation.participant1Id;
+        
+        const recipientSocketId = userSocketMap.get(recipientId);
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit('receiveMessage', message);
+        }
+        const senderSocketId = userSocketMap.get(senderId);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('messageSent', message);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message via socket:', error);
+    }
+  });
+
+  socket.on('typing', (data: { conversationId: string; userId: string; isTyping: boolean }) => {
+    const { conversationId, userId, isTyping } = data;
+    socket.to(`conversation-${conversationId}`).emit('typingIndicator', { userId, isTyping });
+  });
+
+  socket.on('joinConversation', (conversationId: string) => {
+    socket.join(`conversation-${conversationId}`);
+  });
+
+  socket.on('markAsRead', async (data: { conversationId: string; userId: string }) => {
+    try {
+      const { conversationId, userId } = data;
+      
+      await prisma.message.updateMany({
+        where: {
+          conversationId,
+          senderId: { not: userId },
+          isRead: false
+        },
+        data: {
+          isRead: true,
+          readAt: new Date()
+        }
+      });
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId }
+      });
+
+      if (conversation) {
+        const otherUserId = conversation.participant1Id === userId 
+          ? conversation.participant2Id 
+          : conversation.participant1Id;
+        
+        const otherUserSocketId = userSocketMap.get(otherUserId);
+        if (otherUserSocketId) {
+          io.to(otherUserSocketId).emit('messagesRead', { conversationId, userId });
+        }
+      }
+    } catch (error) {
+      console.error('Error marking messages as read via socket:', error);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    for (const [userId, socketId] of userSocketMap.entries()) {
+      if (socketId === socket.id) {
+        userSocketMap.delete(userId);
+        break;
+      }
+    }
+    console.log('User disconnected:', socket.id);
+  });
+});
 
 app.get('/', (req, res) => {
   res.send('Organization Membership Management API');
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

@@ -129,7 +129,7 @@ export const MyIdCard = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Gender</label>
-                <select value={sex} onChange={(e) => setSex(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm">
+                <select title='gender' value={sex} onChange={(e) => setSex(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm">
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                 </select>
@@ -204,6 +204,7 @@ export const MyIdCard = () => {
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Reason</label>
             <select 
+            title='reason'
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -216,6 +217,7 @@ export const MyIdCard = () => {
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Payment Method</label>
             <select 
+            title='payment'
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"

@@ -14,6 +14,7 @@ import {
   Menu,
   X as CloseIcon,
   Briefcase,
+  MessageSquare,
 } from 'lucide-react';
 
 /** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
@@ -24,6 +25,7 @@ const nav = [
   { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
   { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },
   { to: '/org-admin/reports', label: 'Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
   { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
   { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500' },
   { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500' },

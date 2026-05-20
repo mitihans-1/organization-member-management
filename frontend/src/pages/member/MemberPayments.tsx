@@ -520,6 +520,7 @@ const MemberPayments: React.FC = () => {
                       <label className="block text-sm font-semibold text-gray-700 mb-1">What are you paying for?</label>
                       <div className="relative">
                         <select
+                        title='event'
                           value={selectedEventId}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -646,6 +647,7 @@ const MemberPayments: React.FC = () => {
                       <label className="block text-sm font-semibold text-gray-700 mb-1">What are you paying for?</label>
                       <div className="relative">
                         <select
+                        title='event'
                           value={selectedEventId}
                           onChange={(e) => {
                             const val = e.target.value;

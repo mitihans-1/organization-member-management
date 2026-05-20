@@ -21,6 +21,7 @@ import {
   Menu,
   Zap,
   X as CloseIcon,
+  MessageSquare,
 } from 'lucide-react';
 
 const nav = [
@@ -31,6 +32,7 @@ const nav = [
   { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap, color: 'text-amber-400' },
   { to: '/super-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-400' },
   { to: '/super-admin/reports', label: 'Reports', icon: Inbox, color: 'text-rose-400' },
+  { to: '/super-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-400' },
   { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-slate-400' },
 ];
 

@@ -12,6 +12,7 @@ import {
   Menu,
   X as CloseIcon,
   Briefcase,
+  MessageSquare,
 } from 'lucide-react';
 
 const nav = [
@@ -21,6 +22,7 @@ const nav = [
   { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500' },
   { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
   { to: '/member/reports', label: 'My Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
   { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },
   { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
 ];

@@ -14,7 +14,10 @@ const AccordionReportCard: React.FC<{
 }> = ({ report, onAccept, onReply, onUpdateStatus, onUpdatePriority }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, accepted: boolean) => {
+    if (accepted) {
+      return <CheckCircle size={16} className="text-emerald-500" />;
+    }
     switch (status) {
       case 'resolved':
         return <CheckCircle size={16} className="text-emerald-500" />;
@@ -63,7 +66,7 @@ const AccordionReportCard: React.FC<{
         className="w-full p-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-4 flex-1">
-          {getStatusIcon(report.status)}
+          {getStatusIcon(report.status, report.accepted)}
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="font-bold text-gray-900">
