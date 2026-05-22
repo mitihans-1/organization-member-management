@@ -5,27 +5,34 @@ const prisma = new PrismaClient();
 
 export const getAttributeDefinitions = async (req: any, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { organizationId: true, organization_name: true }
-    });
+    const { organizationId: queryOrgId } = req.query;
+    let orgId: string | undefined;
 
-    let orgId = user?.organizationId;
-    if (!orgId && user?.organization_name) {
-      const org = await prisma.organization.findFirst({
-        where: { name: user.organization_name }
+    if (queryOrgId) {
+      orgId = queryOrgId as string;
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { organizationId: true, organization_name: true }
       });
-      if (org) {
-        orgId = org.id;
-        await prisma.user.update({
-          where: { id: req.user.userId },
-          data: { organizationId: org.id }
+
+      orgId = user?.organizationId ?? undefined;
+      if (!orgId && user?.organization_name) {
+        const org = await prisma.organization.findFirst({
+          where: { name: user.organization_name }
         });
+        if (org) {
+          orgId = org.id;
+          await prisma.user.update({
+            where: { id: req.user.userId },
+            data: { organizationId: org.id }
+          });
+        }
       }
     }
 
     if (!orgId) {
-      return res.status(400).json({ message: 'User not associated with an organization' });
+      return res.status(400).json({ message: 'Organization not specified or user not associated with an organization' });
     }
 
     const definitions = await prisma.customAttributeDefinition.findMany({

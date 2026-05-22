@@ -58,6 +58,7 @@ export const getOrgReports = async (req: any, res: Response) => {
 export const getSuperAdminReports = async (req: any, res: Response) => {
   try {
     const reports = await prisma.report.findMany({
+      where: { reportType: 'org_to_superadmin' },
       include: { member: true, organization: true },
       orderBy: { createdAt: 'desc' }
     });

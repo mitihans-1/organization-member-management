@@ -30,7 +30,7 @@ export const getMembers = async (req: any, res: Response) => {
 
 export const createMember = async (req: any, res: Response) => {
   try {
-    const { name, email, password, phone, address, sex, join_date } = req.body;
+    const { name, email, password, phone, address, sex, join_date, organizationId } = req.body;
     const admin = await prisma.user.findUnique({ 
       where: { id: req.user.userId },
       include: { plan: true }
@@ -38,13 +38,36 @@ export const createMember = async (req: any, res: Response) => {
 
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
 
-    // Check plan limits
-    const currentMembers = await prisma.user.count({
-      where: { organization_name: admin.organization_name, role: 'member' }
-    });
+    let targetOrgId: string | undefined;
+    let targetOrgName: string | undefined;
+    let targetOrgType: string | undefined;
 
-    if (admin.plan && currentMembers >= admin.plan.max_members) {
-      return res.status(400).json({ message: 'Member limit reached for your plan' });
+    if (admin.role === 'SuperAdmin') {
+      if (!organizationId) {
+        return res.status(400).json({ message: 'Organization is required for SuperAdmin' });
+      }
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId }
+      });
+      if (!organization) {
+        return res.status(404).json({ message: 'Organization not found' });
+      }
+      targetOrgId = organization.id;
+      targetOrgName = organization.name;
+      targetOrgType = organization.type;
+    } else {
+      targetOrgId = admin.organizationId ?? undefined;
+      targetOrgName = admin.organization_name ?? undefined;
+      targetOrgType = admin.organization_type ?? undefined;
+      
+      // Check plan limits only for OrgAdmins
+      const currentMembers = await prisma.user.count({
+        where: { organization_name: targetOrgName, role: 'member' }
+      });
+
+      if (admin.plan && currentMembers >= admin.plan.max_members) {
+        return res.status(400).json({ message: 'Member limit reached for your plan' });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password || 'password123', 10);
@@ -59,9 +82,9 @@ export const createMember = async (req: any, res: Response) => {
         sex,
         join_date: join_date ? new Date(join_date) : new Date(),
         role: 'member',
-        organizationId: admin.organizationId,
-        organization_name: admin.organization_name,
-        organization_type: admin.organization_type,
+        organizationId: targetOrgId,
+        organization_name: targetOrgName,
+        organization_type: targetOrgType,
         is_verified: true,
       },
     });

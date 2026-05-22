@@ -14,8 +14,10 @@ export const getChatableUsers = async (req: Request, res: Response) => {
     if (userRole === 'member') {
       users = await prisma.user.findMany({
         where: {
-          role: 'orgAdmin',
-          organizationId: userOrganizationId
+          OR: [
+            { role: 'orgAdmin', organizationId: userOrganizationId },
+            { role: 'member', organizationId: userOrganizationId, id: { not: userId } }
+          ]
         },
         select: { id: true, name: true, email: true, profile_photo_path: true }
       });
@@ -33,15 +35,10 @@ export const getChatableUsers = async (req: Request, res: Response) => {
       });
       users = [...members, ...superAdmins];
     } else {
-      const orgAdmins = await prisma.user.findMany({
+      users = await prisma.user.findMany({
         where: { role: 'orgAdmin' },
         select: { id: true, name: true, email: true, profile_photo_path: true, organization_name: true }
       });
-      const members = await prisma.user.findMany({
-        where: { role: 'member' },
-        select: { id: true, name: true, email: true, profile_photo_path: true, organization_name: true }
-      });
-      users = [...orgAdmins, ...members];
     }
 
     res.json(users);

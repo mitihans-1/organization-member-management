@@ -192,7 +192,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
 
     // Log the user in
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
 
     console.log('OTP Verification Successful:', email);
     res.status(200).json({
@@ -271,7 +271,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Please verify your email address before logging in.', requiresOtp: true, email: user.email });
     }
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
 
     res.status(200).json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (error: any) {
@@ -441,7 +441,7 @@ export const googleLogin = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'User not registered. Please sign up first.' });
     }
 
-    const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
     res.status(200).json({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (error: any) {
     console.error('Google Login Error:', error);
@@ -529,7 +529,7 @@ export const googleRegister = async (req: Request, res: Response) => {
       });
     }
 
-    const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    const jwtToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
     res.status(201).json({
       token: jwtToken,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },

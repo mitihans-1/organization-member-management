@@ -17,8 +17,9 @@ export interface MemberAttributeValue {
 }
 
 export const customAttributeService = {
-  getDefinitions: async () => {
-    const response = await api.get<CustomAttributeDefinition[]>('/custom-attributes/definitions');
+  getDefinitions: async (organizationId?: string) => {
+    const params = organizationId ? { organizationId } : {};
+    const response = await api.get<CustomAttributeDefinition[]>('/custom-attributes/definitions', { params });
     return response.data;
   },
 

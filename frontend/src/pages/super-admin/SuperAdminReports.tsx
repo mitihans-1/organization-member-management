@@ -179,7 +179,6 @@ const SuperAdminReports: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [filterStatus, setFilterStatus] = useState<ReportStatus | 'all'>('all');
-  const [filterType, setFilterType] = useState<ReportType | 'all'>('all');
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [replyingReport, setReplyingReport] = useState<Report | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -196,11 +195,8 @@ const SuperAdminReports: React.FC = () => {
     if (filterStatus !== 'all') {
       result = result.filter(r => r.status === filterStatus);
     }
-    if (filterType !== 'all') {
-      result = result.filter(r => r.reportType === filterType);
-    }
     return result;
-  }, [reports, filterStatus, filterType]);
+  }, [reports, filterStatus]);
 
   const updateStatusMutation = useMutation({
     mutationFn: (data: { id: string; status: ReportStatus }) =>
@@ -274,17 +270,13 @@ const SuperAdminReports: React.FC = () => {
       total: 0,
       open: 0,
       inProgress: 0,
-      resolved: 0,
-      memberToOrg: 0,
-      orgToSuperAdmin: 0
+      resolved: 0
     };
     return {
       total: reports.length,
       open: reports.filter(r => r.status === 'open').length,
       inProgress: reports.filter(r => r.status === 'in_progress').length,
-      resolved: reports.filter(r => r.status === 'resolved').length,
-      memberToOrg: reports.filter(r => r.reportType === 'member_to_org').length,
-      orgToSuperAdmin: reports.filter(r => r.reportType === 'org_to_superadmin').length,
+      resolved: reports.filter(r => r.status === 'resolved').length
     };
   }, [reports]);
 
@@ -297,7 +289,7 @@ const SuperAdminReports: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
           <p className="text-xs font-bold text-gray-500 uppercase">Total</p>
           <p className="text-3xl font-black text-gray-900 mt-2">{stats.total}</p>
@@ -313,14 +305,6 @@ const SuperAdminReports: React.FC = () => {
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
           <p className="text-xs font-bold text-emerald-500 uppercase">Resolved</p>
           <p className="text-3xl font-black text-emerald-600 mt-2">{stats.resolved}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-          <p className="text-xs font-bold text-indigo-500 uppercase">Member → Org</p>
-          <p className="text-3xl font-black text-indigo-600 mt-2">{stats.memberToOrg}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-          <p className="text-xs font-bold text-purple-500 uppercase">Org → SuperAdmin</p>
-          <p className="text-3xl font-black text-purple-600 mt-2">{stats.orgToSuperAdmin}</p>
         </div>
       </div>
 
@@ -340,21 +324,6 @@ const SuperAdminReports: React.FC = () => {
             }`}
           >
             {status === 'all' ? 'All' : status.replace('_', ' ')}
-          </button>
-        ))}
-        <div className="w-px h-6 bg-gray-200 mx-2" />
-        <span className="text-sm font-medium text-gray-700">Type:</span>
-        {['all', 'member_to_org', 'org_to_superadmin'].map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilterType(type as any)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-              filterType === type
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {type === 'all' ? 'All' : type.replace('_', ' → ')}
           </button>
         ))}
       </div>

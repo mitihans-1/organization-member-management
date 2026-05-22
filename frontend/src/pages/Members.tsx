@@ -29,6 +29,7 @@ const PAGE_SIZE = 7;
 const Members: React.FC = () => {
   const { user } = useAuth();
   const isOrgAdmin = user?.role === 'orgAdmin';
+  const isSuperAdmin = user?.role === 'SuperAdmin';
   const [activeTab, setActiveTab] = useState<Tab>('members');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -44,8 +45,10 @@ const Members: React.FC = () => {
     password: '',
     role: 'member',
     status: 'active',
+    organizationId: '',
   });
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [selectedOrgCustomAttributes, setSelectedOrgCustomAttributes] = useState<CustomAttributeDefinition[]>([]);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const queryClient = useQueryClient();
@@ -56,11 +59,40 @@ const Members: React.FC = () => {
     queryFn: () => api.get('/members').then((res) => res.data),
   });
 
+  const { data: organizations } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['organizations'],
+    queryFn: () => api.get('/organizations').then((res) => res.data),
+    enabled: isSuperAdmin,
+  });
+
   const { data: customAttributeDefinitions } = useQuery<CustomAttributeDefinition[]>({
     queryKey: ['customAttributeDefinitions'],
     queryFn: () => customAttributeService.getDefinitions(),
-    enabled: !!user,
+    enabled: isOrgAdmin,
   });
+
+  // Fetch custom attributes for selected organization when SuperAdmin
+  useEffect(() => {
+    if (!isSuperAdmin || !formData.organizationId) {
+      setSelectedOrgCustomAttributes([]);
+      return;
+    }
+
+    const fetchAttributes = async () => {
+      try {
+        const attrs = await customAttributeService.getDefinitions(formData.organizationId);
+        setSelectedOrgCustomAttributes(attrs);
+      } catch (error) {
+        console.error('Error fetching custom attributes for selected org:', error);
+        setSelectedOrgCustomAttributes([]);
+      }
+    };
+
+    fetchAttributes();
+  }, [formData.organizationId, isSuperAdmin]);
+
+  // Determine which custom attributes to use
+  const displayCustomAttributes = isSuperAdmin ? selectedOrgCustomAttributes : customAttributeDefinitions;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/members/${id}`),
@@ -246,6 +278,7 @@ const Members: React.FC = () => {
         password: '',
         role: member.role || 'member',
         status: 'active',
+        organizationId: member.organizationId || '',
       });
       // Fetch custom field values for this member
       try {
@@ -266,6 +299,7 @@ const Members: React.FC = () => {
         password: '',
         role: 'member',
         status: 'active',
+        organizationId: '',
       });
       setCustomFieldValues({});
     }
@@ -275,7 +309,7 @@ const Members: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingMember(null);
-    setFormData({ name: '', email: '', password: '', role: 'member', status: 'active' });
+    setFormData({ name: '', email: '', password: '', role: 'member', status: 'active', organizationId: '' });
     setCustomFieldValues({});
   };
 
@@ -674,7 +708,6 @@ const Members: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                 />
-                <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase tracking-widest">Mandatory</p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
@@ -685,7 +718,6 @@ const Members: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                 />
-                <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase tracking-widest">Mandatory</p>
               </div>
               {!editingMember && (
                 <div>
@@ -697,9 +729,29 @@ const Members: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
                   />
+                </div>
+              )}
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Organization</label>
+                  <select
+                    required
+                    title="Select organization"
+                    value={formData.organizationId}
+                    onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
+                  >
+                    <option value="">Select an organization</option>
+                    {organizations?.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
                   <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase tracking-widest">Mandatory</p>
                 </div>
               )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
                 <input
@@ -712,10 +764,10 @@ const Members: React.FC = () => {
               </div>
 
               {/* Custom Fields */}
-              {customAttributeDefinitions && customAttributeDefinitions.length > 0 && (
+              {displayCustomAttributes && displayCustomAttributes.length > 0 && (
                 <div className="pt-4 border-t border-gray-100 space-y-4">
                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Additional Information</h4>
-                  {customAttributeDefinitions.map((attr) => (
+                  {displayCustomAttributes.map((attr) => (
                     <div key={attr.id}>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                         {attr.name} {attr.required && <span className="text-rose-500">*</span>}
