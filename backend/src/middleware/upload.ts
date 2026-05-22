@@ -65,3 +65,22 @@ export const uploadReportAttachment = multer({
         cb(null, true); // Allow all types for now
     }
 });
+
+const attachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/attachments/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname}`);
+    }
+});
+
+export const uploadAttachment = multer({
+    storage: attachmentStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt|xls|xlsx|zip/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        cb(null, true);
+    }
+});

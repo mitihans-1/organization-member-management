@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { relativeTime } from '../../lib/relativeTime';
 import {
   LayoutGrid,
   User,
@@ -13,6 +16,11 @@ import {
   X as CloseIcon,
   Briefcase,
   MessageSquare,
+  Bell,
+  Inbox,
+  Loader2,
+  ChevronDown,
+  User as UserIcon,
 } from 'lucide-react';
 
 const nav = [
@@ -33,8 +41,73 @@ const MemberLayout: React.FC = () => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
+  type Panel = 'notifications' | 'user' | null;
+
+  const [open, setOpen] = useState<Panel>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const baseId = useId();
+  const queryClient = useQueryClient();
+
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
+
+  const { data: notifications = [], isLoading: notifsLoading, isError: notifsError } = useQuery({
+    queryKey: ['member-notifications'],
+    queryFn: async () => {
+      const { data } = await api.get<ApiNotification[]>('/notifications');
+      return data;
+    },
+  });
+
+  const markReadMut = useMutation({
+    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-notifications'] }),
+  });
+
+  const markAllMut = useMutation({
+    mutationFn: () => api.post('/notifications/read-all'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-notifications'] }),
+  });
+
+  const unread = notifications.filter((n) => !n.read).length;
+
+  const close = useCallback(() => setOpen(null), []);
+  const toggle = useCallback((panel: Exclude<Panel, null>) => {
+    setOpen((prev) => (prev === panel ? null : panel));
+  }, []);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) close();
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [close]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, close]);
+
+  const handleLogout = () => {
+    close();
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const iconBtn =
+    'inline-flex shrink-0 items-center justify-center min-h-[44px] min-w-[44px] rounded-xl text-gray-600 transition-colors hover:bg-gray-100 active:bg-gray-200 sm:min-h-[40px] sm:min-w-[40px] sm:rounded-lg';
+
+  const panelClass =
+    'absolute right-0 z-50 mt-1 max-h-[min(70vh,24rem)] w-[min(calc(100vw-1.5rem),20rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 sm:max-h-[min(80vh,22rem)] sm:w-80';
+
+  const notifId = `${baseId}-notifications`;
+  const userId = `${baseId}-user`;
 
   return (
     <div className="min-h-screen bg-slate-100 flex font-poppins relative">
@@ -131,17 +204,224 @@ const MemberLayout: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col overflow-x-hidden">
-        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex justify-between lg:justify-end items-center sticky top-0 z-[30]">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center sticky top-0 z-[30]">
           <button 
             onClick={toggleSidebar}
             className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
           >
             <Menu size={24} />
           </button>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-sm font-bold text-gray-800">{user?.name}</span>
-            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-[10px] border border-slate-200">
-              {user?.name?.charAt(0)}
+          <div className="flex items-center gap-4 ml-auto" ref={containerRef}>
+            <div className="relative">
+                {open === 'notifications' ? (
+                  <button
+                    title="notifications"
+                    type="button"
+                    className={`${iconBtn} relative`}
+                    aria-label="Notifications"
+                    aria-expanded="true"
+                    aria-haspopup="true"
+                    aria-controls={notifId}
+                    id={`${notifId}-trigger`}
+                    onClick={() => toggle('notifications')}
+                  >
+                    <Bell size={20} />
+                    {unread > 0 ? (
+                      <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white sm:right-1.5 sm:top-1.5">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    ) : null}
+                  </button>
+                ) : (
+                  <button
+                    title="notifications"
+                    type="button"
+                    className={`${iconBtn} relative`}
+                    aria-label="Notifications"
+                    aria-expanded="false"
+                    aria-haspopup="true"
+                    aria-controls={notifId}
+                    id={`${notifId}-trigger`}
+                    onClick={() => toggle('notifications')}
+                  >
+                    <Bell size={20} />
+                    {unread > 0 ? (
+                      <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white sm:right-1.5 sm:top-1.5">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    ) : null}
+                  </button>
+                )}
+
+              {open === 'notifications' ? (
+                <div
+                  id={notifId}
+                  role="region"
+                  aria-labelledby={`${notifId}-trigger`}
+                  className={panelClass}
+                >
+                  <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5">
+                    <span className="text-sm font-bold text-slate-800">Notifications</span>
+                    {unread > 0 && !notifsLoading ? (
+                      <button
+                        type="button"
+                        onClick={() => markAllMut.mutate()}
+                        disabled={markAllMut.isPending}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 disabled:opacity-50"
+                      >
+                        {markAllMut.isPending ? '…' : 'Mark all read'}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <ul className="max-h-[min(50vh,18rem)] divide-y divide-gray-50 overflow-y-auto overscroll-contain">
+                    {notifsLoading ? (
+                      <li className="flex justify-center px-4 py-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" aria-label="Loading" />
+                      </li>
+                    ) : notifsError ? (
+                      <li className="px-4 py-8 text-center text-sm text-red-600">
+                        Could not load notifications.
+                      </li>
+                    ) : notifications.length === 0 ? (
+                      <li className="flex flex-col items-center gap-2 px-4 py-8 text-center text-sm text-gray-500">
+                        <Inbox className="h-8 w-8 text-gray-300" aria-hidden />
+                        No notifications
+                      </li>
+                    ) : (
+                      notifications.map((n: ApiNotification) => (
+                        <li key={n.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!n.read) markReadMut.mutate(n.id);
+                            }}
+                            disabled={markReadMut.isPending}
+                            className={`flex w-full gap-3 px-3 py-3 text-left text-sm transition hover:bg-gray-50 disabled:opacity-60 ${
+                              n.read ? 'opacity-75' : 'bg-indigo-50/40'
+                            }`}
+                          >
+                            <span
+                              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                                n.read ? 'bg-gray-300' : 'bg-indigo-500'
+                              }`}
+                              aria-hidden
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="font-medium text-slate-800">{n.title}</span>
+                              <span className="mt-0.5 block text-xs text-gray-500">
+                                {relativeTime(n.createdAt)}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative">
+              {open === 'user' ? (
+                <button
+                  title="user menu"
+                  type="button"
+                  className="inline-flex items-center gap-3 text-sm font-bold text-gray-800 rounded-xl px-2 py-1.5 hover:bg-gray-50 transition-colors"
+                  aria-expanded="true"
+                  aria-haspopup="true"
+                  aria-controls={userId}
+                  id={`${userId}-trigger`}
+                  onClick={() => toggle('user')}
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
+                    <img
+                      src={
+                        user?.profile_photo_path 
+                          ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
+                      }
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="hidden sm:inline">{user?.name}</span>
+                  <ChevronDown
+                    size={16}
+                    className="text-gray-400 transition-transform rotate-180"
+                  />
+                </button>
+              ) : (
+                <button
+                  title="user menu"
+                  type="button"
+                  className="inline-flex items-center gap-3 text-sm font-bold text-gray-800 rounded-xl px-2 py-1.5 hover:bg-gray-50 transition-colors"
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-controls={userId}
+                  id={`${userId}-trigger`}
+                  onClick={() => toggle('user')}
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
+                    <img
+                      src={
+                        user?.profile_photo_path 
+                          ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
+                      }
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="hidden sm:inline">{user?.name}</span>
+                  <ChevronDown
+                    size={16}
+                    className="text-gray-400 transition-transform"
+                  />
+                </button>
+              )}
+
+              {open === 'user' ? (
+                <div
+                  title="user menu"
+                  id={userId}
+                  role="menu"
+                  aria-labelledby={`${userId}-trigger`}
+                  className={`${panelClass} max-h-none`}
+                >
+                  <div className="border-b border-gray-100 px-3 py-2.5">
+                    <p className="truncate text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
+                      {user?.name}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">{user?.email}</p>
+                  </div>
+
+                  <div className="py-1" role="none">
+                    <Link
+                      to="/member/profile"
+                      role="menuitem"
+                      onClick={close}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-gray-50"
+                    >
+                      <User className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
+                      Profile
+                    </Link>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4 shrink-0" aria-hidden />
+                      Log out
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </header>

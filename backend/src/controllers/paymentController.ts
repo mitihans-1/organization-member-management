@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { extractReceiptData } from '../services/ocrService';
+import { sendPaymentConfirmationEmail } from '../services/emailService';
 
 const prisma = new PrismaClient();
 
@@ -226,6 +227,19 @@ export const confirmPayment = async (req: any, res: Response) => {
             title: `Your payment of ${payment.amount} ETB has been approved! You are now on the ${payment.plan.name} plan until ${expiryDate.toLocaleDateString()}.`
         }
       });
+
+      // Send payment confirmation email
+      const user = await prisma.user.findUnique({ where: { id: payment.user_id } });
+      if (user?.email) {
+        await sendPaymentConfirmationEmail(
+          user.email,
+          user.name,
+          payment.amount,
+          payment.plan.name,
+          payment.transaction_id || '',
+          payment.id
+        );
+      }
     }
 
     res.status(200).json({ message: 'Payment confirmed successfully', payment: updatedPayment });

@@ -13,11 +13,13 @@ import {
   Tag,
   CreditCard,
   ArrowLeft,
+  MessageSquare,
 } from 'lucide-react';
 import { Event } from '../types';
 import CoverImage from './CoverImage';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import EventChat from './events/EventChat';
 
 interface EventDetailsModalProps {
   event: Event;
@@ -68,6 +70,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   const [paymentMode, setPaymentMode] = useState<'direct' | 'manual' | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe_birr' | 'ebirr' | 'chapa' | null>(null);
   const [manualTxnId, setManualTxnId] = useState('');
+  const [showChat, setShowChat] = useState(false);
 
   const registerMutation = useMutation({
     mutationFn: (eventId: string) => api.post(`/events/${eventId}/register`),
@@ -218,144 +221,163 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
             </div>
           </div>
 
+          {user?.role !== 'SuperAdmin' && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowChat(!showChat)}
+                className="w-full mb-4 py-3 rounded-xl bg-gray-100 text-gray-800 font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <MessageSquare size={20} />
+                {showChat ? 'Hide Discussion' : 'View Discussion'}
+              </button>
+            </div>
+          )}
           {showRegisterActions && (
-            !isPaymentRequired ? (
-            <button
-              type="button"
-              disabled={registerMutation.isPending}
-              onClick={() => {
-                if (user) {
-                  registerMutation.mutate(event.id);
-                } else {
-                  if (event.organizationId) {
-                    navigate(`/register?org=${event.organizationId}`);
-                  } else {
-                    navigate(`/register`);
-                  }
-                }
-              }}
-              className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none disabled:opacity-50"
-            >
-              {registerMutation.isPending ? 'Registering...' : 'Register for this Event'}
-            </button>
-            ) : !showPaymentForm ? (
-            <button
-              type="button"
-              onClick={() => setShowPaymentForm(true)}
-              className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none flex items-center justify-center gap-2"
-            >
-              <CreditCard size={20} />
-              Pay {Number(event.price).toFixed(2)} ETB & Register
-            </button>
-            ) : !paymentMode ? (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="mb-4">
+              {!isPaymentRequired ? (
                 <button
                   type="button"
-                  disabled={chapaMutation.isPending}
+                  disabled={registerMutation.isPending}
                   onClick={() => {
-                    setPaymentMode('direct');
-                    chapaMutation.mutate(event.id);
+                    if (user) {
+                      registerMutation.mutate(event.id);
+                    } else {
+                      if (event.organizationId) {
+                        navigate(`/register?org=${event.organizationId}`);
+                      } else {
+                        navigate(`/register`);
+                      }
+                    }
                   }}
-                  className="flex flex-col items-center p-6 rounded-2xl border-2 border-slate-100 hover:border-brand-medium hover:bg-brand-pale/5 transition-all text-center group"
+                  className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none disabled:opacity-50"
                 >
-                  <div className="h-12 w-12 rounded-xl bg-brand-pale/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <CreditCard className="h-6 w-6 text-brand-medium" />
-                  </div>
-                  <span className="text-sm font-black text-slate-900 mb-1">Direct Pay</span>
-                  <span className="text-[10px] text-slate-500">Instant activation</span>
+                  {registerMutation.isPending ? 'Registering...' : 'Register for this Event'}
                 </button>
+              ) : !showPaymentForm ? (
                 <button
                   type="button"
-                  onClick={() => setPaymentMode('manual')}
-                  className="flex flex-col items-center p-6 rounded-2xl border-2 border-slate-100 hover:border-brand-medium hover:bg-brand-pale/5 transition-all text-center group"
+                  onClick={() => setShowPaymentForm(true)}
+                  className="w-full py-4 rounded-xl bg-brand-medium text-white font-bold text-base hover:bg-brand-light transition-all shadow-md shadow-brand-medium/25 hover:shadow-lg focus:outline-none flex items-center justify-center gap-2"
                 >
-                  <div className="h-12 w-12 rounded-xl bg-brand-pale/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Tag className="h-6 w-6 text-brand-medium" />
-                  </div>
-                  <span className="text-sm font-black text-slate-900 mb-1">Manual Pay</span>
-                  <span className="text-[10px] text-slate-500">Upload screenshot</span>
+                  <CreditCard size={20} />
+                  Pay {Number(event.price).toFixed(2)} ETB & Register
                 </button>
-              </div>
-            ) : paymentMode === 'manual' && (
-            <form onSubmit={handleEventPayment} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex items-center justify-between mb-2">
-                 <button 
-                  type="button" 
-                  onClick={() => { setPaymentMode(null); setPaymentMethod(null); }}
-                  className="text-xs font-bold text-brand-medium hover:underline flex items-center gap-1"
-                >
-                  <ArrowLeft size={12} /> Change Method
-                </button>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Manual Upload</span>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('telebirr')}
-                  className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
-                    paymentMethod === 'telebirr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
-                  }`}
-                >
-                  <img src="/asset/telebirr-logo.png" alt="Telebirr" className="h-10 w-10 object-contain mb-2" />
-                  <span className="text-[10px] font-bold text-slate-900">Telebirr</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('cbe_birr')}
-                  className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
-                    paymentMethod === 'cbe_birr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
-                  }`}
-                >
-                  <img src="/asset/cbe-logo.png" alt="CBE Birr" className="h-10 w-10 object-contain mb-2" />
-                  <span className="text-[10px] font-bold text-slate-900">CBE Birr</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('ebirr')}
-                  className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
-                    paymentMethod === 'ebirr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
-                  }`}
-                >
-                  <img src="/asset/ebirr-logo.png" alt="E-Birr" className="h-10 w-10 object-contain mb-2" />
-                  <span className="text-[10px] font-bold text-slate-900">E-Birr</span>
-                </button>
-              </div>
-              {paymentMethod && (
-                <div className="space-y-3">
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm">
-                    <p className="font-bold text-amber-900 mb-1">Transfer to:</p>
-                    <p className="font-mono text-amber-800">+251 912 345 678</p>
-                    <p className="mt-2 font-bold text-amber-900">Amount: <span className="text-xl">ETB {Number((event as any).price).toFixed(2)}</span></p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Transaction ID</label>
-                    <input
-                      type="text"
-                      required
-                      value={manualTxnId}
-                      onChange={(e) => setManualTxnId(e.target.value)}
-                      placeholder="Enter your transaction ID"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
-                    />
-                  </div>
+              ) : !paymentMode ? (
+                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <button
-                    type="submit"
-                    disabled={eventPaymentMutation.isPending || !manualTxnId.trim()}
-                    className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                    type="button"
+                    disabled={chapaMutation.isPending}
+                    onClick={() => {
+                      setPaymentMode('direct');
+                      chapaMutation.mutate(event.id);
+                    }}
+                    className="flex flex-col items-center p-6 rounded-2xl border-2 border-slate-100 hover:border-brand-medium hover:bg-brand-pale/5 transition-all text-center group"
                   >
-                    {eventPaymentMutation.isPending ? 'Submitting...' : 'Submit Payment & Register'}
+                    <div className="h-12 w-12 rounded-xl bg-brand-pale/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <CreditCard className="h-6 w-6 text-brand-medium" />
+                    </div>
+                    <span className="text-sm font-black text-slate-900 mb-1">Direct Pay</span>
+                    <span className="text-[10px] text-slate-500">Instant activation</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowPaymentForm(false); setPaymentMethod(null); setManualTxnId(''); }}
-                    className="w-full py-2 text-gray-500 font-medium text-sm hover:text-gray-700"
+                    onClick={() => setPaymentMode('manual')}
+                    className="flex flex-col items-center p-6 rounded-2xl border-2 border-slate-100 hover:border-brand-medium hover:bg-brand-pale/5 transition-all text-center group"
                   >
-                    Cancel
+                    <div className="h-12 w-12 rounded-xl bg-brand-pale/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Tag className="h-6 w-6 text-brand-medium" />
+                    </div>
+                    <span className="text-sm font-black text-slate-900 mb-1">Manual Pay</span>
+                    <span className="text-[10px] text-slate-500">Upload screenshot</span>
                   </button>
                 </div>
-              )}
-            </form>
-            )
+              ) : paymentMode === 'manual' ? (
+                <form onSubmit={handleEventPayment} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center justify-between mb-2">
+                     <button 
+                      type="button" 
+                      onClick={() => { setPaymentMode(null); setPaymentMethod(null); }}
+                      className="text-xs font-bold text-brand-medium hover:underline flex items-center gap-1"
+                    >
+                      <ArrowLeft size={12} /> Change Method
+                    </button>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Manual Upload</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('telebirr')}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                        paymentMethod === 'telebirr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
+                      }`}
+                    >
+                      <img src="/asset/telebirr-logo.png" alt="Telebirr" className="h-10 w-10 object-contain mb-2" />
+                      <span className="text-[10px] font-bold text-slate-900">Telebirr</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('cbe_birr')}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                        paymentMethod === 'cbe_birr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
+                      }`}
+                    >
+                      <img src="/asset/cbe-logo.png" alt="CBE Birr" className="h-10 w-10 object-contain mb-2" />
+                      <span className="text-[10px] font-bold text-slate-900">CBE Birr</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('ebirr')}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                        paymentMethod === 'ebirr' ? 'border-brand-medium bg-brand-medium/5' : 'border-slate-100 hover:border-slate-200'
+                      }`}
+                    >
+                      <img src="/asset/ebirr-logo.png" alt="E-Birr" className="h-10 w-10 object-contain mb-2" />
+                      <span className="text-[10px] font-bold text-slate-900">E-Birr</span>
+                    </button>
+                  </div>
+                  {paymentMethod && (
+                    <div className="space-y-3">
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm">
+                        <p className="font-bold text-amber-900 mb-1">Transfer to:</p>
+                        <p className="font-mono text-amber-800">+251 912 345 678</p>
+                        <p className="mt-2 font-bold text-amber-900">Amount: <span className="text-xl">ETB {Number((event as any).price).toFixed(2)}</span></p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Transaction ID</label>
+                        <input
+                          type="text"
+                          required
+                          value={manualTxnId}
+                          onChange={(e) => setManualTxnId(e.target.value)}
+                          placeholder="Enter your transaction ID"
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={eventPaymentMutation.isPending || !manualTxnId.trim()}
+                        className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                      >
+                        {eventPaymentMutation.isPending ? 'Submitting...' : 'Submit Payment & Register'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowPaymentForm(false); setPaymentMethod(null); setManualTxnId(''); }}
+                        className="w-full py-2 text-gray-500 font-medium text-sm hover:text-gray-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </form>
+              ) : null}
+            </div>
+          )}
+          {user?.role !== 'SuperAdmin' && showChat && (
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <EventChat eventId={event.id} />
+            </div>
           )}
         </div>
       </div>

@@ -6,6 +6,7 @@ import {
   deleteEvent,
   registerForEvent,
 } from '../controllers/eventController';
+import { getEventMessages, createEventMessage } from '../../../controllers/eventMessageController';
 import { authenticateToken } from '../../../middleware/authMiddleware';
 import { uploadImage } from '../../../middleware/upload';
 
@@ -16,5 +17,8 @@ router.post('/', authenticateToken, uploadImage.single('image'), createEvent);
 router.post('/:id/register', authenticateToken, registerForEvent);
 router.put('/:id', authenticateToken, uploadImage.single('image'), updateEvent);
 router.delete('/:id', authenticateToken, deleteEvent);
+
+router.get('/:eventId/messages', authenticateToken, getEventMessages);
+router.post('/:eventId/messages', authenticateToken, createEventMessage);
 
 export default router;

@@ -21,7 +21,9 @@ import idCardRoutes from './routes/idCardRoutes';
 import serviceRoutes from './modules/services/routes/serviceRoutes';
 import reportRoutes from './routes/reportRoutes';
 import chatRoutes from './routes/chatRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 import { PrismaClient } from '@prisma/client';
+import { startCronJobs } from './services/cronService';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -59,6 +61,7 @@ app.use('/api/id-cards', idCardRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/upload', uploadRoutes);
 
 const userSocketMap = new Map<string, string>();
 
@@ -159,6 +162,63 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ==========================================
+  // EVENT DISCUSSION ROOMS
+  // ==========================================
+  socket.on('joinEventRoom', async (data: { eventId: string; userId: string }) => {
+    const { eventId, userId } = data;
+    socket.join(`event-${eventId}`);
+    console.log(`User ${userId} joined event room ${eventId}`);
+    
+    io.to(`event-${eventId}`).emit('userJoinedEventRoom', { userId, socketId: socket.id });
+  });
+
+  socket.on('sendEventMessage', async (data: { 
+    eventId: string; 
+    senderId: string; 
+    content?: string; 
+    attachmentUrl?: string; 
+    attachmentType?: string;
+    replyToId?: string;
+  }) => {
+    try {
+      const { eventId, senderId, content, attachmentUrl, attachmentType, replyToId } = data;
+      
+      const message = await prisma.eventMessage.create({
+        data: {
+          eventId,
+          senderId,
+          content,
+          attachmentUrl,
+          attachmentType,
+          replyToId
+        },
+        include: {
+          sender: { select: { id: true, name: true, profile_photo_path: true } },
+          replyTo: {
+            include: {
+              sender: { select: { id: true, name: true } }
+            }
+          }
+        }
+      });
+
+      io.to(`event-${eventId}`).emit('receiveEventMessage', message);
+    } catch (error) {
+      console.error('Error sending event message via socket:', error);
+    }
+  });
+
+  socket.on('eventTyping', (data: { eventId: string; userId: string; isTyping: boolean }) => {
+    const { eventId, userId, isTyping } = data;
+    socket.to(`event-${eventId}`).emit('eventTypingIndicator', { userId, isTyping });
+  });
+
+  socket.on('leaveEventRoom', (eventId: string) => {
+    socket.leave(`event-${eventId}`);
+    console.log(`User left event room ${eventId}`);
+  });
+
   socket.on('disconnect', () => {
     for (const [userId, socketId] of userSocketMap.entries()) {
       if (socketId === socket.id) {
@@ -176,4 +236,5 @@ app.get('/', (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  startCronJobs();
 });

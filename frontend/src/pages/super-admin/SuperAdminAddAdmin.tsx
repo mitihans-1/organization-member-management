@@ -4,14 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { Plan } from '../../types';
 
+interface Organization {
+  id: string;
+  name: string;
+  type: string;
+}
+
 const SuperAdminAddAdmin: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    organization_name: '',
-    organization_type: 'business',
+    organization_id: '',
     plan_id: '',
   });
   const [message, setMessage] = useState<string | null>(null);
@@ -21,8 +26,13 @@ const SuperAdminAddAdmin: React.FC = () => {
     queryFn: () => api.get('/plans').then((res) => res.data),
   });
 
+  const { data: organizations } = useQuery<Organization[]>({
+    queryKey: ['admin', 'organizations', 'all'],
+    queryFn: () => api.get('/admin/organizations/all').then((res) => res.data),
+  });
+
   const createMutation = useMutation({
-    mutationFn: (payload: typeof formData) => api.post('/admin/organizations', payload),
+    mutationFn: (payload: typeof formData) => api.post('/admin/org-admins', payload),
     onSuccess: () => {
       setMessage('Admin created successfully.');
       setTimeout(() => navigate('/super-admin/org-admins'), 700);
@@ -41,7 +51,7 @@ const SuperAdminAddAdmin: React.FC = () => {
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900">Add Organization Admin</h1>
-        <p className="text-sm text-slate-500">Create an organization and its admin account</p>
+        <p className="text-sm text-slate-500">Add an admin to an existing organization</p>
       </div>
 
       <form onSubmit={onSubmit} className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
@@ -76,26 +86,19 @@ const SuperAdminAddAdmin: React.FC = () => {
           />
         </div>
         <div>
-          <label className="block text-sm font-bold text-slate-700">Organization name</label>
-          <input
-            type="text"
-            required
-            value={formData.organization_name}
-            onChange={(e) => setFormData({ ...formData, organization_name: e.target.value })}
-            className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-slate-700">Organization type</label>
+          <label className="block text-sm font-bold text-slate-700">Select Organization</label>
           <select
-            value={formData.organization_type}
-            onChange={(e) => setFormData({ ...formData, organization_type: e.target.value })}
+            required
+            value={formData.organization_id}
+            onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
             className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
           >
-            <option value="business">Business</option>
-            <option value="nonprofit">Non-Profit</option>
-            <option value="government">Government</option>
-            <option value="other">Other</option>
+            <option value="">Select an organization</option>
+            {organizations?.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name} ({org.type})
+              </option>
+            ))}
           </select>
         </div>
         <div>

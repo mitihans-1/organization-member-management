@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaClient } from '@prisma/client';
-import { sendOtpEmail, sendResetPasswordEmail } from '../services/emailService';
+import { sendOtpEmail, sendResetPasswordEmail, sendWelcomeEmail } from '../services/emailService';
 import { JWT_SECRET } from '../config/jwtConfig';
 import fs from 'fs';
 import path from 'path';
@@ -146,6 +146,33 @@ export const verifyOtp = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid OTP code.' });
     }
 
+    // First check if this is an existing user (created by SuperAdmin)
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      // This is an existing user - just verify them!
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { is_verified: true },
+      });
+
+      // Delete the pending user record
+      await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
+
+      // Send welcome email (if needed)
+      await sendWelcomeEmail(existingUser.email, existingUser.name, existingUser.id);
+
+      // Log the user in
+      const token = jwt.sign({ userId: existingUser.id, role: existingUser.role }, JWT_SECRET, { expiresIn: '30d' });
+
+      console.log('OTP Verification Successful (Existing User):', email);
+      return res.status(200).json({
+        message: 'Email verified successfully',
+        token,
+        user: { id: existingUser.id, name: existingUser.name, email: existingUser.email, role: existingUser.role }
+      });
+    }
+
+    // If not existing user, proceed with normal registration flow
     let user;
 
     // Create User and Organization now that OTP is verified
@@ -191,10 +218,13 @@ export const verifyOtp = async (req: Request, res: Response) => {
     // Delete the pending user record
     await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
 
+    // Send welcome email
+    await sendWelcomeEmail(user.email, user.name, user.id);
+
     // Log the user in
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
 
-    console.log('OTP Verification Successful:', email);
+    console.log('OTP Verification Successful (New User):', email);
     res.status(200).json({
       message: 'Email verified and account created successfully',
       token,
@@ -213,29 +243,65 @@ export const resendOtp = async (req: Request, res: Response) => {
 
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
+    // First check if it's a pending user
     const pendingUser = await prisma.pendingUser.findUnique({ where: { email } });
-    if (!pendingUser) {
-      const existingUser = await prisma.user.findUnique({ where: { email } });
-      if (existingUser) return res.status(400).json({ message: 'User is already verified' });
-      return res.status(404).json({ message: 'Registration not found. Please register again.' });
+    if (pendingUser) {
+      const otpCode = generateOtp();
+      const hashedOtp = await bcrypt.hash(otpCode, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60000);
+
+      await prisma.pendingUser.update({
+        where: { id: pendingUser.id },
+        data: { otp_code: hashedOtp, expiresAt }
+      });
+
+      await sendOtpEmail(pendingUser.email, otpCode, pendingUser.name);
+      return res.status(200).json({ message: 'A new OTP has been sent to your email.' });
     }
 
-    // Generate new OTP
-    const otpCode = generateOtp();
-    const hashedOtp = await bcrypt.hash(otpCode, 10);
-    const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes
+    // If not pending, check if it's an existing user not yet verified
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser && !existingUser.is_verified) {
+      // Generate and store OTP in a temporary place - let's use PendingUser for existing users too!
+      const otpCode = generateOtp();
+      const hashedOtp = await bcrypt.hash(otpCode, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60000);
 
-    await prisma.pendingUser.update({
-      where: { id: pendingUser.id },
-      data: {
-        otp_code: hashedOtp,
-        expiresAt,
-      }
-    });
+      // Upsert pending user for existing unverified user
+      await prisma.pendingUser.upsert({
+        where: { email },
+        update: {
+          name: existingUser.name,
+          password: existingUser.password,
+          role: existingUser.role,
+          organization_name: existingUser.organization_name,
+          organization_type: existingUser.organization_type,
+          organization_id: existingUser.organizationId,
+          otp_code: hashedOtp,
+          expiresAt,
+        },
+        create: {
+          name: existingUser.name,
+          email: existingUser.email,
+          password: existingUser.password,
+          role: existingUser.role,
+          organization_name: existingUser.organization_name,
+          organization_type: existingUser.organization_type,
+          organization_id: existingUser.organizationId,
+          otp_code: hashedOtp,
+          expiresAt,
+        },
+      });
 
-    await sendOtpEmail(pendingUser.email, otpCode, pendingUser.name);
+      await sendOtpEmail(existingUser.email, otpCode, existingUser.name);
+      return res.status(200).json({ message: 'A new OTP has been sent to your email.' });
+    }
 
-    res.status(200).json({ message: 'A new OTP has been sent to your email.' });
+    if (existingUser && existingUser.is_verified) {
+      return res.status(400).json({ message: 'User is already verified' });
+    }
+
+    return res.status(404).json({ message: 'Registration not found. Please register again.' });
   } catch (error: any) {
     console.error('Resend OTP Error:', error);
     res.status(500).json({ message: 'Error resending OTP', error: error.message });
@@ -265,10 +331,44 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Since in the new flow, User is only created after verification,
-    // this check might be redundant but keeping it for safety/consistency.
     if (!user.is_verified) {
-      return res.status(403).json({ message: 'Please verify your email address before logging in.', requiresOtp: true, email: user.email });
+      // Generate OTP for existing unverified user
+      const otpCode = generateOtp();
+      const hashedOtp = await bcrypt.hash(otpCode, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60000);
+
+      await prisma.pendingUser.upsert({
+        where: { email },
+        update: {
+          name: user.name,
+          password: user.password,
+          role: user.role,
+          organization_name: user.organization_name,
+          organization_type: user.organization_type,
+          organization_id: user.organizationId,
+          otp_code: hashedOtp,
+          expiresAt,
+        },
+        create: {
+          name: user.name,
+          email: user.email,
+          password: user.password,
+          role: user.role,
+          organization_name: user.organization_name,
+          organization_type: user.organization_type,
+          organization_id: user.organizationId,
+          otp_code: hashedOtp,
+          expiresAt,
+        },
+      });
+
+      await sendOtpEmail(user.email, otpCode, user.name);
+
+      return res.status(403).json({ 
+        message: 'Please verify your email address before logging in. An OTP has been sent to your email.', 
+        requiresOtp: true, 
+        email: user.email 
+      });
     }
 
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });

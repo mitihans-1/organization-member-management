@@ -1,26 +1,19 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-function requireNotificationAccess(req: any, res: Response): boolean {
-  const role = req.user?.role;
-  if (role !== 'orgAdmin' && role !== 'SuperAdmin') {
-    res.status(403).json({ message: 'Organization admin or super admin only' });
-    return false;
-  }
-  return true;
-}
-
 export const listNotifications = async (req: any, res: Response) => {
   try {
-    if (!requireNotificationAccess(req, res)) return;
-
+    console.log('Fetching notifications for user:', req.user);
+    
     const rows = await prisma.notification.findMany({
       where: { userId: req.user.userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+
+    console.log('Found notifications:', rows);
 
     res.status(200).json(
       rows.map((n) => ({
@@ -31,14 +24,29 @@ export const listNotifications = async (req: any, res: Response) => {
       })),
     );
   } catch (error) {
+    console.error('Error fetching notifications:', error);
     res.status(500).json({ message: 'Error fetching notifications', error });
+  }
+};
+
+export const createTestNotification = async (req: any, res: Response) => {
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        userId: req.user.userId,
+        title: req.body.title || 'Test Notification',
+      },
+    });
+
+    res.status(201).json(notification);
+  } catch (error) {
+    console.error('Error creating test notification:', error);
+    res.status(500).json({ message: 'Error creating test notification', error });
   }
 };
 
 export const markNotificationRead = async (req: any, res: Response) => {
   try {
-    if (!requireNotificationAccess(req, res)) return;
-
     const id = req.params.id;
     if (!id) {
       return res.status(400).json({ message: 'Invalid id' });
@@ -64,8 +72,6 @@ export const markNotificationRead = async (req: any, res: Response) => {
 
 export const markAllNotificationsRead = async (req: any, res: Response) => {
   try {
-    if (!requireNotificationAccess(req, res)) return;
-
     await prisma.notification.updateMany({
       where: { userId: req.user.userId, read: false },
       data: { read: true },

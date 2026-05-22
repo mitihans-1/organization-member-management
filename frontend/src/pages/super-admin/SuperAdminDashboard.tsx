@@ -1,41 +1,80 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
-import { Building2, UserCog, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { Building2, Users, DollarSign, TrendingUp, TrendingDown, Activity, BarChart3 } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const SuperAdminDashboard: React.FC = () => {
-  const { data, isLoading } = useQuery({
+  const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats').then((r) => r.data),
   });
 
-  const stats = data?.stats ?? [];
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['dashboard-analytics'],
+    queryFn: () => api.get('/dashboard/analytics').then((r) => r.data),
+  });
+
+  const stats = statsData?.stats ?? [];
+  const isLoading = statsLoading || analyticsLoading;
 
   const kpis = [
-    { label: 'Total Organizations', value: stats.find((s: any) => s.label?.includes('Organization'))?.value ?? '—', sub: '+ from last month', icon: Building2 },
-    { label: 'Active OrgAdmins', value: stats.find((s: any) => s.label?.includes('Organization'))?.value ?? '—', sub: null, icon: UserCog },
-    { label: 'Active Members', value: stats.find((s: any) => s.label?.includes('Members'))?.value ?? '—', sub: null, icon: Users },
-    { label: 'Monthly Revenue', value: stats.find((s: any) => s.label?.includes('Revenue'))?.value ?? '—', sub: 'Platform-wide', icon: DollarSign },
+    { 
+      label: 'Total Organizations', 
+      value: analyticsData?.totalOrganizations ?? '—', 
+      icon: Building2,
+      color: 'sky',
+      growth: null
+    },
+    { 
+      label: 'Total Members', 
+      value: analyticsData?.totalMembers ?? '—', 
+      icon: Users,
+      color: 'emerald',
+      growth: null
+    },
+    { 
+      label: 'Monthly Revenue', 
+      value: `${analyticsData?.monthlyRevenue ?? 0} ETB`, 
+      icon: DollarSign,
+      color: 'indigo',
+      growth: analyticsData?.revenueGrowth ?? 0
+    },
+    { 
+      label: 'Monthly Registrations', 
+      value: analyticsData?.monthlyRegistrations ?? '—', 
+      icon: Activity,
+      color: 'orange',
+      growth: analyticsData?.registrationGrowth ?? 0
+    },
+    { 
+      label: 'Churn Rate', 
+      value: `${analyticsData?.churnRate ?? 0}%`, 
+      icon: TrendingDown,
+      color: 'red',
+      growth: null
+    },
   ];
 
-  const health = [
-    { label: 'CPU Usage', pct: 63 },
-    { label: 'Memory Usage', pct: 59 },
-    { label: 'Disk Space', pct: 20 },
-    { label: 'Network Load', pct: 23 },
-  ];
+  const colorClasses: Record<string, string> = {
+    sky: 'bg-sky-50 text-sky-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
+    orange: 'bg-orange-50 text-orange-600',
+    red: 'bg-red-50 text-red-600',
+  };
 
   return (
-    <div className="space-y-8 max-w-6xl">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-black text-slate-900">Welcome back, Super Admin</h1>
-        <p className="text-sm text-slate-500 mt-1">Platform-wide overview and system health</p>
+        <p className="text-sm text-slate-500 mt-1">Platform analytics and insights</p>
       </div>
 
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 bg-white rounded-xl border border-slate-200 animate-pulse" />
+            <div key={i} className="h-32 bg-white rounded-xl border border-slate-200 animate-pulse" />
           ))}
         </div>
       ) : (
@@ -43,16 +82,20 @@ const SuperAdminDashboard: React.FC = () => {
           {kpis.map((k) => (
             <div key={k.label} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <div className="flex items-start justify-between gap-2">
-                <div>
+                <div className="flex-1">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{k.label}</p>
                   <p className="text-2xl font-black text-slate-900 mt-2 flex items-center gap-1">
                     {k.value}
-                    <TrendingUp size={16} className="text-emerald-500" />
                   </p>
-                  {k.sub && <p className="text-[11px] text-slate-400 mt-1">{k.sub}</p>}
+                  {k.growth !== null && (
+                    <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${k.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {k.growth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {Math.abs(k.growth)}% from last month
+                    </p>
+                  )}
                 </div>
-                <div className="p-2 rounded-lg bg-sky-50 text-sky-600">
-                  <k.icon size={22} />
+                <div className={`p-2.5 rounded-lg ${colorClasses[k.color]}`}>
+                  <k.icon size={24} />
                 </div>
               </div>
             </div>
@@ -60,45 +103,92 @@ const SuperAdminDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <h2 className="text-lg font-black text-slate-900">Financial snapshot</h2>
-        <p className="text-sm text-slate-500 mb-4">Revenue and expenses aggregated across organizations</p>
-        <div className="grid sm:grid-cols-3 gap-4 text-sm">
-          <div className="p-4 rounded-lg bg-slate-50">
-            <p className="text-slate-500 font-medium">Total Revenue</p>
-            <p className="text-xl font-black text-slate-900 mt-1">{stats.find((s: any) => s.label?.includes('Revenue'))?.value ?? '—'}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-50">
-            <p className="text-slate-500 font-medium">Total Expenses</p>
-            <p className="text-xl font-black text-slate-900 mt-1">—</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-50">
-            <p className="text-slate-500 font-medium">Profit margin</p>
-            <p className="text-xl font-black text-emerald-600 mt-1">—</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <h2 className="text-lg font-black text-slate-900 mb-4">System health</h2>
-        <div className="space-y-4 max-w-xl">
-          {health.map((h) => (
-            <div key={h.label}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-medium text-slate-700">{h.label}</span>
-                <span className="text-slate-500">{h.pct}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-sky-500 transition-all"
-                  style={{ width: `${h.pct}%` }}
-                />
+      {!isLoading && (
+        <>
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <TrendingUp size={18} className="text-indigo-600" />
+                Revenue Trend (Last 12 Months)
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analyticsData?.revenueChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                    <YAxis stroke="#64748b" fontSize={12} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      formatter={(value: any) => [`${value} ETB`, 'Revenue']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke="#6366f1" 
+                      strokeWidth={3} 
+                      dot={{ r: 4 }} 
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
-          ))}
-        </div>
-        <p className="text-xs text-slate-400 mt-6 text-right">Last updated: {new Date().toLocaleString()}</p>
-      </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Users size={18} className="text-emerald-600" />
+                Registrations (Last 12 Months)
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData?.registrationChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
+                    <YAxis stroke="#64748b" fontSize={12} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                      formatter={(value: any) => [value, 'Registrations']}
+                    />
+                    <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {analyticsData?.topOrganizations?.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <BarChart3 size={18} className="text-sky-600" />
+                Top Organizations by Revenue
+              </h3>
+              <div className="space-y-3">
+                {analyticsData.topOrganizations.map((org: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-4">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-semibold text-slate-900">{org.name}</span>
+                        <span className="text-sm font-bold text-indigo-600">{org.revenue} ETB</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 rounded-full"
+                          style={{ 
+                            width: `${Math.min(100, (org.revenue / (analyticsData.topOrganizations[0]?.revenue || 1)) * 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

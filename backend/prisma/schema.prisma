@@ -95,6 +95,8 @@ model User {
   conversations1         Conversation[]          @relation("ConversationParticipant1")
   conversations2         Conversation[]          @relation("ConversationParticipant2")
   sentMessages           Message[]
+  emailNotificationLogs  EmailNotificationLog[]
+  eventMessages          EventMessage[]
 
   @@map("users")
 }
@@ -239,7 +241,8 @@ model Payment {
   reference_type String?
   reference_id   String?
 
-  organization_id String? @db.ObjectId
+  organization_id       String?                @db.ObjectId
+  emailNotificationLogs EmailNotificationLog[]
 
   @@map("payments")
 }
@@ -291,8 +294,10 @@ model Event {
   updatedAt            DateTime      @updatedAt
   organizations        Organization? @relation(fields: [organizationId], references: [id])
 
-  attendeesIds String[] @db.ObjectId
-  attendees    User[]   @relation("EventAttendees", fields: [attendeesIds], references: [id])
+  attendeesIds          String[]               @db.ObjectId
+  attendees             User[]                 @relation("EventAttendees", fields: [attendeesIds], references: [id])
+  emailNotificationLogs EmailNotificationLog[]
+  eventMessages         EventMessage[]
 
   @@map("events")
 }
@@ -344,6 +349,26 @@ model EventMedia {
   uploadedAt DateTime @default(now())
 
   @@map("event_media")
+}
+
+// ==========================================
+// EVENT DISCUSSION ROOM
+// ==========================================
+model EventMessage {
+  id             String         @id @default(cuid()) @map("_id")
+  eventId        String         @db.ObjectId
+  senderId       String         @db.ObjectId
+  content        String?
+  attachmentUrl  String?
+  attachmentType String? // image, file
+  replyToId      String?        @db.ObjectId
+  replyTo        EventMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies        EventMessage[] @relation("MessageReplies")
+  createdAt      DateTime       @default(now())
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sender         User           @relation(fields: [senderId], references: [id])
+
+  @@map("event_messages")
 }
 
 model EventAnnouncement {
@@ -656,4 +681,28 @@ model TypingIndicator {
   updatedAt      DateTime @updatedAt
 
   @@map("typing_indicators")
+}
+
+// ==========================================
+// EMAIL NOTIFICATION SYSTEM
+// ==========================================
+model EmailNotificationLog {
+  id          String    @id @default(cuid()) @map("_id")
+  to          String
+  subject     String
+  type        String // "welcome", "password_reset", "event_reminder", "payment_confirmation", "invitation"
+  status      String    @default("pending") // "pending", "sent", "failed"
+  error       String?
+  sentAt      DateTime?
+  scheduledAt DateTime?
+  userId      String?   @db.ObjectId
+  user        User?     @relation(fields: [userId], references: [id])
+  eventId     String?   @db.ObjectId
+  event       Event?    @relation(fields: [eventId], references: [id])
+  paymentId   String?   @db.ObjectId
+  payment     Payment?  @relation(fields: [paymentId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("email_notification_logs")
 }

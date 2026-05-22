@@ -85,7 +85,7 @@ export const createMember = async (req: any, res: Response) => {
         organizationId: targetOrgId,
         organization_name: targetOrgName,
         organization_type: targetOrgType,
-        is_verified: true,
+        is_verified: false,
       },
     });
     res.status(201).json(member);

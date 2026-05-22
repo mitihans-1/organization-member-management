@@ -23,7 +23,14 @@ const AdminOrganizations: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const { data: organizations, isLoading: orgsLoading } = useQuery<User[]>({
+interface OrganizationWithAdmin {
+  id: string;
+  name: string;
+  type: string;
+  users: User[];
+}
+
+  const { data: organizations, isLoading: orgsLoading } = useQuery<OrganizationWithAdmin[]>({
     queryKey: ['admin', 'organizations'],
     queryFn: () => api.get('/admin/organizations').then(res => res.data),
   });
@@ -110,15 +117,18 @@ const AdminOrganizations: React.FC = () => {
 
     if (mode === 'edit' && editIdRaw && organizations) {
       const org = organizations.find((o) => o.id === editIdRaw);
-      if (org) openModal(org);
+      const admin = org?.users?.[0];
+      if (admin) openModal(admin);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, organizations, orgsLoading]);
 
   const filteredOrgs = organizations?.filter(org =>
-    org.organization_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.email.toLowerCase().includes(searchTerm.toLowerCase())
+    org.users?.some(user => 
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   return (
@@ -165,28 +175,34 @@ const AdminOrganizations: React.FC = () => {
               ) : filteredOrgs?.length === 0 ? (
                 <tr><td colSpan={5} className="px-8 py-10 text-center text-gray-400 font-medium">No organizations found</td></tr>
               ) : (
-                filteredOrgs?.map((org) => (
+                filteredOrgs?.map((org) => {
+                  const admin = org.users?.[0];
+                  return (
                   <tr key={org.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex items-center space-x-4">
                         <div className="w-11 h-11 bg-brand-pale/30 rounded-2xl flex items-center justify-center text-brand-medium font-black shadow-sm">
-                           {org.organization_name?.charAt(0) || 'O'}
+                           {org.name.charAt(0) || 'O'}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-brand-dark">{org.organization_name}</p>
-                          <p className="text-[10px] font-black text-brand-deep/50 uppercase tracking-widest">{org.organization_type}</p>
+                          <p className="text-sm font-bold text-brand-dark">{org.name}</p>
+                          <p className="text-[10px] font-black text-brand-deep/50 uppercase tracking-widest">{org.type}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-8 py-5">
-                      <div className="flex flex-col">
-                        <p className="text-sm font-bold text-brand-dark">{org.name}</p>
-                        <p className="text-xs text-brand-deep font-medium opacity-60">{org.email}</p>
-                      </div>
+                      {admin ? (
+                        <div className="flex flex-col">
+                          <p className="text-sm font-bold text-brand-dark">{admin.name}</p>
+                          <p className="text-xs text-brand-deep font-medium opacity-60">{admin.email}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">No admin assigned</p>
+                      )}
                     </td>
                     <td className="px-8 py-5">
                       <span className="px-3 py-1 text-[10px] font-black rounded-lg bg-brand-pale/40 text-brand-medium uppercase tracking-widest">
-                        {org.plan?.name || 'Free'}
+                        {admin?.plan?.name || 'Free'}
                       </span>
                     </td>
                     <td className="px-8 py-5">
@@ -197,16 +213,18 @@ const AdminOrganizations: React.FC = () => {
                     </td>
                     <td className="px-8 py-5 text-right">
                       <div className="flex justify-end space-x-2">
-                        <button 
-                        title='Editorganization'
-                          onClick={() => openModal(org)}
-                          className="p-2 bg-white shadow-sm border border-gray-100 rounded-xl hover:text-brand-medium transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Edit2 size={16} />
-                        </button>
+                        {admin && (
+                          <button 
+                          title='Edit organization'
+                            onClick={() => openModal(admin)}
+                            className="p-2 bg-white shadow-sm border border-gray-100 rounded-xl hover:text-brand-medium transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        )}
                         <button 
                         title='Delete organization'
-                          onClick={() => { if (confirm('Are you sure you want to delete this organization?')) deleteMutation.mutate(org.id) }}
+                          onClick={() => { if (confirm('Are you sure you want to delete this organization?')) deleteMutation.mutate(admin?.id || org.id) }}
                           className="p-2 bg-white shadow-sm border border-gray-100 rounded-xl hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 size={16} />
@@ -214,7 +232,8 @@ const AdminOrganizations: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))
+                );
+              })
               )}
             </tbody>
           </table>
@@ -277,13 +296,12 @@ const AdminOrganizations: React.FC = () => {
               </div>
 
               <div className="space-y-4 pt-4">
-                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b pb-2">Admin Details</p>
+                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b pb-2">Admin Details <span className="text-gray-500">(Optional - Can be added later)</span></p>
                  <div>
                    <label className="block text-sm font-medium text-gray-700">Admin Name</label>
                    <input
                    title='Admin name'
                      type="text"
-                     required
                      value={formData.name}
                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                      className="mt-1 w-full border rounded-lg px-3 py-2"
@@ -296,7 +314,6 @@ const AdminOrganizations: React.FC = () => {
                       <input
                       title='Admin email'
                         type="email"
-                        required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="w-full border rounded-lg pl-10 pr-3 py-2"
@@ -309,7 +326,6 @@ const AdminOrganizations: React.FC = () => {
                       <input
                       title='Initial password'
                         type="password"
-                        required
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         className="mt-1 w-full border rounded-lg px-3 py-2"

@@ -36,6 +36,7 @@ import Profile from './pages/Profile';
 import AdminOrganizations from './pages/AdminOrganizations';
 import UpgradePlan from './pages/org/UpgradePlan';
 import OrgSettings from './pages/org/OrgSettings';
+import OrgIdCards from './pages/org/OrgIdCards';
 
 import MemberOverview from './pages/member/MemberOverview';
 import MemberEvents from './pages/member/MemberEvents';
@@ -126,6 +127,7 @@ const App: React.FC = () => {
               <Route path="settings" element={<OrgSettings />} />
               <Route path="reports" element={<OrgReports />} />
               <Route path="chat" element={<ChatPage />} />
+              <Route path="id-cards" element={<OrgIdCards />} />
             </Route>
 
             <Route path="/org/*" element={<OrgLegacyRedirect />} />

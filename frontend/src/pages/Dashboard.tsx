@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { Users, Calendar, FileText, CreditCard, AlertCircle, Briefcase, Settings, UserPlus, Database, Lock, Terminal, BarChart, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 
 const platformFeatures = [
   { title: 'Community Tools', desc: 'Powerful tools for member interaction and engagement.', icon: UserPlus },
@@ -150,7 +149,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 font-poppins">
-      <OrgAdminPageHeader title="Dashboard" />
+      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
 
       {user?.role !== 'SuperAdmin' && dashboardData?.expiry && (
         <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">

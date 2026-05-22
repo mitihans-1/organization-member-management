@@ -41,7 +41,7 @@ const SuperAdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  type ApiNotification = { id: number; title: string; read: boolean; createdAt: string };
+  type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
   type Panel = 'notifications' | 'user' | null;
 
   const [open, setOpen] = useState<Panel>(null);
@@ -62,7 +62,7 @@ const SuperAdminLayout: React.FC = () => {
   });
 
   const markReadMut = useMutation({
-    mutationFn: (id: number) => api.patch(`/notifications/${id}/read`),
+    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['superadmin-notifications'] }),
   });
 
@@ -196,7 +196,7 @@ const SuperAdminLayout: React.FC = () => {
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 outline-none"
             />
           </div>
-          <div className="flex items-center gap-4" ref={containerRef}>
+          <div className="flex items-center gap-4 ml-auto" ref={containerRef}>
             <div className="relative">
                 {open === 'notifications' ? (
                   <button
