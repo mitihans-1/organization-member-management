@@ -15,9 +15,15 @@ import SuperAdminAddAdmin from './pages/super-admin/SuperAdminAddAdmin';
 import SuperAdminMembers from './pages/super-admin/SuperAdminMembers';
 import SuperAdminPayments from './pages/super-admin/SuperAdminPayments';
 import PlanManagement from './pages/super-admin/PlanManagement';
+import SuperAdminTickets from './pages/super-admin/SuperAdminTickets';
 import SuperAdminReports from './pages/super-admin/SuperAdminReports';
+import SuperReport from './pages/super-admin/SuperReport';
+import MemberTickets from './pages/member/MemberTickets';
 import MemberReports from './pages/member/MemberReports';
+import MembersReport from './pages/member/MembersReport';
+import OrgTickets from './pages/OrgTickets';
 import OrgReports from './pages/OrgReports';
+import OrganiReport from './pages/OrganiReport';
 import ChatPage from './pages/ChatPage';
 // System configuration
 import SystemConfig from './pages/super-admin/SystemConfig';
@@ -100,7 +106,8 @@ const App: React.FC = () => {
               <Route path="members" element={<SuperAdminMembers />} />
               <Route path="plans" element={<PlanManagement />} />
               <Route path="payments" element={<SuperAdminPayments />} />
-              <Route path="reports" element={<SuperAdminReports />} />
+              <Route path="reports" element={<SuperReport />} />
+              <Route path="tickets" element={<SuperAdminTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="system-config" element={<SystemConfig />} />
             </Route>
@@ -125,7 +132,8 @@ const App: React.FC = () => {
               <Route path="profile" element={<Profile />} />
               <Route path="upgrade" element={<UpgradePlan />} />
               <Route path="settings" element={<OrgSettings />} />
-              <Route path="reports" element={<OrgReports />} />
+              <Route path="reports" element={<OrganiReport />} />
+              <Route path="tickets" element={<OrgTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="id-cards" element={<OrgIdCards />} />
             </Route>
@@ -148,7 +156,8 @@ const App: React.FC = () => {
               <Route path="blog" element={<MemberBlog />} />
               <Route path="id-card" element={<MyIdCard />} />
               <Route path="payments" element={<MemberPayments />} />
-              <Route path="reports" element={<MemberReports />} />
+              <Route path="reports" element={<MembersReport />} />
+              <Route path="tickets" element={<MemberTickets />} />
               <Route path="chat" element={<ChatPage />} />
             </Route>
 

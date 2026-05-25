@@ -3,6 +3,33 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+export const getPublicStats = async (_req: Request, res: Response) => {
+  try {
+    const totalOrganizations = await prisma.organization.count();
+    const totalMemberUsers = await prisma.user.count({ where: { role: 'member' } });
+    const totalMembersFromModel = await prisma.member.count();
+    const totalMembers = totalMemberUsers + totalMembersFromModel;
+    const totalPayments = await prisma.payment.aggregate({
+      _sum: { amount: true }
+    });
+    const processedAmount = totalPayments._sum.amount 
+      ? Math.round(totalPayments._sum.amount / 1000000) 
+      : 0;
+
+    return res.status(200).json({
+      stats: [
+        { value: `${totalOrganizations}+`, label: 'Organizations' },
+        { value: `${totalMembers.toLocaleString()}+`, label: 'Active Members' },
+        { value: `${processedAmount}+`, label: 'Million Processed' },
+        { value: '99%', label: 'Satisfaction' }
+      ]
+    });
+  } catch (error: any) {
+    console.error('Error fetching public stats:', error);
+    res.status(500).json({ message: 'Error fetching public stats', error });
+  }
+};
+
 export const getSystemConfig = async (_req: Request, res: Response) => {
   try {
     // Standard Prisma property name for SystemConfig model

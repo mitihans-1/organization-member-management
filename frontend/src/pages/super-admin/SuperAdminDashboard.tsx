@@ -3,8 +3,56 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { Building2, Users, DollarSign, TrendingUp, TrendingDown, Activity, BarChart3 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import useCountAnimation from '../../hooks/useCountAnimation';
+import { useAuth } from '../../context/AuthContext';
+
+interface KPICardProps {
+  label: string;
+  value: string | number;
+  icon: React.ElementType;
+  color: string;
+  growth?: number | null;
+}
+
+const KPICard: React.FC<KPICardProps> = ({ label, value, icon: Icon, color, growth }) => {
+  const safeValue = value ?? 0;
+  const animatedValue = useCountAnimation(safeValue);
+  
+  const colorClasses: Record<string, string> = {
+    sky: 'bg-sky-50 text-sky-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
+    orange: 'bg-orange-50 text-orange-600',
+    red: 'bg-red-50 text-red-600',
+  };
+
+  const safeGrowth = growth ?? 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</p>
+          <p className="text-2xl font-black text-slate-900 mt-2 flex items-center gap-1">
+            {animatedValue}
+          </p>
+          {growth !== null && growth !== undefined && (
+            <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${safeGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {safeGrowth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {Math.abs(safeGrowth)}% from last month
+            </p>
+          )}
+        </div>
+        <div className={`p-2.5 rounded-lg ${colorClasses[color]}`}>
+          <Icon size={24} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const SuperAdminDashboard: React.FC = () => {
+  const { user } = useAuth();
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats').then((r) => r.data),
@@ -56,19 +104,11 @@ const SuperAdminDashboard: React.FC = () => {
     },
   ];
 
-  const colorClasses: Record<string, string> = {
-    sky: 'bg-sky-50 text-sky-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    indigo: 'bg-indigo-50 text-indigo-600',
-    orange: 'bg-orange-50 text-orange-600',
-    red: 'bg-red-50 text-red-600',
-  };
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-black text-slate-900">Welcome back, Super Admin</h1>
-        <p className="text-sm text-slate-500 mt-1">Platform analytics and insights</p>
+    <div className="max-w-5xl space-y-8 font-poppins">
+      <div className="rounded-2xl bg-sky-600 text-white px-8 py-10 shadow-lg">
+        <h1 className="text-2xl font-black">Welcome back, {user?.name}!</h1>
+        <p className="mt-2 text-sky-100 text-sm">Here&apos;s your platform overview for today.</p>
       </div>
 
       {isLoading ? (
@@ -79,26 +119,8 @@ const SuperAdminDashboard: React.FC = () => {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {kpis.map((k) => (
-            <div key={k.label} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{k.label}</p>
-                  <p className="text-2xl font-black text-slate-900 mt-2 flex items-center gap-1">
-                    {k.value}
-                  </p>
-                  {k.growth !== null && (
-                    <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${k.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {k.growth >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                      {Math.abs(k.growth)}% from last month
-                    </p>
-                  )}
-                </div>
-                <div className={`p-2.5 rounded-lg ${colorClasses[k.color]}`}>
-                  <k.icon size={24} />
-                </div>
-              </div>
-            </div>
+          {kpis.slice(0, 4).map((k) => (
+            <KPICard key={k.label} {...k} />
           ))}
         </div>
       )}

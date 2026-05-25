@@ -158,6 +158,22 @@ export const deleteOrganization = async (req: any, res: Response) => {
   }
 };
 
+export const getOrgAdmins = async (req: any, res: Response) => {
+  if (req.user.role !== 'SuperAdmin') {
+    return res.status(403).json({ message: 'Forbidden: SuperAdmin only' });
+  }
+
+  try {
+    const orgAdmins = await prisma.user.findMany({
+      where: { role: 'orgAdmin' },
+      orderBy: { name: 'asc' },
+    });
+    res.status(200).json(orgAdmins);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching org admins', error });
+  }
+};
+
 export const createOrgAdmin = async (req: any, res: Response) => {
   if (req.user.role !== 'SuperAdmin') {
     return res.status(403).json({ message: 'Forbidden: SuperAdmin only' });

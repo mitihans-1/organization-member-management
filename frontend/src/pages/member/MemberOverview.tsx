@@ -5,6 +5,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Calendar, CreditCard, CheckCircle, Briefcase } from 'lucide-react';
 import { Service } from '../../types';
+import useCountAnimation from '../../hooks/useCountAnimation';
 
 const MemberOverview: React.FC = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ const MemberOverview: React.FC = () => {
   });
 
   const upcoming = dash?.stats?.find((s: { label: string }) => s.label?.includes('Events'))?.value ?? '—';
+  const animatedUpcoming = useCountAnimation(upcoming);
   const activeServices = services?.filter((s) => s.status === 'Active') ?? [];
 
   return (
@@ -49,7 +51,7 @@ const MemberOverview: React.FC = () => {
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase">Upcoming events</p>
-            <p className="text-3xl font-black text-slate-900 mt-2">{upcoming}</p>
+            <p className="text-3xl font-black text-slate-900 mt-2">{animatedUpcoming}</p>
             <Link to="/member/events" className="text-sm font-bold text-sky-600 mt-3 inline-block">
               View all →
             </Link>

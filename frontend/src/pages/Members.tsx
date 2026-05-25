@@ -505,24 +505,24 @@ const Members: React.FC = () => {
                     <td className="px-4 py-4 text-gray-600">{lastActive(member as User & { updatedAt?: string })}</td>
                   )}
                   <td className="px-4 py-4 text-right">
-                    <div className="inline-flex items-center gap-1 justify-end relative">
-                      <button
-                        type="button"
-                        title="Edit"
-                        onClick={() => openModal(member)}
-                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => deleteMutation.mutate(member.id)}
-                        className="p-2 rounded-lg hover:bg-gray-100 text-red-500"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      {isOrgAdmin && (
+                    {isOrgAdmin ? (
+                      <div className="inline-flex items-center gap-1 justify-end relative">
+                        <button
+                          type="button"
+                          title="Edit"
+                          onClick={() => openModal(member)}
+                          className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete"
+                          onClick={() => deleteMutation.mutate(member.id)}
+                          className="p-2 rounded-lg hover:bg-gray-100 text-red-500"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -533,35 +533,37 @@ const Members: React.FC = () => {
                         >
                           <MoreVertical size={16} />
                         </button>
-                      )}
-                      {isOrgAdmin && openActionMenuId === member.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white shadow-lg py-1"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              openModal(member);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        {openActionMenuId === member.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white shadow-lg py-1"
                           >
-                            Edit Member
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              deleteMutation.mutate(member.id);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            Delete Member
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                openModal(member);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              Edit Member
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                deleteMutation.mutate(member.id);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                            >
+                              Delete Member
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs font-medium">—</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -674,14 +676,6 @@ const Members: React.FC = () => {
         <>
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-black text-brand-dark tracking-tight">Members</h1>
-            <button
-              type="button"
-              onClick={() => openModal()}
-              className="bg-brand-medium text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 hover:bg-brand-light font-bold"
-            >
-              <Plus size={20} />
-              <span>Add Member</span>
-            </button>
           </div>
           {tableSection}
         </>
