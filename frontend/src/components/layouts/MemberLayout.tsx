@@ -21,9 +21,10 @@ import {
   Loader2,
   ChevronDown,
   User as UserIcon,
+  Search,
 } from 'lucide-react';
 
-const nav = [
+const navItems = [
   { to: '/member/dashboard', label: 'Overview', icon: LayoutGrid, end: true, color: 'text-sky-500' },
   { to: '/member/profile', label: 'Profile', icon: User, color: 'text-indigo-500' },
   { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500' },
@@ -31,7 +32,20 @@ const nav = [
   { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
   { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
   { to: '/member/reports', label: 'My Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/member/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
   { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
+];
+
+const reportsSubmenu = [
+  { to: '/member/reports', label: 'Overview', color: 'text-sky-500' },
+  { to: '/member/reports/membership', label: 'Membership Report', color: 'text-indigo-500' },
+  { to: '/member/reports/events', label: 'Event Reports', color: 'text-blue-500' },
+  { to: '/member/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
+  { to: '/member/reports/tickets', label: 'Ticket Reports', color: 'text-amber-500' },
+  { to: '/member/reports/payments', label: 'Payment Reports', color: 'text-rose-500' },
+];
+
+const otherNavItems = [
   { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },
   { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
 ];
@@ -41,6 +55,7 @@ const MemberLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(true);
 
   type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
   type Panel = 'notifications' | 'user' | null;
@@ -145,10 +160,86 @@ const MemberLayout: React.FC = () => {
           </button>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {nav.map((item) => {
+          {navItems.map((item) => {
             const active = item.end
               ? location.pathname === item.to
               : location.pathname.startsWith(item.to);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={closeSidebar}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={18} className={active ? '' : (item as any).color} />
+                <span className={active ? 'text-white' : 'text-gray-600'}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* Reports Collapsible Menu */}
+          <div>
+            <button
+              onClick={() => setIsReportsOpen(!isReportsOpen)}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                location.pathname.startsWith('/member/reports')
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                  : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileText
+                  size={18}
+                  className={
+                    location.pathname.startsWith('/member/reports') ? '' : 'text-rose-500'
+                  }
+                />
+                <span
+                  className={
+                    location.pathname.startsWith('/member/reports')
+                      ? 'text-white'
+                      : 'text-gray-600'
+                  }
+                >
+                  Reports
+                </span>
+              </div>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {isReportsOpen && (
+              <div className="ml-4 mt-1 space-y-1">
+                {reportsSubmenu.map((item) => {
+                  const active = location.pathname === item.to;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={closeSidebar}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className={active ? 'text-indigo-700' : item.color}>•</span>
+                      <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {otherNavItems.map((item) => {
+            const active = location.pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
@@ -205,14 +296,24 @@ const MemberLayout: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col overflow-x-hidden">
-        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center sticky top-0 z-[30]">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-[30]">
           <button 
             onClick={toggleSidebar}
             className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
           >
             <Menu size={24} />
           </button>
-          <div className="flex items-center gap-4 ml-auto" ref={containerRef}>
+          <div className="flex-1 mx-4 max-w-md hidden sm:block">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search events, services, blogs..."
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-4" ref={containerRef}>
             <div className="relative">
                 {open === 'notifications' ? (
                   <button

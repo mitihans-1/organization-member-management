@@ -268,9 +268,9 @@ export const startCronJobs = () => {
       console.log(`Found ${organizations.length} organizations with expiring plans.`);
 
       for (const org of organizations) {
-        if (org.plan) {
+        if (org.plan && org.plan_expiry) {
           // Generate invoice for organization
-          const billingPeriodStart = org.plan_expiry;
+          const billingPeriodStart = org.plan_expiry as Date;
           const billingPeriodEnd = new Date(billingPeriodStart);
           billingPeriodEnd.setDate(billingPeriodEnd.getDate() + org.plan.duration_days);
 

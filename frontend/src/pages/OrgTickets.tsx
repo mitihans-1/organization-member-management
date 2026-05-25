@@ -354,13 +354,13 @@ const OrgReports: React.FC = () => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <OrgAdminPageHeader
-        title="Ticket Management"
-        subtitle="Manage member tickets and send tickets to Super Admin"
+        title="Report Management"
+        subtitle="Manage member reports and send reports to Super Admin"
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase">Total Tickets</p>
+          <p className="text-xs font-bold text-gray-500 uppercase">Total Reports</p>
           <p className="text-3xl font-black text-gray-900 mt-2">{stats.total}</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
@@ -386,7 +386,7 @@ const OrgReports: React.FC = () => {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Member Tickets ({memberReports.length})
+          Member Reports ({memberReports.length})
         </button>
         <button
           onClick={() => { setActiveTab('org'); setFilterStatus('all'); }}
@@ -396,7 +396,7 @@ const OrgReports: React.FC = () => {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Tickets to Super Admin ({orgReports.length})
+          Reports to Super Admin ({orgReports.length})
         </button>
         {activeTab === 'org' && (
           <button
@@ -443,7 +443,7 @@ const OrgReports: React.FC = () => {
       ) : filteredReports.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
           <p className="text-gray-500">
-            {activeTab === 'member' ? 'No member Tickets found.' : 'No Tickets sent to Super Admin yet.'}
+            {activeTab === 'member' ? 'No member reports found.' : 'No reports sent to Super Admin yet.'}
           </p>
         </div>
       ) : (
@@ -465,7 +465,7 @@ const OrgReports: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-gray-900">Manage Tickets</h3>
+              <h3 className="text-lg font-black text-gray-900">Manage Report</h3>
               <button onClick={closeAllModals} className="p-2 rounded-lg hover:bg-gray-100">
                 <div className="h-5 w-5 flex items-center justify-center">×</div>
               </button>
@@ -553,7 +553,7 @@ const OrgReports: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-gray-900">Reply to Ticket</h3>
+              <h3 className="text-lg font-black text-gray-900">Reply to Report</h3>
               <button onClick={closeAllModals} className="p-2 rounded-lg hover:bg-gray-100">
                 <div className="h-5 w-5 flex items-center justify-center">×</div>
               </button>
@@ -601,7 +601,7 @@ const OrgReports: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-gray-900">Send Tickets to Super Admin</h3>
+              <h3 className="text-lg font-black text-gray-900">Send Report to Super Admin</h3>
               <button onClick={closeAllModals} className="p-2 rounded-lg hover:bg-gray-100">
                 <div className="h-5 w-5 flex items-center justify-center">×</div>
               </button>
@@ -615,7 +615,7 @@ const OrgReports: React.FC = () => {
                   value={orgFormData.title}
                   onChange={(e) => setOrgFormData({ ...orgFormData, title: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
-                  placeholder="Tickets title..."
+                  placeholder="Report title..."
                 />
               </div>
               <div>
@@ -626,7 +626,7 @@ const OrgReports: React.FC = () => {
                   value={orgFormData.description}
                   onChange={(e) => setOrgFormData({ ...orgFormData, description: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none resize-y"
-                  placeholder="Describe your Tickets in detail..."
+                  placeholder="Describe your report in detail..."
                 />
               </div>
               <div>
@@ -677,7 +677,7 @@ const OrgReports: React.FC = () => {
                   disabled={createMutation.isPending}
                   className="flex-1 rounded-xl bg-indigo-600 py-3 font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
                 >
-                  {createMutation.isPending ? 'Sending...' : 'Send Tickets'}
+                  {createMutation.isPending ? 'Sending...' : 'Send Report'}
                 </button>
               </div>
             </form>

@@ -57,7 +57,6 @@ export const getInvoiceById = async (req: any, res: Response) => {
         organization: true,
         member: true,
         subscription: true,
-        plan: true,
         payments: true,
       },
     });

@@ -9,6 +9,7 @@ import {
   Building2,
   UserCog,
   Users,
+  UserRound,
   CreditCard,
   Settings,
   Bell,
@@ -22,18 +23,32 @@ import {
   Zap,
   X as CloseIcon,
   MessageSquare,
+  FileText,
 } from 'lucide-react';
 
-const nav = [
-  { to: '/super-admin', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-sky-400' },
-  { to: '/super-admin/organizations', label: 'Organizations', icon: Building2, color: 'text-blue-400' },
-  { to: '/super-admin/org-admins', label: 'OrgAdmins', icon: UserCog, color: 'text-indigo-400' },
-  { to: '/super-admin/members', label: 'Members', icon: Users, color: 'text-green-400' },
-  { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap, color: 'text-amber-400' },
-  { to: '/super-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-400' },
-  { to: '/super-admin/reports', label: 'Reports', icon: Inbox, color: 'text-rose-400' },
-  { to: '/super-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-400' },
-  { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-slate-400' },
+const navItems = [
+  { to: '/super-admin', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-sky-500' },
+  { to: '/super-admin/organizations', label: 'Organizations', icon: Building2, color: 'text-indigo-500' },
+  { to: '/super-admin/org-admins', label: 'OrgAdmins', icon: Users, color: 'text-blue-500' },
+  { to: '/super-admin/members', label: 'Members', icon: UserRound, color: 'text-emerald-500' },
+  { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap, color: 'text-amber-500' },
+  { to: '/super-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-rose-500' },
+];
+
+const reportsSubmenu = [
+  { to: '/super-admin/reports', label: 'Overview', color: 'text-sky-500' },
+  { to: '/super-admin/reports/organizations', label: 'Organization Reports', color: 'text-indigo-500' },
+  { to: '/super-admin/reports/membership', label: 'Membership Reports', color: 'text-blue-500' },
+  { to: '/super-admin/reports/revenue', label: 'Revenue Reports', color: 'text-emerald-500' },
+  { to: '/super-admin/reports/subscriptions', label: 'Subscription Reports', color: 'text-amber-500' },
+  { to: '/super-admin/reports/tickets', label: 'Ticket Reports', color: 'text-rose-500' },
+  { to: '/super-admin/reports/system', label: 'System Reports', color: 'text-violet-500' },
+];
+
+const otherNavItems = [
+  { to: '/super-admin/tickets', label: 'Tickets', icon: FileText, color: 'text-indigo-500' },
+  { to: '/super-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-slate-500' },
+  { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-gray-500' },
 ];
 
 const SuperAdminLayout: React.FC = () => {
@@ -46,6 +61,7 @@ const SuperAdminLayout: React.FC = () => {
 
   const [open, setOpen] = useState<Panel>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const baseId = useId();
   const queryClient = useQueryClient();
@@ -110,70 +126,165 @@ const SuperAdminLayout: React.FC = () => {
   const notifId = `${baseId}-notifications`;
   const userId = `${baseId}-user`;
   return (
-    <div className="min-h-screen bg-slate-50 flex font-poppins relative">
+    <div className="min-h-screen bg-slate-100 flex font-poppins relative">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[40] lg:hidden animate-in fade-in duration-300"
+          className="fixed inset-0 bg-brand-dark/40 backdrop-blur-sm z-[40] lg:hidden animate-in fade-in duration-300"
           onClick={closeSidebar}
         ></div>
       )}
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-[50] w-64 bg-slate-900 text-white flex flex-col border-r border-slate-800 transition-transform duration-300 transform
+        fixed inset-y-0 left-0 z-[50] w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 transform
         lg:translate-x-0 lg:static lg:inset-auto lg:shrink-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <div>
             <Link
               to="/"
               title="Back to public home"
-              className="text-lg font-black tracking-tight text-white hover:text-sky-300 transition-colors block"
+              className="text-lg font-black text-sky-600 hover:text-sky-500 transition-colors block"
             >
               OMMS
             </Link>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Super Admin</p>
+            <p className="text-xs text-gray-500 mt-1">Super Admin</p>
           </div>
           <button 
             onClick={closeSidebar}
-            className="lg:hidden p-2 rounded-lg hover:bg-slate-800 text-slate-400"
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-400"
           >
             <CloseIcon size={20} />
           </button>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {nav.map((item) => {
+          {navItems.map((item) => {
             const active = item.end
               ? location.pathname === item.to
-              : location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+              : location.pathname.startsWith(item.to);
             const Icon = item.icon;
             return (
               <Link
                 key={item.to}
                 to={item.to}
                 onClick={closeSidebar}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                  active ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
                 }`}
               >
                 <Icon size={18} className={active ? '' : (item as any).color} />
-                {item.label}
+                <span className={active ? 'text-white' : 'text-gray-600'}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* Reports Collapsible Menu */}
+          <div>
+            <button
+              onClick={() => setIsReportsOpen(!isReportsOpen)}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                location.pathname.startsWith('/super-admin/reports')
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                  : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileText
+                  size={18}
+                  className={
+                    location.pathname.startsWith('/super-admin/reports') ? '' : 'text-violet-500'
+                  }
+                />
+                <span
+                  className={
+                    location.pathname.startsWith('/super-admin/reports')
+                      ? 'text-white'
+                      : 'text-gray-600'
+                  }
+                >
+                  Reports
+                </span>
+              </div>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {isReportsOpen && (
+              <div className="ml-4 mt-1 space-y-1">
+                {reportsSubmenu.map((item) => {
+                  const active = location.pathname === item.to;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={closeSidebar}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className={active ? 'text-indigo-700' : item.color}>•</span>
+                      <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {otherNavItems.map((item) => {
+            const active = location.pathname.startsWith(item.to);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={closeSidebar}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={18} className={active ? '' : (item as any).color} />
+                <span className={active ? 'text-white' : 'text-gray-600'}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
-        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+        <div className="p-4 border-t border-gray-100">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-800 font-bold text-xs border border-sky-200 overflow-hidden">
+              {user?.profile_photo_path ? (
+                <img 
+                  src={`http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                user?.name?.charAt(0)
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-gray-900 truncate">{user?.name}</p>
+              <p className="text-[10px] text-gray-500">Super Admin</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => {
               logout();
               navigate('/login');
             }}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white w-full px-2 py-2 transition-colors"
+            className="mt-3 flex items-center gap-2 text-xs text-red-500 hover:text-red-600 transition-colors"
           >
-            <LogOut size={18} />
+            <LogOut size={14} />
             Sign out
           </button>
         </div>
@@ -410,7 +521,7 @@ const SuperAdminLayout: React.FC = () => {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>

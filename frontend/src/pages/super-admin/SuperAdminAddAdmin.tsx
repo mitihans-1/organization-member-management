@@ -88,6 +88,7 @@ const SuperAdminAddAdmin: React.FC = () => {
         <div>
           <label className="block text-sm font-bold text-slate-700">Select Organization</label>
           <select
+          title="name"
             required
             value={formData.organization_id}
             onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
@@ -104,6 +105,7 @@ const SuperAdminAddAdmin: React.FC = () => {
         <div>
           <label className="block text-sm font-bold text-slate-700">Initial plan (optional)</label>
           <select
+          title="name"
             value={formData.plan_id}
             onChange={(e) => setFormData({ ...formData, plan_id: e.target.value })}
             className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"

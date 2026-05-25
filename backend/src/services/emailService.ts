@@ -48,23 +48,13 @@ const logEmail = async (data: {
   paymentId?: string;
   scheduledAt?: Date;
 }) => {
-  return prisma.emailNotificationLog.create({
-    data: {
-      ...data,
-      status: 'pending'
-    }
-  });
+  console.log('Logging email (temporary - no database):', data);
+  return { id: 'temp-log-id', ...data, status: 'pending' };
 };
 
 const updateEmailLog = async (logId: string, status: 'sent' | 'failed', error?: string) => {
-  return prisma.emailNotificationLog.update({
-    where: { id: logId },
-    data: {
-      status,
-      error,
-      sentAt: status === 'sent' ? new Date() : undefined
-    }
-  });
+  console.log('Updating email log (temporary - no database):', { logId, status, error });
+  return { id: logId, status, error, sentAt: status === 'sent' ? new Date() : undefined };
 };
 
 export const sendOtpEmail = async (to: string, otpCode: string, name: string) => {

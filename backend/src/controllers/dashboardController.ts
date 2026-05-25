@@ -52,24 +52,42 @@ export const getDashboardStats = async (req: any, res: Response) => {
     }
 
     if (role === 'orgAdmin') {
+      const organizationId = user.organizationId;
       const orgName = user.organization_name;
-      const members = await prisma.user.count({
-        where: { organization_name: orgName, role: 'member' }
+      
+      const memberUsers = await prisma.user.count({
+        where: { organizationId, role: 'member' }
       });
+      const membersFromModel = await prisma.member.count({
+        where: { user: { organizationId } }
+      });
+      const totalMembers = memberUsers + membersFromModel;
+      
       const payments = await prisma.payment.aggregate({
-        where: { user: { organization_name: orgName } },
+        where: { user: { organizationId } },
         _sum: { amount: true }
       });
-      const events = await prisma.event.count(); // In a real app, events might be scoped to orgs
-      const blogs = await prisma.blog.count(); // Same for blogs
+      
+      const events = await prisma.event.count({
+        where: { organizationId }
+      });
+      
+      const blogs = await prisma.blog.count({
+        where: { organizationId }
+      });
+      
+      const services = await prisma.service.count({
+        where: { organizationId }
+      });
 
       return res.status(200).json({
         stats: [
-          { label: 'Total Members', value: members },
-          { label: 'Total Revenue', value: `${payments._sum.amount || 0} ETB` },
+          { label: 'Total Members', value: totalMembers },
           { label: 'Upcoming Events', value: events },
+          { label: 'Active Services', value: services },
           { label: 'Recent Blogs', value: blogs }
         ],
+        totalPaidPayments: payments._sum.amount || 0,
         plan: user.plan,
         expiry: user.plan_expiry
       });

@@ -131,7 +131,7 @@ const AccordionReportCard: React.FC<{
             </div>
             <div className="flex flex-wrap gap-2 min-w-[320px]">
               <select
-                title="Update Tickets status"
+                title="Update Ticket status"
                 value={report.status}
                 onChange={(e) => onUpdateStatus(e.target.value as ReportStatus)}
                 className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
@@ -141,7 +141,7 @@ const AccordionReportCard: React.FC<{
                 <option value="resolved">Resolved</option>
               </select>
               <select
-                title="Update Tickets priority"
+                title="Update Ticket priority"
                 value={report.priority}
                 onChange={(e) => onUpdatePriority(e.target.value)}
                 className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
@@ -203,7 +203,7 @@ const SuperAdminReports: React.FC = () => {
       reportService.updateReportStatus(data.id, data.status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-reports'] });
-      alert('Report status updated!');
+      alert('Ticket status updated!');
     },
     onError: (error: any) => {
       alert(error.response?.data?.message || 'Failed to update status.');
@@ -215,7 +215,7 @@ const SuperAdminReports: React.FC = () => {
       reportService.updateReportPriority(data.id, data.priority),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-reports'] });
-      alert('Report priority updated!');
+      alert('Ticket priority updated!');
     },
     onError: (error: any) => {
       alert(error.response?.data?.message || 'Failed to update priority.');
@@ -226,10 +226,10 @@ const SuperAdminReports: React.FC = () => {
     mutationFn: (id: string) => reportService.acceptReport(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-reports'] });
-      alert('Report accepted!');
+      alert('Ticket accepted!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to accept report.');
+      alert(error.response?.data?.message || 'Failed to accept ticket.');
     },
   });
 

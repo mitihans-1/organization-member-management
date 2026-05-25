@@ -25,19 +25,34 @@ import {
   User as UserIcon,
   Shield,
   TrendingUp,
+  Search,
 } from 'lucide-react';
 
 /** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
-const nav = [
+const navItems = [
   { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-indigo-500' },
   { to: '/org-admin/members', label: 'Member Management', icon: Users, color: 'text-blue-500' },
   { to: '/org-admin/id-cards', label: 'ID Card Management', icon: Shield, color: 'text-cyan-500' },
   { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500' },
   { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
   { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },
-  { to: '/org-admin/subscription-plans', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
-  { to: '/org-admin/reports', label: 'Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/org-admin/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
+  { to: '/org-admin/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
   { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
+];
+
+const reportsSubmenu = [
+  
+  { to: '/org-admin/reports/members', label: 'Member Reports', color: 'text-indigo-500' },
+  { to: '/org-admin/reports/events', label: 'Event Reports', color: 'text-blue-500' },
+  { to: '/org-admin/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
+  { to: '/org-admin/reports/tickets', label: 'Ticket Reports', color: 'text-amber-500' },
+  { to: '/org-admin/reports/blogs', label: 'Blog & Announcement Reports', color: 'text-rose-500' },
+  { to: '/org-admin/reports/payments', label: 'Payment Reports', color: 'text-violet-500' },
+  { to: '/org-admin/reports/id-cards', label: 'ID Card Reports', color: 'text-indigo-500' },
+];
+
+const otherNavItems = [
   { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
   { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500' },
   { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500' },
@@ -48,6 +63,7 @@ const OrgAdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(true);
   const orgLabel = user?.organization_name || 'Your organization';
 
   type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
@@ -158,7 +174,7 @@ const OrgAdminLayout: React.FC = () => {
           </button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {nav.map((item) => {
+          {navItems.map((item) => {
             const active = item.end
               ? location.pathname === item.to
               : location.pathname === item.to || location.pathname.startsWith(item.to + '/');
@@ -168,17 +184,88 @@ const OrgAdminLayout: React.FC = () => {
                 key={item.to}
                 to={item.to}
                 onClick={closeSidebar}
-                className={`flex items-start gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all leading-snug ${
-                  active
-                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm'
-                    : 'hover:bg-gray-50 border border-transparent'
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
                 }`}
               >
-                <Icon
-                  size={20}
-                  className={`shrink-0 mt-0.5 ${active ? 'text-indigo-600' : (item as any).color}`}
+                <Icon size={18} className={active ? '' : (item as any).color} />
+                <span className={active ? 'text-white' : 'text-gray-600'}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* Reports Collapsible Menu */}
+          <div>
+            <button
+              onClick={() => setIsReportsOpen(!isReportsOpen)}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                location.pathname.startsWith('/org-admin/reports')
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                  : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileText
+                  size={18}
+                  className={
+                    location.pathname.startsWith('/org-admin/reports') ? '' : 'text-rose-500'
+                  }
                 />
-                <span className={`${active ? 'text-indigo-700' : 'text-gray-600'} ${(item as { narrow?: boolean }).narrow ? 'text-[13px]' : ''}`}>
+                <span
+                  className={
+                    location.pathname.startsWith('/org-admin/reports')
+                      ? 'text-white'
+                      : 'text-gray-600'
+                  }
+                >
+                  Reports
+                </span>
+              </div>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {isReportsOpen && (
+              <div className="ml-4 mt-1 space-y-1">
+                {reportsSubmenu.map((item) => {
+                  const active = location.pathname === item.to;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={closeSidebar}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className={active ? 'text-indigo-700' : item.color}>•</span>
+                      <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {otherNavItems.map((item) => {
+            const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={closeSidebar}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={18} className={active ? '' : (item as any).color} />
+                <span className={active ? 'text-white' : 'text-gray-600'}>
                   {item.label}
                 </span>
               </Link>
@@ -227,13 +314,22 @@ const OrgAdminLayout: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col overflow-x-hidden">
-        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center sticky top-0 z-[30] min-h-[64px]">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-[30] min-h-[64px]">
           <button 
             onClick={toggleSidebar}
             className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
           >
             <Menu size={24} />
           </button>
+          
+          <div className="flex-1 max-w-xl relative hidden md:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="search"
+              placeholder="Search members, events, services..."
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 outline-none"
+            />
+          </div>
           <div className="flex items-center gap-4 ml-auto" ref={containerRef}>
             <div className="relative">
                 {open === 'notifications' ? (

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { Users, Calendar, FileText, CreditCard, AlertCircle, Briefcase, Settings, UserPlus, Database, Lock, Terminal, BarChart, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import useCountAnimation from '../hooks/useCountAnimation';
 
 const platformFeatures = [
   { title: 'Community Tools', desc: 'Powerful tools for member interaction and engagement.', icon: UserPlus },
@@ -13,6 +14,34 @@ const platformFeatures = [
   { title: 'Real-time Analytics', desc: 'Deep insights into your organization’s health and growth.', icon: BarChart },
   { title: 'Smart Integration', desc: 'Easily connect with your existing workflows and APIs.', icon: Terminal },
 ];
+
+interface DashboardStatsCardProps {
+  label: string;
+  value: string | number;
+  sub: React.ReactNode;
+  icon: React.ElementType;
+}
+
+const DashboardStatsCard: React.FC<DashboardStatsCardProps> = ({
+  label,
+  value,
+  sub,
+  icon: Icon,
+}) => {
+  const animatedValue = useCountAnimation(value);
+  return (
+    <div className="bg-white rounded-3xl border border-gray-100 p-6 flex items-center justify-between gap-4">
+      <div className="flex-1">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+        <p className="text-3xl font-black text-gray-900">{animatedValue}</p>
+        <div className="text-xs mt-1">{sub}</div>
+      </div>
+      <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+        <Icon size={22} strokeWidth={2} />
+      </div>
+    </div>
+  );
+};
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -58,10 +87,9 @@ const Dashboard: React.FC = () => {
       stats.find((s: { label: string }) => s.label?.toLowerCase().includes(needle.toLowerCase()));
     const memberVal = find('member')?.value ?? members?.length ?? '—';
     const eventVal = find('event')?.value ?? events?.length ?? '—';
-    const serviceVal = services?.length ?? '—';
+    const serviceVal = find('service')?.value ?? services?.length ?? '—';
     const blogVal = find('blog')?.value ?? blogs?.length ?? '—';
-    const paidSum =
-      payments?.reduce((a: number, p: { amount?: number }) => a + (p.amount || 0), 0) ?? 0;
+    const paidSum = dashboardData?.totalPaidPayments ?? 0;
 
     return [
       {
@@ -149,7 +177,16 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 font-poppins">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-black mb-2">Welcome back, {user?.name?.split(' ')[0] || 'Admin'}!</h1>
+            <p className="text-indigo-100 text-lg">
+              Manage your organization and make the most of your membership platform today.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {user?.role !== 'SuperAdmin' && dashboardData?.expiry && (
         <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
@@ -178,24 +215,9 @@ const Dashboard: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {statsCards.slice(0, 4).map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.label}
-                className="bg-white rounded-3xl border border-gray-100 p-6 flex items-center justify-between gap-4"
-              >
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{card.label}</p>
-                  <p className="text-3xl font-black text-gray-900">{card.value}</p>
-                  <div className="text-xs mt-1">{card.sub}</div>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
-                  <Icon size={22} strokeWidth={2} />
-                </div>
-              </div>
-            );
-          })}
+          {statsCards.slice(0, 4).map((card) => (
+            <DashboardStatsCard key={card.label} {...card} />
+          ))}
         </div>
       )}
 

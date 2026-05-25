@@ -5,7 +5,7 @@ import api from '../../services/api';
 import { Search, Plus, Download, MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
 
 type OrgAdmin = {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: string;
@@ -39,15 +39,15 @@ const downloadCsv = (filename: string, rows: Record<string, unknown>[]) => {
 
 const SuperAdminOrgAdmins: React.FC = () => {
   const [q, setQ] = useState('');
-  const [openMenuFor, setOpenMenuFor] = useState<number | null>(null);
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
   const menuContainerRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: orgAdmins, isLoading } = useQuery<OrgAdmin[]>({
-    queryKey: ['admin', 'organizations'],
-    queryFn: () => api.get('/admin/organizations').then((r) => r.data),
+    queryKey: ['admin', 'org-admins'],
+    queryFn: () => api.get('/admin/org-admins').then((r) => r.data),
   });
 
   useEffect(() => {
@@ -74,9 +74,10 @@ const SuperAdminOrgAdmins: React.FC = () => {
   }, [orgAdmins, q]);
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/admin/organizations/${id}`),
+    mutationFn: (id: string) => api.delete(`/admin/organizations/${id}`),
     onSuccess: () => {
       setOpenMenuFor(null);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'org-admins'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] });
     },
   });

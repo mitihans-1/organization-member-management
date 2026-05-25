@@ -14,13 +14,34 @@ import {
 import GuestNavbar from '../components/GuestNavbar';
 import GuestFooter from '../components/GuestFooter';
 import LiveChatWidget from '../components/LiveChatWidget';
+import useCountAnimation from '../hooks/useCountAnimation';
 
 const forest = '#3d5a2b';
 const forestHover = '#4f772d';
 
+const StatCard: React.FC<{ stat: { value: string; label: string } }> = ({ stat }) => {
+  const animatedValue = useCountAnimation(stat.value);
+  return (
+    <div>
+      <p className="text-3xl md:text-4xl font-black tracking-tight">
+        {animatedValue}
+      </p>
+      <p className="mt-2 text-sm md:text-base font-semibold text-white/90 uppercase tracking-wide">
+        {stat.label}
+      </p>
+    </div>
+  );
+};
+
 const Home: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [testimonialIdx, setTestimonialIdx] = useState(0);
+  const [stats, setStats] = useState([
+    { value: '150+', label: 'Organizations' },
+    { value: '3,000+', label: 'Active Members' },
+    { value: '750+', label: 'Million Processed' },
+    { value: '99%', label: 'Satisfaction' },
+  ]);
 
   const slides = [
     {
@@ -51,12 +72,20 @@ const Home: React.FC = () => {
     return () => clearInterval(t);
   }, []);
 
-  const stats = [
-    { value: '150+', label: 'Organizations' },
-    { value: '3,000+', label: 'Active Members' },
-    { value: '750+', label: 'Million Processed' },
-    { value: '99%', label: 'Satisfaction' },
-  ];
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/public/stats');
+        const data = await response.json();
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const features = [
     {
@@ -207,12 +236,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6 lg:gap-4 text-center text-white">
             {stats.map((s) => (
-              <div key={s.label}>
-                <p className="text-3xl md:text-4xl font-black tracking-tight">{s.value}</p>
-                <p className="mt-2 text-sm md:text-base font-semibold text-white/90 uppercase tracking-wide">
-                  {s.label}
-                </p>
-              </div>
+              <StatCard key={s.label} stat={s} />
             ))}
           </div>
         </div>

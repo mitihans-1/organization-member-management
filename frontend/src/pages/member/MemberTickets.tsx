@@ -231,15 +231,15 @@ const MemberReports: React.FC = () => {
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-black text-gray-900">My Tickets</h1>
-          <p className="text-sm text-gray-500 mt-1">Submit your tickets to your organization</p>
+          <h1 className="text-2xl font-black text-gray-900">My Reports</h1>
+          <p className="text-sm text-gray-500 mt-1">Submit and track reports to your organization</p>
         </div>
         <button
           onClick={() => openModal()}
           className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
         >
           <Plus size={18} />
-          New ticket
+          New Report
         </button>
       </div>
 
@@ -278,7 +278,7 @@ const MemberReports: React.FC = () => {
         </div>
       ) : reports?.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-          <p className="text-gray-500">No tickets yet. Submit your first ticket!</p>
+          <p className="text-gray-500">No reports yet. Submit your first report!</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -302,7 +302,7 @@ const MemberReports: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
               <h3 className="text-lg font-black text-gray-900">
-                {editingReport ? 'Edit Report' : 'Submit New Ticket'}
+                {editingReport ? 'Edit Report' : 'Submit New Report'}
               </h3>
               <button onClick={closeModal} className="p-2 rounded-lg hover:bg-gray-100">
                 <X size={20} />
