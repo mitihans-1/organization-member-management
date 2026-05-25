@@ -22,6 +22,10 @@ import serviceRoutes from './modules/services/routes/serviceRoutes';
 import reportRoutes from './routes/reportRoutes';
 import chatRoutes from './routes/chatRoutes';
 import uploadRoutes from './routes/uploadRoutes';
+import memberSubscriptionPlanRoutes from './routes/memberSubscriptionPlanRoutes';
+import memberSubscriptionRoutes from './routes/memberSubscriptionRoutes';
+import invoiceRoutes from './routes/invoiceRoutes';
+import organizationSubscriptionRoutes from './routes/organizationSubscriptionRoutes';
 import { PrismaClient } from '@prisma/client';
 import { startCronJobs } from './services/cronService';
 
@@ -62,6 +66,10 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api', memberSubscriptionPlanRoutes);
+app.use('/api', memberSubscriptionRoutes);
+app.use('/api', invoiceRoutes);
+app.use('/api/organization-subscriptions', organizationSubscriptionRoutes);
 
 const userSocketMap = new Map<string, string>();
 

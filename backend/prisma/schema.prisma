@@ -41,11 +41,14 @@ model Organization {
   plan             Plan?                       @relation(fields: [plan_id], references: [id])
   payment_phone    String?
 
-  conversations          Conversation[]
-  idCards                IdCard[]
-  idCardRequests         IdCardRequest[]
-  idCardVerificationLogs IdCardVerificationLog[]
-  reports                Report[]
+  conversations           Conversation[]
+  idCards                 IdCard[]
+  idCardRequests          IdCardRequest[]
+  idCardVerificationLogs  IdCardVerificationLog[]
+  reports                 Report[]
+  memberSubscriptionPlans MemberSubscriptionPlan[]
+  memberSubscriptions     MemberSubscription[]
+  invoices                Invoice[]
 
   @@map("organizations")
 }
@@ -75,6 +78,8 @@ model User {
   updatedAt             DateTime               @updatedAt
   members               Member[]
   payments              Payment[]
+  memberSubscriptions   MemberSubscription[]
+  invoices              Invoice[]
   notifications         Notification[]
   otpTokens             OtpToken[]
   customAttributeValues MemberAttributeValue[]
@@ -215,6 +220,7 @@ model Plan {
   payments      Payment[]
   users         User[]
   organizations Organization[]
+  invoices      Invoice[]      @relation("InvoiceOrganizationPlan")
 
   @@map("plans")
 }
@@ -241,8 +247,10 @@ model Payment {
   reference_type String?
   reference_id   String?
 
-  organization_id       String?                @db.ObjectId
-  emailNotificationLogs EmailNotificationLog[]
+  organization_id            String?                     @db.ObjectId
+  emailNotificationLogs      EmailNotificationLog[]
+  invoicePayments            InvoicePayment[]
+  memberSubscriptionPayments MemberSubscriptionPayment[]
 
   @@map("payments")
 }
@@ -705,4 +713,162 @@ model EmailNotificationLog {
   updatedAt   DateTime  @updatedAt
 
   @@map("email_notification_logs")
+}
+
+// ==========================================
+// MEMBER SUBSCRIPTION & INVOICING SYSTEM
+// ==========================================
+
+model MemberSubscriptionPlan {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  name           String
+  description    String?
+  price          Float
+  currency       String   @default("ETB")
+  billingCycle   String // "monthly", "quarterly", "annual"
+  durationDays   Int
+  trialDays      Int?     // Number of free trial days for new users
+  features       String[] @default([])
+  isActive       Boolean  @default(true)
+  maxMembers     Int?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptions MemberSubscription[]
+  invoices      Invoice[]            @relation("InvoiceMemberPlan")
+
+  @@map("member_subscription_plans")
+}
+
+model MemberSubscription {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  memberId           String    @db.ObjectId
+  organizationId     String    @db.ObjectId
+  planId             String    @db.ObjectId
+  status             String    @default("active") // active, paused, cancelled, expired
+  startDate          DateTime
+  nextBillingDate    DateTime
+  endDate            DateTime?
+  cancellationDate   DateTime?
+  cancellationReason String?
+  autoRenew          Boolean   @default(true)
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  member       User                        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         MemberSubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+  payments     MemberSubscriptionPayment[]
+
+  @@map("member_subscriptions")
+}
+
+model Invoice {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  invoiceNumber      String    @unique
+  organizationId     String    @db.ObjectId
+  memberId           String?   @db.ObjectId
+  subscriptionId     String?   @db.ObjectId
+  planId             String?   @db.ObjectId
+  planType           String? // "organization" or "member"
+  status             String    @default("draft") // draft, sent, paid, overdue, void
+  subtotal           Float
+  tax                Float     @default(0)
+  discount           Float     @default(0)
+  total              Float
+  currency           String    @default("ETB")
+  dueDate            DateTime
+  paidAt             DateTime?
+  notes              String?
+  pdfUrl             String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  sentAt             DateTime?
+  billingPeriodStart DateTime?
+  billingPeriodEnd   DateTime?
+  isRecurring        Boolean   @default(false)
+
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  member                  User?                   @relation(fields: [memberId], references: [id])
+  subscription            MemberSubscription?     @relation(fields: [subscriptionId], references: [id])
+  memberSubscriptionPlan  MemberSubscriptionPlan? @relation("InvoiceMemberPlan", fields: [planId], references: [id])
+  organizationPlan        Plan?                   @relation("InvoiceOrganizationPlan", fields: [planId], references: [id])
+  items                   InvoiceItem[]
+  payments                InvoicePayment[]
+  reminders               InvoiceReminder[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String @id @default(cuid()) @map("_id")
+  invoiceId   String @db.ObjectId
+  description String
+  quantity    Int    @default(1)
+  unitPrice   Float
+  total       Float
+  sortOrder   Int    @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id            String   @id @default(cuid()) @map("_id")
+  invoiceId     String   @db.ObjectId
+  paymentId     String?  @db.ObjectId
+  amount        Float
+  paymentMethod String?
+  transactionId String?
+  paidAt        DateTime @default(now())
+  notes         String?
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@map("invoice_payments")
+}
+
+model InvoiceReminder {
+  id        String   @id @default(cuid()) @map("_id")
+  invoiceId String   @db.ObjectId
+  type      String // "before_due", "overdue_1day", "overdue_7days"
+  sentAt    DateTime @default(now())
+  channel   String // "email", "sms"
+  status    String   @default("sent") // sent, failed
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_reminders")
+}
+
+model MemberSubscriptionPayment {
+  id             String   @id @default(cuid()) @map("_id")
+  subscriptionId String   @db.ObjectId
+  paymentId      String   @db.ObjectId
+  amount         Float
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         String   @default("completed")
+
+  subscription MemberSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payment      Payment            @relation(fields: [paymentId], references: [id])
+
+  @@map("member_subscription_payments")
+}
+
+model InvoiceCounter {
+  id        String   @id @default(cuid()) @map("_id")
+  year      Int
+  sequence  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([year])
+  @@map("invoice_counters")
 }

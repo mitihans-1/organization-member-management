@@ -29,6 +29,7 @@ const nav = [
   { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500' },
   { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500' },
   { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
+  { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
   { to: '/member/reports', label: 'My Reports', icon: FileText, color: 'text-rose-500' },
   { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
   { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },

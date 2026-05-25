@@ -37,12 +37,15 @@ import AdminOrganizations from './pages/AdminOrganizations';
 import UpgradePlan from './pages/org/UpgradePlan';
 import OrgSettings from './pages/org/OrgSettings';
 import OrgIdCards from './pages/org/OrgIdCards';
+import OrgSubscriptions from './pages/org/OrgSubscriptions';
 
 import MemberOverview from './pages/member/MemberOverview';
 import MemberEvents from './pages/member/MemberEvents';
 import MemberServices from './pages/member/MemberServices';
 import MemberBlog from './pages/member/MemberBlog';
 import MemberPayments from './pages/member/MemberPayments';
+import MemberSubscriptions from './pages/member/MemberSubscriptions';
+import SubscriptionGuard from './components/SubscriptionGuard';
 
 import Home from './pages/Home';
 import About from './pages/About';
@@ -128,6 +131,7 @@ const App: React.FC = () => {
               <Route path="reports" element={<OrgReports />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="id-cards" element={<OrgIdCards />} />
+              <Route path="subscription-plans" element={<OrgSubscriptions />} />
             </Route>
 
             <Route path="/org/*" element={<OrgLegacyRedirect />} />
@@ -142,14 +146,15 @@ const App: React.FC = () => {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<MemberOverview />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="events" element={<MemberEvents />} />
-              <Route path="services" element={<MemberServices />} />
-              <Route path="blog" element={<MemberBlog />} />
-              <Route path="id-card" element={<MyIdCard />} />
-              <Route path="payments" element={<MemberPayments />} />
-              <Route path="reports" element={<MemberReports />} />
-              <Route path="chat" element={<ChatPage />} />
+              <Route path="profile" element={<SubscriptionGuard allowBasic><Profile /></SubscriptionGuard>} />
+              <Route path="events" element={<SubscriptionGuard><MemberEvents /></SubscriptionGuard>} />
+              <Route path="services" element={<SubscriptionGuard><MemberServices /></SubscriptionGuard>} />
+              <Route path="blog" element={<SubscriptionGuard><MemberBlog /></SubscriptionGuard>} />
+              <Route path="id-card" element={<SubscriptionGuard><MyIdCard /></SubscriptionGuard>} />
+              <Route path="payments" element={<SubscriptionGuard><MemberPayments /></SubscriptionGuard>} />
+              <Route path="subscriptions" element={<MemberSubscriptions />} />
+              <Route path="reports" element={<SubscriptionGuard><MemberReports /></SubscriptionGuard>} />
+              <Route path="chat" element={<SubscriptionGuard><ChatPage /></SubscriptionGuard>} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

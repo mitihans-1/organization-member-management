@@ -24,6 +24,7 @@ import {
   ChevronDown,
   User as UserIcon,
   Shield,
+  TrendingUp,
 } from 'lucide-react';
 
 /** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
@@ -34,6 +35,7 @@ const nav = [
   { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500' },
   { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
   { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },
+  { to: '/org-admin/subscription-plans', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
   { to: '/org-admin/reports', label: 'Reports', icon: FileText, color: 'text-rose-500' },
   { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
   { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
