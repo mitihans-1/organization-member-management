@@ -107,6 +107,7 @@ const App: React.FC = () => {
               <Route path="plans" element={<PlanManagement />} />
               <Route path="payments" element={<SuperAdminPayments />} />
               <Route path="reports" element={<SuperReport />} />
+              <Route path="reports/:section" element={<SuperReport />} />
               <Route path="tickets" element={<SuperAdminTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="system-config" element={<SystemConfig />} />
@@ -133,6 +134,7 @@ const App: React.FC = () => {
               <Route path="upgrade" element={<UpgradePlan />} />
               <Route path="settings" element={<OrgSettings />} />
               <Route path="reports" element={<OrganiReport />} />
+              <Route path="reports/:section" element={<OrganiReport />} />
               <Route path="tickets" element={<OrgTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="id-cards" element={<OrgIdCards />} />
@@ -157,6 +159,7 @@ const App: React.FC = () => {
               <Route path="id-card" element={<MyIdCard />} />
               <Route path="payments" element={<MemberPayments />} />
               <Route path="reports" element={<MembersReport />} />
+              <Route path="reports/:section" element={<MembersReport />} />
               <Route path="tickets" element={<MemberTickets />} />
               <Route path="chat" element={<ChatPage />} />
             </Route>

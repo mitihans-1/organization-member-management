@@ -509,6 +509,7 @@ const OrgServices: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Category</label>
                   <select
+                  title="name"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm capitalize"

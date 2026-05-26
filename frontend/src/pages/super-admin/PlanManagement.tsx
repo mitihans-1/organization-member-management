@@ -281,6 +281,7 @@ const PlanManagement: React.FC = () => {
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Billing Cycle</label>
                   <select
+                  title="name"
                     value={formData.billing_cycle}
                     onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"

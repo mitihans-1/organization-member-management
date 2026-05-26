@@ -1,35 +1,64 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { 
   Download, FileText, TrendingUp, Users, Building2, CreditCard, 
-  Ticket, Calendar, Filter, ArrowRight, Printer, Mail, FileSpreadsheet,
+  Ticket, Filter, Printer, Mail, FileSpreadsheet,
   Activity, ShieldCheck, ChevronDown, Search
 } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
+const superSectionToReport: Record<string, string> = {
+  organizations: 'organizations',
+  membership: 'membership',
+  revenue: 'revenue',
+  subscriptions: 'subscription',
+  tickets: 'tickets',
+  system: 'system',
+};
+
 const SuperReport: React.FC = () => {
-  const [activeReport, setActiveReport] = useState('overview');
+  const { section } = useParams<{ section: string }>();
+  const activeReport = section ? (superSectionToReport[section] ?? 'overview') : 'overview';
+
   const [dateRange, setDateRange] = useState('month');
-  const [selectedPlan, setSelectedPlan] = useState('all');
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [organizationFilter, setOrganizationFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
-  const [autoRenewFilter, setAutoRenewFilter] = useState('all');
-  const [assignedFilter, setAssignedFilter] = useState('all');
-  const [verifiedFilter, setVerifiedFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('default');
-  const [sortOrder, setSortOrder] = useState('asc');
-  const [minAmount, setMinAmount] = useState('');
-  const [maxAmount, setMaxAmount] = useState('');
-  const [minMembers, setMinMembers] = useState('');
-  const [maxMembers, setMaxMembers] = useState('');
+
+  // Organizations filters (columns: Organization, Email, Phone, Location, Status, Members, Plan, Revenue, Joined, Last Active)
+  const [orgStatusFilter, setOrgStatusFilter] = useState('all');
+  const [orgPlanFilter, setOrgPlanFilter] = useState('all');
+  const [orgLocationFilter, setOrgLocationFilter] = useState('all');
+
+  // Membership filters (columns: Member, Email, Phone, Organization, Role, Status, Verified, Joined, Last Login)
+  const [memOrgFilter, setMemOrgFilter] = useState('all');
+  const [memStatusFilter, setMemStatusFilter] = useState('all');
+  const [memRoleFilter, setMemRoleFilter] = useState('all');
+  const [memVerifiedFilter, setMemVerifiedFilter] = useState('all');
+
+  // Revenue filters (columns: Date, Invoice, Organization, Amount, Method, Transaction ID, Plan, Status)
+  const [revOrgFilter, setRevOrgFilter] = useState('all');
+  const [revMethodFilter, setRevMethodFilter] = useState('all');
+  const [revPlanFilter, setRevPlanFilter] = useState('all');
+  const [revStatusFilter, setRevStatusFilter] = useState('all');
+
+  // Subscription filters (columns: Organization, Plan, Start Date, End Date, Billing Cycle, Amount, Status, Auto Renew)
+  const [subOrgFilter, setSubOrgFilter] = useState('all');
+  const [subPlanFilter, setSubPlanFilter] = useState('all');
+  const [subBillingFilter, setSubBillingFilter] = useState('all');
+  const [subStatusFilter, setSubStatusFilter] = useState('all');
+  const [subAutoRenewFilter, setSubAutoRenewFilter] = useState('all');
+
+  // Tickets filters (columns: Ticket ID, Title, Description, Organization, Priority, Category, Status, Created, Due Date, Assigned)
+  const [tkOrgFilter, setTkOrgFilter] = useState('all');
+  const [tkStatusFilter, setTkStatusFilter] = useState('all');
+  const [tkPriorityFilter, setTkPriorityFilter] = useState('all');
+  const [tkCategoryFilter, setTkCategoryFilter] = useState('all');
+  const [tkAssignedFilter, setTkAssignedFilter] = useState('all');
 
   const statsData = [
     { name: 'Jan', members: 400, organizations: 24, revenue: 2400 },
@@ -108,15 +137,81 @@ const SuperReport: React.FC = () => {
     { id: 5, metric: 'API Calls', today: 45678, yesterday: 42000, weekAvg: 43500, change: '+8.8%' },
   ];
 
-  const reportCategories = [
-    { id: 'overview', label: 'Overview', icon: Activity },
-    { id: 'organizations', label: 'Organizations', icon: Building2 },
-    { id: 'membership', label: 'Membership', icon: Users },
-    { id: 'revenue', label: 'Revenue', icon: CreditCard },
-    { id: 'subscription', label: 'Subscriptions', icon: ShieldCheck },
-    { id: 'tickets', label: 'Tickets', icon: Ticket },
-    { id: 'system', label: 'System', icon: FileText },
-  ];
+  // --- Filtered data ---
+  const filteredOrgs = organizationTableData.filter((o) => {
+    const q = searchQuery.toLowerCase();
+    if (q && !o.name.toLowerCase().includes(q) && !o.email.toLowerCase().includes(q)) return false;
+    if (orgStatusFilter !== 'all' && o.status.toLowerCase() !== orgStatusFilter) return false;
+    if (orgPlanFilter !== 'all' && o.plan.toLowerCase() !== orgPlanFilter) return false;
+    if (orgLocationFilter !== 'all' && o.location.toLowerCase().replace(' ', '-') !== orgLocationFilter) return false;
+    return true;
+  });
+
+  const filteredMembers = membershipTableData.filter((m) => {
+    const q = searchQuery.toLowerCase();
+    if (q && !m.name.toLowerCase().includes(q) && !m.email.toLowerCase().includes(q)) return false;
+    if (memOrgFilter !== 'all' && !m.organization.toLowerCase().replace(/ /g, '-').includes(memOrgFilter.replace(/-/g, ''))) return false;
+    if (memStatusFilter !== 'all' && m.status.toLowerCase() !== memStatusFilter) return false;
+    if (memRoleFilter !== 'all' && m.role.toLowerCase() !== memRoleFilter) return false;
+    if (memVerifiedFilter !== 'all' && m.verified.toLowerCase() !== memVerifiedFilter) return false;
+    return true;
+  });
+
+  const filteredRevenue = revenueTableData.filter((r) => {
+    const q = searchQuery.toLowerCase();
+    if (q && !r.invoice.toLowerCase().includes(q) && !r.transactionId.toLowerCase().includes(q)) return false;
+    if (revOrgFilter !== 'all' && !r.organization.toLowerCase().replace(/ /g, '-').includes(revOrgFilter.replace(/-/g, ''))) return false;
+    if (revMethodFilter !== 'all' && r.method.toLowerCase().replace(' ', '-') !== revMethodFilter) return false;
+    if (revPlanFilter !== 'all' && r.plan.toLowerCase() !== revPlanFilter) return false;
+    if (revStatusFilter !== 'all' && r.status.toLowerCase() !== revStatusFilter) return false;
+    return true;
+  });
+
+  const filteredSubs = subscriptionTableData.filter((s) => {
+    const q = searchQuery.toLowerCase();
+    if (q && !s.organization.toLowerCase().includes(q)) return false;
+    if (subOrgFilter !== 'all' && !s.organization.toLowerCase().replace(/ /g, '-').includes(subOrgFilter.replace(/-/g, ''))) return false;
+    if (subPlanFilter !== 'all' && s.plan.toLowerCase() !== subPlanFilter) return false;
+    if (subBillingFilter !== 'all' && s.billingCycle.toLowerCase() !== subBillingFilter) return false;
+    if (subStatusFilter !== 'all' && s.status.toLowerCase().replace(' ', '-') !== subStatusFilter) return false;
+    if (subAutoRenewFilter !== 'all' && s.autoRenew.toLowerCase() !== subAutoRenewFilter) return false;
+    return true;
+  });
+
+  const filteredTickets = ticketTableData.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    if (q && !t.title.toLowerCase().includes(q) && !t.id.toLowerCase().includes(q)) return false;
+    if (tkOrgFilter !== 'all' && !t.organization.toLowerCase().replace(/ /g, '-').includes(tkOrgFilter.replace(/-/g, ''))) return false;
+    if (tkStatusFilter !== 'all' && t.status.toLowerCase().replace(' ', '-') !== tkStatusFilter) return false;
+    if (tkPriorityFilter !== 'all' && t.priority.toLowerCase() !== tkPriorityFilter) return false;
+    if (tkCategoryFilter !== 'all' && t.category.toLowerCase() !== tkCategoryFilter) return false;
+    if (tkAssignedFilter !== 'all' && t.assigned.toLowerCase() !== tkAssignedFilter) return false;
+    return true;
+  });
+
+  const filteredSystem = systemTableData.filter((s) => {
+    if (searchQuery && !s.metric.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const hasActiveFilters = (() => {
+    if (searchQuery) return true;
+    if (activeReport === 'organizations') return orgStatusFilter !== 'all' || orgPlanFilter !== 'all' || orgLocationFilter !== 'all';
+    if (activeReport === 'membership') return memOrgFilter !== 'all' || memStatusFilter !== 'all' || memRoleFilter !== 'all' || memVerifiedFilter !== 'all';
+    if (activeReport === 'revenue') return revOrgFilter !== 'all' || revMethodFilter !== 'all' || revPlanFilter !== 'all' || revStatusFilter !== 'all';
+    if (activeReport === 'subscription') return subOrgFilter !== 'all' || subPlanFilter !== 'all' || subBillingFilter !== 'all' || subStatusFilter !== 'all' || subAutoRenewFilter !== 'all';
+    if (activeReport === 'tickets') return tkOrgFilter !== 'all' || tkStatusFilter !== 'all' || tkPriorityFilter !== 'all' || tkCategoryFilter !== 'all' || tkAssignedFilter !== 'all';
+    return false;
+  })();
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setOrgStatusFilter('all'); setOrgPlanFilter('all'); setOrgLocationFilter('all');
+    setMemOrgFilter('all'); setMemStatusFilter('all'); setMemRoleFilter('all'); setMemVerifiedFilter('all');
+    setRevOrgFilter('all'); setRevMethodFilter('all'); setRevPlanFilter('all'); setRevStatusFilter('all');
+    setSubOrgFilter('all'); setSubPlanFilter('all'); setSubBillingFilter('all'); setSubStatusFilter('all'); setSubAutoRenewFilter('all');
+    setTkOrgFilter('all'); setTkStatusFilter('all'); setTkPriorityFilter('all'); setTkCategoryFilter('all'); setTkAssignedFilter('all');
+  };
 
   const quickStats = [
     { label: 'Total Organizations', value: '124', icon: Building2, color: 'text-indigo-500', bg: 'bg-indigo-50' },
@@ -133,6 +228,16 @@ const SuperReport: React.FC = () => {
     { label: 'Email Report', icon: Mail },
   ];
 
+  const orgOptions = [
+    { value: 'tech-corp-ethiopia', label: 'Tech Corp Ethiopia' },
+    { value: 'addis-innovations', label: 'Addis Innovations' },
+    { value: 'lion-tech-solutions', label: 'Lion Tech Solutions' },
+    { value: 'blue-nile-services', label: 'Blue Nile Services' },
+    { value: 'ethiopian-digital-hub', label: 'Ethiopian Digital Hub' },
+  ];
+
+  const selectClass = 'rounded-xl border border-gray-200 px-3 py-2 text-sm';
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
@@ -147,21 +252,14 @@ const SuperReport: React.FC = () => {
           >
             <Download size={16} />
             Export
-            <ChevronDown
-              size={14}
-              className={`transition-transform ${isExportOpen ? 'rotate-180' : ''}`}
-            />
+            <ChevronDown size={14} className={`transition-transform ${isExportOpen ? 'rotate-180' : ''}`} />
           </button>
           {isExportOpen && (
             <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-[180px]">
               {exportOptions.map((option, idx) => {
                 const Icon = option.icon;
                 return (
-                  <button
-                    key={idx}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl"
-                    onClick={() => setIsExportOpen(false)}
-                  >
+                  <button key={idx} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl" onClick={() => setIsExportOpen(false)}>
                     <Icon size={16} />
                     {option.label}
                   </button>
@@ -191,49 +289,29 @@ const SuperReport: React.FC = () => {
         })}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {reportCategories.map((cat) => {
-          const Icon = cat.icon;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setActiveReport(cat.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                activeReport === cat.id
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Icon size={16} />
-              {cat.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex gap-4 flex-wrap items-center">
+      {/* ── Filter bar ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex gap-3 flex-wrap items-center">
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-gray-500" />
           <span className="text-sm font-medium text-gray-700">Filters:</span>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Search size={14} className="text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          />
-        </div>
 
-        <select
-          title="Select date range"
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value)}
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        >
+        {/* Search — all table views */}
+        {activeReport !== 'overview' && (
+          <div className="flex items-center gap-2">
+            <Search size={14} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+        )}
+
+        {/* Date range — all views */}
+        <select title="Date range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} className={selectClass}>
           <option value="today">Today</option>
           <option value="week">This Week</option>
           <option value="month">This Month</option>
@@ -241,63 +319,52 @@ const SuperReport: React.FC = () => {
           <option value="year">This Year</option>
         </select>
 
+        {/* ── Organizations filters ── */}
+        {/* Columns: Organization, Email, Phone, Location, Status, Members, Plan, Revenue, Joined, Last Active */}
         {activeReport === 'organizations' && (
           <>
-            <select
-              title="Select organization status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Status" value={orgStatusFilter} onChange={(e) => setOrgStatusFilter(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
               <option value="pending">Pending</option>
             </select>
-            <select
-              title="Select organization plan"
-              value={selectedPlan}
-              onChange={(e) => setSelectedPlan(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Plan" value={orgPlanFilter} onChange={(e) => setOrgPlanFilter(e.target.value)} className={selectClass}>
               <option value="all">All Plans</option>
               <option value="basic">Basic</option>
               <option value="pro">Pro</option>
               <option value="enterprise">Enterprise</option>
             </select>
+            <select title="Location" value={orgLocationFilter} onChange={(e) => setOrgLocationFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Locations</option>
+              <option value="addis-ababa">Addis Ababa</option>
+              <option value="bahir-dar">Bahir Dar</option>
+              <option value="hawassa">Hawassa</option>
+              <option value="dire-dawa">Dire Dawa</option>
+            </select>
           </>
         )}
 
+        {/* ── Membership filters ── */}
+        {/* Columns: Member, Email, Phone, Organization, Role, Status, Verified, Joined, Last Login */}
         {activeReport === 'membership' && (
           <>
-            <select
-              title="Select organization"
-              value={organizationFilter}
-              onChange={(e) => setOrganizationFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Organization" value={memOrgFilter} onChange={(e) => setMemOrgFilter(e.target.value)} className={selectClass}>
               <option value="all">All Organizations</option>
-              <option value="tech-corp">Tech Corp Ethiopia</option>
-              <option value="addis-innovations">Addis Innovations</option>
-              <option value="lion-tech">Lion Tech Solutions</option>
-              <option value="blue-nile">Blue Nile Services</option>
+              {orgOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <select
-              title="Select member status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Status" value={memStatusFilter} onChange={(e) => setMemStatusFilter(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-            <select
-              title="Select verified status"
-              value={verifiedFilter}
-              onChange={(e) => setVerifiedFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Role" value={memRoleFilter} onChange={(e) => setMemRoleFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Roles</option>
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+              <option value="moderator">Moderator</option>
+            </select>
+            <select title="Verified" value={memVerifiedFilter} onChange={(e) => setMemVerifiedFilter(e.target.value)} className={selectClass}>
               <option value="all">All</option>
               <option value="yes">Verified</option>
               <option value="no">Unverified</option>
@@ -305,249 +372,115 @@ const SuperReport: React.FC = () => {
           </>
         )}
 
+        {/* ── Revenue filters ── */}
+        {/* Columns: Date, Invoice, Organization, Amount, Method, Transaction ID, Plan, Status */}
         {activeReport === 'revenue' && (
           <>
-            <select
-              title="Select organization"
-              value={organizationFilter}
-              onChange={(e) => setOrganizationFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Organization" value={revOrgFilter} onChange={(e) => setRevOrgFilter(e.target.value)} className={selectClass}>
               <option value="all">All Organizations</option>
-              <option value="tech-corp">Tech Corp Ethiopia</option>
-              <option value="addis-innovations">Addis Innovations</option>
-              <option value="lion-tech">Lion Tech Solutions</option>
-              <option value="blue-nile">Blue Nile Services</option>
+              {orgOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <select
-              title="Select payment method"
-              value={paymentMethodFilter}
-              onChange={(e) => setPaymentMethodFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Method" value={revMethodFilter} onChange={(e) => setRevMethodFilter(e.target.value)} className={selectClass}>
               <option value="all">All Methods</option>
               <option value="telebirr">Telebirr</option>
               <option value="cbe-birr">CBE Birr</option>
               <option value="chapa">Chapa</option>
               <option value="cash">Cash</option>
             </select>
-            <select
-              title="Select payment status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Plan" value={revPlanFilter} onChange={(e) => setRevPlanFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Plans</option>
+              <option value="basic">Basic</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+            <select title="Status" value={revStatusFilter} onChange={(e) => setRevStatusFilter(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
               <option value="completed">Completed</option>
               <option value="pending">Pending</option>
               <option value="failed">Failed</option>
             </select>
-            <select
-              title="Select plan"
-              value={selectedPlan}
-              onChange={(e) => setSelectedPlan(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
-              <option value="all">All Plans</option>
-              <option value="basic">Basic</option>
-              <option value="pro">Pro</option>
-              <option value="enterprise">Enterprise</option>
-            </select>
           </>
         )}
 
+        {/* ── Subscription filters ── */}
+        {/* Columns: Organization, Plan, Start Date, End Date, Billing Cycle, Amount, Status, Auto Renew */}
         {activeReport === 'subscription' && (
           <>
-            <select
-              title="Select organization"
-              value={organizationFilter}
-              onChange={(e) => setOrganizationFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Organization" value={subOrgFilter} onChange={(e) => setSubOrgFilter(e.target.value)} className={selectClass}>
               <option value="all">All Organizations</option>
-              <option value="tech-corp">Tech Corp Ethiopia</option>
-              <option value="addis-innovations">Addis Innovations</option>
-              <option value="lion-tech">Lion Tech Solutions</option>
-              <option value="blue-nile">Blue Nile Services</option>
+              {orgOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <select
-              title="Select subscription plan"
-              value={selectedPlan}
-              onChange={(e) => setSelectedPlan(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Plan" value={subPlanFilter} onChange={(e) => setSubPlanFilter(e.target.value)} className={selectClass}>
               <option value="all">All Plans</option>
               <option value="basic">Basic</option>
               <option value="pro">Pro</option>
               <option value="enterprise">Enterprise</option>
             </select>
-            <select
-              title="Select subscription status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Billing Cycle" value={subBillingFilter} onChange={(e) => setSubBillingFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Billing Cycles</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annual">Annual</option>
+            </select>
+            <select title="Status" value={subStatusFilter} onChange={(e) => setSubStatusFilter(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
-              <option value="expired">Expired</option>
               <option value="expiring-soon">Expiring Soon</option>
               <option value="suspended">Suspended</option>
+              <option value="expired">Expired</option>
             </select>
-            <select
-              title="Select auto-renew status"
-              value={autoRenewFilter}
-              onChange={(e) => setAutoRenewFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Auto Renew" value={subAutoRenewFilter} onChange={(e) => setSubAutoRenewFilter(e.target.value)} className={selectClass}>
               <option value="all">All</option>
-              <option value="yes">Auto-renew Enabled</option>
-              <option value="no">Auto-renew Disabled</option>
+              <option value="yes">Auto-renew On</option>
+              <option value="no">Auto-renew Off</option>
             </select>
           </>
         )}
 
+        {/* ── Tickets filters ── */}
+        {/* Columns: Ticket ID, Title, Description, Organization, Priority, Category, Status, Created, Due Date, Assigned */}
         {activeReport === 'tickets' && (
           <>
-            <select
-              title="Select organization"
-              value={organizationFilter}
-              onChange={(e) => setOrganizationFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Organization" value={tkOrgFilter} onChange={(e) => setTkOrgFilter(e.target.value)} className={selectClass}>
               <option value="all">All Organizations</option>
-              <option value="tech-corp">Tech Corp Ethiopia</option>
-              <option value="addis-innovations">Addis Innovations</option>
-              <option value="lion-tech">Lion Tech Solutions</option>
-              <option value="blue-nile">Blue Nile Services</option>
+              {orgOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <select
-              title="Select ticket status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Status" value={tkStatusFilter} onChange={(e) => setTkStatusFilter(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
               <option value="open">Open</option>
               <option value="in-progress">In Progress</option>
               <option value="resolved">Resolved</option>
               <option value="closed">Closed</option>
             </select>
-            <select
-              title="Select ticket priority"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
+            <select title="Priority" value={tkPriorityFilter} onChange={(e) => setTkPriorityFilter(e.target.value)} className={selectClass}>
               <option value="all">All Priorities</option>
               <option value="high">High</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
-            <select
-              title="Select assigned to"
-              value={assignedFilter}
-              onChange={(e) => setAssignedFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            >
-              <option value="all">All</option>
+            <select title="Category" value={tkCategoryFilter} onChange={(e) => setTkCategoryFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Categories</option>
+              <option value="technical">Technical</option>
+              <option value="billing">Billing</option>
+              <option value="feature">Feature</option>
+              <option value="admin">Admin</option>
+            </select>
+            <select title="Assigned" value={tkAssignedFilter} onChange={(e) => setTkAssignedFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Assigned</option>
               <option value="admin">Admin</option>
               <option value="support">Support</option>
-              <option value="unassigned">Unassigned</option>
             </select>
           </>
         )}
 
-        <select
-          title="Sort by"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        >
-          <option value="default">Default</option>
-          <option value="date">Date</option>
-          <option value="name">Name</option>
-          <option value="amount">Amount</option>
-          <option value="status">Status</option>
-        </select>
-
-        <select
-          title="Sort order"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        >
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
-        </select>
-
-        {(activeReport === 'revenue' || activeReport === 'organizations') && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Amount:</span>
-            <input
-              type="number"
-              placeholder="Min"
-              value={minAmount}
-              onChange={(e) => setMinAmount(e.target.value)}
-              className="rounded-xl border border-gray-200 px-2 py-2 text-sm w-20"
-            />
-            <span className="text-sm text-gray-400">-</span>
-            <input
-              type="number"
-              placeholder="Max"
-              value={maxAmount}
-              onChange={(e) => setMaxAmount(e.target.value)}
-              className="rounded-xl border border-gray-200 px-2 py-2 text-sm w-20"
-            />
-          </div>
-        )}
-
-        {(activeReport === 'membership' || activeReport === 'organizations') && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Members:</span>
-            <input
-              type="number"
-              placeholder="Min"
-              value={minMembers}
-              onChange={(e) => setMinMembers(e.target.value)}
-              className="rounded-xl border border-gray-200 px-2 py-2 text-sm w-20"
-            />
-            <span className="text-sm text-gray-400">-</span>
-            <input
-              type="number"
-              placeholder="Max"
-              value={maxMembers}
-              onChange={(e) => setMaxMembers(e.target.value)}
-              className="rounded-xl border border-gray-200 px-2 py-2 text-sm w-20"
-            />
-          </div>
-        )}
-
-        {(searchQuery || statusFilter !== 'all' || organizationFilter !== 'all' || priorityFilter !== 'all' || selectedPlan !== 'all' || paymentMethodFilter !== 'all' || autoRenewFilter !== 'all' || assignedFilter !== 'all' || verifiedFilter !== 'all' || sortBy !== 'default' || minAmount || maxAmount || minMembers || maxMembers) && (
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setStatusFilter('all');
-              setOrganizationFilter('all');
-              setPriorityFilter('all');
-              setSelectedPlan('all');
-              setPaymentMethodFilter('all');
-              setAutoRenewFilter('all');
-              setAssignedFilter('all');
-              setVerifiedFilter('all');
-              setSortBy('default');
-              setSortOrder('asc');
-              setMinAmount('');
-              setMaxAmount('');
-              setMinMembers('');
-              setMaxMembers('');
-            }}
-            className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl"
-          >
+        {hasActiveFilters && (
+          <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
             Clear Filters
           </button>
         )}
       </div>
 
+      {/* ── Overview ── */}
       {activeReport === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
@@ -566,22 +499,8 @@ const SuperReport: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
                 <YAxis stroke="#9ca3af" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }} 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="members" 
-                  stroke="#6366f1" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorMembers)" 
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                <Area type="monotone" dataKey="members" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorMembers)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -593,19 +512,8 @@ const SuperReport: React.FC = () => {
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie
-                  data={planData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {planData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                <Pie data={planData} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`} outerRadius={100} fill="#8884d8" dataKey="value">
+                  {planData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -622,13 +530,7 @@ const SuperReport: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
                 <YAxis stroke="#9ca3af" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '12px'
-                  }} 
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }} />
                 <Bar dataKey="value" fill="#6366f1" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -641,19 +543,8 @@ const SuperReport: React.FC = () => {
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie
-                  data={paymentMethodData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {paymentMethodData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                <Pie data={paymentMethodData} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`} outerRadius={100} fill="#8884d8" dataKey="value">
+                  {paymentMethodData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -662,13 +553,14 @@ const SuperReport: React.FC = () => {
         </div>
       )}
 
+      {/* ── Organizations ── */}
       {activeReport === 'organizations' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-xl font-black text-gray-900">Organization Reports</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
+            <table className="w-full min-w-[1100px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Organization</th>
@@ -684,22 +576,16 @@ const SuperReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {organizationTableData.map((org) => (
+                {filteredOrgs.length === 0 ? (
+                  <tr><td colSpan={10} className="px-6 py-8 text-center text-sm text-gray-400">No organizations match the selected filters.</td></tr>
+                ) : filteredOrgs.map((org) => (
                   <tr key={org.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-gray-900">{org.name}</div>
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{org.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{org.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{org.phone}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{org.location}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        org.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 
-                        org.status === 'Suspended' ? 'bg-rose-100 text-rose-800' : 
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {org.status}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${org.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : org.status === 'Suspended' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'}`}>{org.status}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{org.members}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{org.plan}</td>
@@ -714,13 +600,14 @@ const SuperReport: React.FC = () => {
         </div>
       )}
 
+      {/* ── Membership ── */}
       {activeReport === 'membership' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-xl font-black text-gray-900">Membership Reports</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
+            <table className="w-full min-w-[1100px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
@@ -735,30 +622,20 @@ const SuperReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {membershipTableData.map((member) => (
+                {filteredMembers.length === 0 ? (
+                  <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-400">No members match the selected filters.</td></tr>
+                ) : filteredMembers.map((member) => (
                   <tr key={member.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-gray-900">{member.name}</div>
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{member.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{member.organization}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{member.role}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        member.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {member.status}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${member.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{member.status}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        member.verified === 'Yes' ? 'bg-blue-100 text-blue-800' : 
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {member.verified}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${member.verified === 'Yes' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{member.verified}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.joined}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.lastLogin}</td>
@@ -770,13 +647,14 @@ const SuperReport: React.FC = () => {
         </div>
       )}
 
+      {/* ── Revenue ── */}
       {activeReport === 'revenue' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-xl font-black text-gray-900">Revenue Reports</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
+            <table className="w-full min-w-[1000px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
@@ -790,7 +668,9 @@ const SuperReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {revenueTableData.map((rev) => (
+                {filteredRevenue.length === 0 ? (
+                  <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">No revenue records match the selected filters.</td></tr>
+                ) : filteredRevenue.map((rev) => (
                   <tr key={rev.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rev.date}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{rev.invoice}</td>
@@ -800,13 +680,7 @@ const SuperReport: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rev.transactionId}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{rev.plan}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        rev.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 
-                        rev.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 
-                        'bg-rose-100 text-rose-800'
-                      }`}>
-                        {rev.status}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${rev.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : rev.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>{rev.status}</span>
                     </td>
                   </tr>
                 ))}
@@ -816,13 +690,14 @@ const SuperReport: React.FC = () => {
         </div>
       )}
 
+      {/* ── Subscriptions ── */}
       {activeReport === 'subscription' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-xl font-black text-gray-900">Subscription Reports</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
+            <table className="w-full min-w-[1000px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Organization</th>
@@ -836,7 +711,9 @@ const SuperReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {subscriptionTableData.map((sub) => (
+                {filteredSubs.length === 0 ? (
+                  <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">No subscriptions match the selected filters.</td></tr>
+                ) : filteredSubs.map((sub) => (
                   <tr key={sub.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{sub.organization}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sub.plan}</td>
@@ -845,22 +722,10 @@ const SuperReport: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sub.billingCycle}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">{sub.amount}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        sub.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 
-                        sub.status === 'Expiring Soon' ? 'bg-amber-100 text-amber-800' : 
-                        sub.status === 'Suspended' ? 'bg-rose-100 text-rose-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {sub.status}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${sub.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : sub.status === 'Expiring Soon' ? 'bg-amber-100 text-amber-800' : sub.status === 'Suspended' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'}`}>{sub.status}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        sub.autoRenew === 'Yes' ? 'bg-blue-100 text-blue-800' : 
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {sub.autoRenew}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${sub.autoRenew === 'Yes' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{sub.autoRenew}</span>
                     </td>
                   </tr>
                 ))}
@@ -870,13 +735,14 @@ const SuperReport: React.FC = () => {
         </div>
       )}
 
+      {/* ── Tickets ── */}
       {activeReport === 'tickets' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-xl font-black text-gray-900">Ticket Reports</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
+            <table className="w-full min-w-[1100px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Ticket ID</th>
@@ -892,30 +758,20 @@ const SuperReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {ticketTableData.map((ticket) => (
+                {filteredTickets.length === 0 ? (
+                  <tr><td colSpan={10} className="px-6 py-8 text-center text-sm text-gray-400">No tickets match the selected filters.</td></tr>
+                ) : filteredTickets.map((ticket) => (
                   <tr key={ticket.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{ticket.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">{ticket.title}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={ticket.description}>{ticket.description}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket.organization}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        ticket.priority === 'High' ? 'bg-rose-100 text-rose-800' : 
-                        ticket.priority === 'Medium' ? 'bg-amber-100 text-amber-800' : 
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {ticket.priority}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.priority === 'High' ? 'bg-rose-100 text-rose-800' : ticket.priority === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'}`}>{ticket.priority}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket.category}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        ticket.status === 'Open' ? 'bg-rose-100 text-rose-800' : 
-                        ticket.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 
-                        'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {ticket.status}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.status === 'Open' ? 'bg-rose-100 text-rose-800' : ticket.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{ticket.status}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.created}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.dueDate}</td>
@@ -928,6 +784,7 @@ const SuperReport: React.FC = () => {
         </div>
       )}
 
+      {/* ── System ── */}
       {activeReport === 'system' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-200">
@@ -945,19 +802,16 @@ const SuperReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {systemTableData.map((sys) => (
+                {filteredSystem.length === 0 ? (
+                  <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">No metrics match the search.</td></tr>
+                ) : filteredSystem.map((sys) => (
                   <tr key={sys.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{sys.metric}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sys.today.toLocaleString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sys.yesterday.toLocaleString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sys.weekAvg.toLocaleString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                        sys.change.startsWith('+') ? 'bg-emerald-100 text-emerald-800' : 
-                        'bg-rose-100 text-rose-800'
-                      }`}>
-                        {sys.change}
-                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${sys.change.startsWith('+') ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{sys.change}</span>
                     </td>
                   </tr>
                 ))}
