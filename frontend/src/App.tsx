@@ -24,6 +24,9 @@ import OrganiReport from './pages/OrganiReport';
 import ChatPage from './pages/ChatPage';
 // System configuration
 import SystemConfig from './pages/super-admin/SystemConfig';
+import PlatformServices from './pages/super-admin/PlatformServices';
+import PlatformEvents from './pages/super-admin/PlatformEvents';
+import PlatformBlogs from './pages/super-admin/PlatformBlogs';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -111,6 +114,9 @@ const App: React.FC = () => {
               <Route path="tickets" element={<SuperAdminTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="system-config" element={<SystemConfig />} />
+              <Route path="platform-services" element={<PlatformServices />} />
+              <Route path="platform-events" element={<PlatformEvents />} />
+              <Route path="platform-blogs" element={<PlatformBlogs />} />
             </Route>
 
             <Route path="/organadmin/*" element={<OrganAdminLegacyRedirect />} />

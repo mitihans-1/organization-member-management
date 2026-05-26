@@ -7,6 +7,8 @@ import GuestFooter from '../components/GuestFooter';
 import CoverImage from '../components/CoverImage';
 import BlogDetailsModal from '../components/BlogDetailsModal';
 import { Eye, Search } from 'lucide-react';
+import { useCardPagination } from '../hooks/useCardPagination';
+import CardPagination from '../components/filters/CardPagination';
 
 const FOREST = '#2D4A22';
 const PAGE_SIZE = 4;
@@ -51,7 +53,6 @@ function tagForBlog(id: string): { label: string; urgent?: boolean } {
 
 const PublicBlogs: React.FC = () => {
   const [q, setQ] = useState('');
-  const [visible, setVisible] = useState(PAGE_SIZE);
   const [viewingBlog, setViewingBlog] = useState<Blog | null>(null);
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
@@ -69,8 +70,14 @@ const PublicBlogs: React.FC = () => {
     );
   }, [blogs, q]);
 
-  const shown = filtered.slice(0, visible);
-  const hasMore = filtered.length > visible;
+  const {
+    pagedItems: shown,
+    currentPage,
+    totalPages,
+    setPage,
+    totalItems,
+    pageSize,
+  } = useCardPagination(filtered, PAGE_SIZE, q);
 
   return (
     <div className="min-h-screen bg-white font-poppins text-gray-900">
@@ -97,7 +104,6 @@ const PublicBlogs: React.FC = () => {
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
-                setVisible(PAGE_SIZE);
               }}
               placeholder="Search articles..."
               className="flex-1 min-w-0 bg-transparent border-0 outline-none text-gray-800 placeholder:text-gray-400 text-[15px] py-2"
@@ -149,6 +155,7 @@ const PublicBlogs: React.FC = () => {
           <>
             <div className="grid sm:grid-cols-2 gap-8">
               {shown.map((blog, index) => {
+                const slotIdx = (currentPage - 1) * pageSize + index;
                 const tag = tagForBlog(blog.id);
                 return (
                   <article
@@ -161,7 +168,7 @@ const PublicBlogs: React.FC = () => {
                     >
                       <CoverImage
                         stored={blog.image}
-                        slotIndex={index}
+                        slotIndex={slotIdx}
                         variant="blog"
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -228,18 +235,14 @@ const PublicBlogs: React.FC = () => {
               })}
             </div>
 
-            {hasMore && (
-              <div className="flex justify-center mt-12">
-                <button
-                  type="button"
-                  onClick={() => setVisible((v) => v + PAGE_SIZE)}
-                  className="rounded-full px-8 py-3 text-sm font-bold border-2 bg-white transition hover:bg-gray-50"
-                  style={{ color: FOREST, borderColor: FOREST }}
-                >
-                  Load More Articles
-                </button>
-              </div>
-            )}
+            <CardPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              itemLabel="articles"
+            />
           </>
         )}
       </main>

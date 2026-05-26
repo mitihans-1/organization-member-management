@@ -22,6 +22,7 @@ import OrgAdminPageHeader from '../../components/org-admin/OrgAdminPageHeader';
 import { useAuth } from '../../context/AuthContext';
 import { customAttributeService, CustomAttributeDefinition } from '../../services/customAttributeService';
 import api from '../../services/api';
+import ContactMessagesInbox from '../../components/content/ContactMessagesInbox';
 
 const OrgSettings: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -34,6 +35,17 @@ const OrgSettings: React.FC = () => {
   const [publicTagline, setPublicTagline] = useState('');
   const [accentNote, setAccentNote] = useState('');
   const [paymentPhone, setPaymentPhone] = useState('');
+  const [aboutTitle, setAboutTitle] = useState('');
+  const [aboutSubtitle, setAboutSubtitle] = useState('');
+  const [aboutMission, setAboutMission] = useState('');
+  const [aboutStory, setAboutStory] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactAddress, setContactAddress] = useState('');
+  const [contactHours, setContactHours] = useState('');
+  const [contactFormRecipient, setContactFormRecipient] = useState('');
+  const [endorsementMessage, setEndorsementMessage] = useState('');
+  const [endorsementStatus, setEndorsementStatus] = useState<string | null>(null);
 
   // Custom Attributes State
   const [attributes, setAttributes] = useState<CustomAttributeDefinition[]>([]);
@@ -47,7 +59,26 @@ const OrgSettings: React.FC = () => {
     setDisplayName(user?.organization_name ?? '');
     fetchAttributes();
     fetchMyOrganization();
+    fetchOrgContent();
   }, [user?.organization_name]);
+
+  const fetchOrgContent = async () => {
+    try {
+      const res = await api.get('/public/organization-content');
+      const d = res.data;
+      setAboutTitle(d.about?.title || '');
+      setAboutSubtitle(d.about?.subtitle || '');
+      setAboutMission(d.about?.mission || '');
+      setAboutStory(d.about?.story || '');
+      setContactEmail(d.contact?.email || '');
+      setContactPhone(d.contact?.phone || '');
+      setContactAddress(d.contact?.address || '');
+      setContactHours(d.contact?.hours || '');
+      setContactFormRecipient(d.contact?.formRecipient || '');
+    } catch {
+      /* org content may not exist yet */
+    }
+  };
 
   const fetchMyOrganization = async () => {
     try {
@@ -475,6 +506,139 @@ const OrgSettings: React.FC = () => {
         >
           Open upgrade &amp; billing
         </Link>
+      </section>
+
+      <section className={card}>
+        <h2 className={sectionTitle}>
+          <Globe className="h-5 w-5 shrink-0 text-indigo-600" aria-hidden />
+          Member portal — About &amp; Contact
+        </h2>
+        <p className="mb-6 text-sm text-gray-600">
+          This content appears on your members&apos; <strong>About</strong> and <strong>Contact</strong> pages after they log in.
+        </p>
+        <div className="space-y-6">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">About title</label>
+            <input className={input} value={aboutTitle} onChange={(e) => setAboutTitle(e.target.value)} placeholder="About our organization" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">About subtitle</label>
+            <input className={input} value={aboutSubtitle} onChange={(e) => setAboutSubtitle(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mission</label>
+            <textarea className={input} rows={3} value={aboutMission} onChange={(e) => setAboutMission(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Our story</label>
+            <textarea className={input} rows={4} value={aboutStory} onChange={(e) => setAboutStory(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact email</label>
+              <input className={input} type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact phone</label>
+              <input className={input} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Address</label>
+              <input className={input} value={contactAddress} onChange={(e) => setContactAddress(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Office hours</label>
+              <input className={input} value={contactHours} onChange={(e) => setContactHours(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Form notifications email</label>
+              <input className={input} type="email" value={contactFormRecipient} onChange={(e) => setContactFormRecipient(e.target.value)} placeholder="admin@yourorg.com" />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                setIsSaving(true);
+                await api.put('/public/organization-content', {
+                  aboutTitle,
+                  aboutSubtitle,
+                  aboutMission,
+                  aboutStory,
+                  contactEmail,
+                  contactPhone,
+                  contactAddress,
+                  contactHours,
+                  contactFormRecipient,
+                });
+                setMessage({ type: 'success', text: 'Member About & Contact saved.' });
+              } catch {
+                setMessage({ type: 'error', text: 'Failed to save member content.' });
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white"
+          >
+            <Save size={16} />
+            Save member About &amp; Contact
+          </button>
+        </div>
+      </section>
+
+      <section className={card}>
+        <ContactMessagesInbox
+          mode="organization"
+          title="Messages from members"
+          emptyHint="When members submit the contact form, their messages appear here."
+        />
+      </section>
+
+      <section className={card}>
+        <h2 className={sectionTitle}>
+          <Users className="h-5 w-5 shrink-0 text-indigo-600" aria-hidden />
+          Trusted by organizations — endorsement
+        </h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Submit a short message about OMMS. It will appear on the public Home page after Super Admin approval.
+        </p>
+        {endorsementStatus ? (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            {endorsementStatus}
+          </div>
+        ) : null}
+        <textarea
+          rows={4}
+          value={endorsementMessage}
+          onChange={(e) => setEndorsementMessage(e.target.value)}
+          className={input}
+          placeholder="Write your organization endorsement..."
+        />
+        <div className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-center">
+          <button
+            type="button"
+            disabled={isSaving || !endorsementMessage.trim()}
+            onClick={async () => {
+              try {
+                setIsSaving(true);
+                await api.post('/organizations/me/endorsements', { message: endorsementMessage });
+                setEndorsementMessage('');
+                setEndorsementStatus('Submitted. Waiting for Super Admin approval.');
+              } catch (e: any) {
+                setEndorsementStatus(e?.response?.data?.message || 'Failed to submit endorsement.');
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            <Save size={16} />
+            Submit endorsement
+          </button>
+          <p className="text-xs text-gray-500">
+            Tip: Keep it short (1–2 sentences). Use your organization name and role in the text if needed.
+          </p>
+        </div>
       </section>
 
       <section className={`${card} border-red-100 bg-red-50/40`}>

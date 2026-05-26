@@ -22,7 +22,7 @@ export const createEvent = async (req: any, res: Response) => {
   try {
     const { 
       title, description, date, end_date, location, image, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required 
+      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline
     } = req.body;
     const finalImage = req.file ? req.file.path : image;
     
@@ -49,6 +49,8 @@ export const createEvent = async (req: any, res: Response) => {
         status: status || 'draft',
         price: price ? parseFloat(price) : null,
         payment_required: payment_required === true || payment_required === 'true',
+        organizer: organizer || null,
+        registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : null,
       },
     });
     res.status(201).json(event);
@@ -62,7 +64,7 @@ export const updateEvent = async (req: any, res: Response) => {
     const { id } = req.params;
     const { 
       title, description, date, end_date, location, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required 
+      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
     const event = await prisma.event.update({
@@ -81,6 +83,8 @@ export const updateEvent = async (req: any, res: Response) => {
         status: status || 'draft',
         price: price !== undefined ? parseFloat(price) : null,
         payment_required: payment_required !== undefined ? (payment_required === true || payment_required === 'true') : undefined,
+        organizer: organizer !== undefined ? organizer : null,
+        registrationDeadline: registrationDeadline !== undefined ? (registrationDeadline ? new Date(registrationDeadline) : null) : undefined,
       },
     });
     res.status(200).json(event);

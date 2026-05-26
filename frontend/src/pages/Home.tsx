@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -15,6 +15,10 @@ import GuestNavbar from '../components/GuestNavbar';
 import GuestFooter from '../components/GuestFooter';
 import LiveChatWidget from '../components/LiveChatWidget';
 import useCountAnimation from '../hooks/useCountAnimation';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useCardPagination } from '../hooks/useCardPagination';
+import CardPagination from '../components/filters/CardPagination';
 
 const forest = '#3d5a2b';
 const forestHover = '#4f772d';
@@ -34,14 +38,18 @@ const StatCard: React.FC<{ stat: { value: string; label: string } }> = ({ stat }
 };
 
 const Home: React.FC = () => {
+  const { user } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [testimonialIdx, setTestimonialIdx] = useState(0);
   const [stats, setStats] = useState([
     { value: '150+', label: 'Organizations' },
     { value: '3,000+', label: 'Active Members' },
     { value: '750+', label: 'Million Processed' },
     { value: '99%', label: 'Satisfaction' },
   ]);
+  const [endorsements, setEndorsements] = useState<
+    { id: string; organizationName: string; message: string; createdAt: string }[]
+  >([]);
+  const [plans, setPlans] = useState<any[]>([]);
 
   const slides = [
     {
@@ -68,14 +76,9 @@ const Home: React.FC = () => {
   }, [slides.length]);
 
   useEffect(() => {
-    const t = setInterval(() => setTestimonialIdx((p) => (p + 1) % testimonials.length), 8000);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/public/stats');
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/public/stats`);
         const data = await response.json();
         if (data.stats) {
           setStats(data.stats);
@@ -86,6 +89,30 @@ const Home: React.FC = () => {
     };
     fetchStats();
   }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const e = await api.get('/public/endorsements');
+        setEndorsements(e.data || []);
+      } catch {
+        setEndorsements([]);
+      }
+
+      try {
+        if (user?.role === 'member') {
+          const available = await api.get('/member-subscriptions/member/available-plans');
+          setPlans(available.data || []);
+        } else {
+          const p = await api.get('/plans');
+          setPlans(p.data || []);
+        }
+      } catch {
+        setPlans([]);
+      }
+    };
+    load();
+  }, [user?.role]);
 
   const features = [
     {
@@ -127,54 +154,76 @@ const Home: React.FC = () => {
     { n: 4, label: 'Go Live' },
   ];
 
-  const pricing = [
-    {
-      name: 'Starter',
-      price: '0',
-      sub: 'Perfect to explore OMMS',
-      highlight: false,
-      cta: 'Get Started',
-      href: '/register',
-      features: ['Up to 5 members', 'Core member directory', 'Email support'],
-    },
-    {
-      name: 'Professional',
-      price: '25',
-      sub: 'For growing organizations',
-      highlight: true,
-      cta: 'Choose Plan',
-      href: '/register',
-      features: ['Up to 500 members', 'Events & blogs', 'Priority support', 'Payment tracking'],
-    },
-    {
-      name: 'Enterprise',
-      price: '99',
-      sub: 'Maximum scale & control',
-      highlight: false,
-      cta: 'Contact Sales',
-      href: '/contact',
-      features: ['Up to 5,000+ members', 'Dedicated success manager', 'Custom integrations', 'SLA options'],
-    },
-  ];
+  const pricingCards = useMemo(() => {
+    const list = Array.isArray(plans) ? plans : [];
 
-  const testimonials = [
-    {
-      quote:
-        'OMMS cut our admin workload in half. Member records and payments finally live in one place.',
-      name: 'Muaz Amin',
-      role: 'President',
-    },
-    {
-      quote: 'Events and RSVPs used to be spreadsheets. Now our board actually trusts the numbers.',
-      name: 'Elisa Amin',
-      role: 'Treasurer',
-    },
-    {
-      quote: 'We rolled out to five chapters in a month. The role-based dashboards made training easy.',
-      name: 'Obsa Amin',
-      role: 'Operations Lead',
-    },
-  ];
+    const normalize = (p: any) => {
+      const name = p.name || 'Plan';
+      const price = Number(p.price ?? 0);
+      const billing = p.billing_cycle || p.billingCycle || 'monthly';
+      const durationDays = p.duration_days || p.durationDays;
+      const maxMembers = p.max_members || p.maxMembers;
+
+      const features = Array.isArray(p.features)
+        ? p.features
+        : typeof p.features === 'string'
+          ? p.features
+              .split(',')
+              .map((x: string) => x.trim())
+              .filter(Boolean)
+          : [];
+
+      const sub =
+        p.description ||
+        (maxMembers
+          ? `Up to ${maxMembers} members`
+          : durationDays
+            ? `${durationDays} days`
+            : '');
+
+      const href = user ? '/dashboard' : '/register';
+      const cta = user ? 'Go to Dashboard' : 'Get Started';
+
+      return {
+        id: p.id || name,
+        name,
+        price,
+        billing,
+        sub,
+        highlight: false,
+        features,
+        href,
+        cta,
+      };
+    };
+
+    const cards = list.map(normalize);
+    if (cards.length > 0) {
+      const mid = Math.floor(cards.length / 2);
+      cards[mid] = { ...cards[mid], highlight: true };
+    }
+    return cards;
+  }, [plans, user]);
+
+  const pricingResetKey = `${user?.role || 'guest'}|${pricingCards.length}`;
+  const {
+    pagedItems: pagedPricingCards,
+    currentPage: pricingPage,
+    totalPages: pricingTotalPages,
+    setPage: setPricingPage,
+    totalItems: pricingTotalItems,
+    pageSize: pricingPageSize,
+  } = useCardPagination(pricingCards, 3, pricingResetKey);
+
+  const endorsementResetKey = String(endorsements.length);
+  const {
+    pagedItems: pagedEndorsements,
+    currentPage: endorsementPage,
+    totalPages: endorsementTotalPages,
+    setPage: setEndorsementPage,
+    totalItems: endorsementTotalItems,
+    pageSize: endorsementPageSize,
+  } = useCardPagination(endorsements, 3, endorsementResetKey);
 
   return (
     <div className="min-h-screen bg-white font-poppins text-gray-800">
@@ -311,9 +360,9 @@ const Home: React.FC = () => {
             <p className="mt-3 text-gray-600">All prices in ETB (Ethiopian Birr)</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto">
-            {pricing.map((plan) => (
+            {pagedPricingCards.map((plan) => (
               <div
-                key={plan.name}
+                key={plan.id}
                 className={`relative rounded-2xl bg-white border p-8 flex flex-col ${
                   plan.highlight
                     ? 'border-[#3d5a2b] shadow-xl scale-[1.02] z-10 ring-2 ring-[#3d5a2b]/20'
@@ -331,11 +380,11 @@ const Home: React.FC = () => {
                 <h3 className="text-xl font-bold text-[#1a2e0a]">{plan.name}</h3>
                 <p className="text-sm text-gray-500 mt-1 min-h-[40px]">{plan.sub}</p>
                 <p className="mt-6 text-4xl font-black text-[#1a2e0a]">
-                  {plan.price}{' '}
+                  {Number(plan.price || 0).toFixed(0)}{' '}
                   <span className="text-lg font-semibold text-gray-500">ETB/month</span>
                 </p>
                 <ul className="mt-8 space-y-3 flex-1 text-sm text-gray-600">
-                  {plan.features.map((line) => (
+                  {(plan.features || []).map((line: string) => (
                     <li key={line} className="flex gap-2">
                       <span className="text-[#3d5a2b] font-bold">✓</span>
                       {line}
@@ -365,6 +414,14 @@ const Home: React.FC = () => {
               </div>
             ))}
           </div>
+          <CardPagination
+            currentPage={pricingPage}
+            totalPages={pricingTotalPages}
+            totalItems={pricingTotalItems}
+            pageSize={pricingPageSize}
+            onPageChange={setPricingPage}
+            itemLabel="plans"
+          />
         </div>
       </section>
 
@@ -374,66 +431,43 @@ const Home: React.FC = () => {
           <h2 className="text-3xl md:text-4xl font-bold text-center text-[#1a2e0a] mb-12">
             Trusted by Organizations
           </h2>
-          <div className="relative">
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50/80 p-8 md:p-12 min-h-[220px] flex items-center">
-              <Quote
-                className="absolute top-6 left-6 text-[#3d5a2b]/20 w-12 h-12 md:w-16 md:h-16"
-                strokeWidth={1}
-              />
-              <div className="w-full text-center px-4">
-                <p className="text-lg md:text-xl text-gray-700 font-medium leading-relaxed max-w-2xl mx-auto">
-                  “{testimonials[testimonialIdx].quote}”
-                </p>
-                <div className="mt-8 flex flex-col items-center gap-1">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                    style={{ backgroundColor: forest }}
-                  >
-                    {testimonials[testimonialIdx].name
-                      .split(' ')
-                      .map((w) => w[0])
-                      .join('')
-                      .slice(0, 2)}
-                  </div>
-                  <p className="font-bold text-[#1a2e0a] mt-2">{testimonials[testimonialIdx].name}</p>
-                  <p className="text-sm text-gray-500">{testimonials[testimonialIdx].role}</p>
-                </div>
-              </div>
+          {endorsements.length === 0 ? (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-10 text-center text-gray-600">
+              No organization endorsements yet.
             </div>
-            <div className="flex justify-center gap-4 mt-8">
-              <button
-                type="button"
-                aria-label="Previous testimonial"
-                className="p-2 rounded-full border border-gray-200 hover:bg-gray-50"
-                onClick={() =>
-                  setTestimonialIdx((i) => (i - 1 + testimonials.length) % testimonials.length)
-                }
-              >
-                <ChevronLeft size={22} />
-              </button>
-              <div className="flex items-center gap-2">
-                {testimonials.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                      i === testimonialIdx ? 'bg-[#3d5a2b]' : 'bg-gray-300'
-                    }`}
-                    onClick={() => setTestimonialIdx(i)}
-                    aria-label={`Testimonial ${i + 1}`}
-                  />
+          ) : (
+            <>
+              <div className="grid gap-6 md:grid-cols-3">
+                {pagedEndorsements.map((t) => (
+                  <div key={t.id} className="rounded-2xl border border-gray-100 bg-gray-50/80 p-7 relative">
+                    <Quote className="absolute top-5 left-5 text-[#3d5a2b]/20 w-10 h-10" strokeWidth={1} />
+                    <p className="text-gray-700 font-medium leading-relaxed mt-6 whitespace-pre-wrap">“{t.message}”</p>
+                    <div className="mt-6 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: forest }}>
+                        {t.organizationName
+                          .split(' ')
+                          .map((w) => w[0])
+                          .join('')
+                          .slice(0, 2)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-[#1a2e0a] truncate">{t.organizationName}</p>
+                        <p className="text-[11px] text-gray-500">{new Date(t.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-              <button
-                type="button"
-                aria-label="Next testimonial"
-                className="p-2 rounded-full border border-gray-200 hover:bg-gray-50"
-                onClick={() => setTestimonialIdx((i) => (i + 1) % testimonials.length)}
-              >
-                <ChevronRight size={22} />
-              </button>
-            </div>
-          </div>
+              <CardPagination
+                currentPage={endorsementPage}
+                totalPages={endorsementTotalPages}
+                totalItems={endorsementTotalItems}
+                pageSize={endorsementPageSize}
+                onPageChange={setEndorsementPage}
+                itemLabel="endorsements"
+              />
+            </>
+          )}
         </div>
       </section>
 

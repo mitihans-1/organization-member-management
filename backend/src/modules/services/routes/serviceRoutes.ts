@@ -7,13 +7,16 @@ import {
   deleteService,
   subscribeToService,
 } from '../controllers/serviceController';
-import { authenticateToken } from '../../../middleware/authMiddleware';
+import {
+  authenticateToken,
+  optionalAuthenticateToken,
+} from '../../../middleware/authMiddleware';
 import { uploadImage } from '../../../middleware/upload';
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
-router.get('/', authenticateToken, getServices);
+router.get('/', optionalAuthenticateToken, getServices);
 router.post('/', authenticateToken, uploadImage.single('image'), createService);
 router.put('/:id', authenticateToken, uploadImage.single('image'), updateService);
 router.delete('/:id', authenticateToken, deleteService);

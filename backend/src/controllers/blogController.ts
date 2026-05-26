@@ -1,11 +1,16 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { resolveCatalogWhere, resolveRequestContext } from '../utils/catalogScope';
 
 const prisma = new PrismaClient();
 
-export const getBlogs = async (req: Request, res: Response) => {
+export const getBlogs = async (req: any, res: Response) => {
   try {
+    const ctx = await resolveRequestContext(req);
+    const where = await resolveCatalogWhere(req);
+    const publishedOnly = ctx.role === 'guest' || ctx.role === 'member';
     const blogs = await prisma.blog.findMany({
+      where: publishedOnly ? { ...where, status: 'published' } : where,
       include: {
         author: { select: { id: true, name: true, email: true } },
       },
@@ -19,8 +24,19 @@ export const getBlogs = async (req: Request, res: Response) => {
 
 export const createBlog = async (req: any, res: Response) => {
   try {
-    const { title, content, image, status, category, tags, readTime } = req.body;
+    const { title, content, image, status, category, tags, readTime, isPredefined } = req.body;
     const finalImage = req.file ? req.file.path : image;
+
+    let orgId = req.user?.organizationId;
+    if (!orgId && req.user?.userId) {
+      const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+      orgId = user?.organizationId;
+    }
+
+    const predefined =
+      req.user?.role === 'SuperAdmin' &&
+      (isPredefined === true || isPredefined === 'true');
+
     const blog = await prisma.blog.create({
       data: {
         title,
@@ -31,6 +47,8 @@ export const createBlog = async (req: any, res: Response) => {
         tags: tags || null,
         readTime: readTime ? parseInt(readTime) : null,
         author_id: req.user.userId,
+        organizationId: predefined ? null : orgId || null,
+        isPredefined: predefined,
       },
       include: {
         author: { select: { id: true, name: true, email: true } },
@@ -54,6 +72,11 @@ export const updateBlog = async (req: any, res: Response) => {
     
     if (!existingBlog) {
       return res.status(404).json({ message: 'Blog not found' });
+    }
+
+    // Platform predefined blogs are fully controlled by SuperAdmin
+    if ((existingBlog as any).isPredefined && req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Platform predefined blogs can only be edited by SuperAdmin.' });
     }
     
     if (existingBlog.author_id !== req.user.userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'orgAdmin') {
@@ -91,6 +114,11 @@ export const deleteBlog = async (req: any, res: Response) => {
     
     if (!existingBlog) {
       return res.status(404).json({ message: 'Blog not found' });
+    }
+
+    // Platform predefined blogs are fully controlled by SuperAdmin
+    if ((existingBlog as any).isPredefined && req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Platform predefined blogs can only be deleted by SuperAdmin.' });
     }
     
     if (existingBlog.author_id !== req.user.userId && req.user.role !== 'SuperAdmin' && req.user.role !== 'orgAdmin') {

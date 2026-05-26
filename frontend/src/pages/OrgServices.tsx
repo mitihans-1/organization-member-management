@@ -44,7 +44,6 @@ const OrgServices: React.FC = () => {
     contactEmail: '',
     price: '',
     payment_required: false,
-    isPredefined: false,
   });
   const [viewingService, setViewingService] = useState<Service | null>(null);
 
@@ -81,6 +80,7 @@ const OrgServices: React.FC = () => {
     const list = services ?? [];
     const q = searchTerm.trim().toLowerCase();
     return list.filter((s) => {
+      if ((s as any).isPredefined) return false;
       const textMatch =
         !q ||
         s.title.toLowerCase().includes(q) ||
@@ -115,11 +115,10 @@ const OrgServices: React.FC = () => {
         contactEmail: service.contactEmail || '',
         price: service.price !== undefined && service.price !== null ? String(service.price) : '',
         payment_required: (service as any).payment_required || false,
-        isPredefined: (service as any).isPredefined || false,
       });
     } else {
       setEditingService(null);
-      setFormData({ title: '', code: '', description: '', owner: '', department: '', duration: '', requiredDocuments: '', eligibilityRules: '', image: '', status: 'Active', category: 'general', contactEmail: '', price: '', payment_required: false, isPredefined: false });
+      setFormData({ title: '', code: '', description: '', owner: '', department: '', duration: '', requiredDocuments: '', eligibilityRules: '', image: '', status: 'Active', category: 'general', contactEmail: '', price: '', payment_required: false });
     }
     setIsModalOpen(true);
   };
@@ -127,7 +126,7 @@ const OrgServices: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingService(null);
-    setFormData({ title: '', code: '', description: '', owner: '', department: '', duration: '', requiredDocuments: '', eligibilityRules: '', image: '', status: 'Active', category: 'general', contactEmail: '', price: '', payment_required: false, isPredefined: false });
+    setFormData({ title: '', code: '', description: '', owner: '', department: '', duration: '', requiredDocuments: '', eligibilityRules: '', image: '', status: 'Active', category: 'general', contactEmail: '', price: '', payment_required: false });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -247,14 +246,10 @@ const OrgServices: React.FC = () => {
                                 {service.title}
                               </p>
                               {service.description ? (
-                                <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{service.description}</p>
+                                <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 whitespace-pre-wrap break-words">{service.description}</p>
                               ) : null}
                             </div>
-                            {(service as any).isPredefined && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100 px-2.5 py-0.5 text-[10px] font-semibold">
-                                Platform
-                              </span>
-                            )}
+                            {/* Predefined platform services are hidden from this org management view */}
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -543,17 +538,7 @@ const OrgServices: React.FC = () => {
                   <span className="text-sm font-bold text-gray-700">Require payment to subscribe</span>
                 </label>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isPredefined}
-                    onChange={(e) => setFormData({ ...formData, isPredefined: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-sm font-bold text-gray-700">Predefined Platform Service</span>
-                </label>
-              </div>
+              {/* Predefined platform services are managed by Super Admin only */}
               {formData.payment_required && (
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Price (ETB)</label>

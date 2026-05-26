@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
+import ContactMessagesInbox from '../../components/content/ContactMessagesInbox';
 
 type SystemConfig = {
   platformName: string;
@@ -18,11 +19,19 @@ type SystemConfig = {
   facebookUrl: string;
   telegramUrl: string;
   linkedinUrl: string;
+  aboutTitle: string;
+  aboutSubtitle: string;
+  aboutMission: string;
+  aboutStory: string;
+  aboutStatsJson: string;
+  aboutTimelineJson: string;
 };
 
 const SystemConfigPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [activeSubTab, setActiveSubTab] = useState<'payment' | 'contact' | 'general'>('payment');
+  const [activeSubTab, setActiveSubTab] = useState<
+    'payment' | 'contact' | 'about' | 'endorsements' | 'messages' | 'general'
+  >('payment');
   
   const { data, isLoading } = useQuery({
     queryKey: ['systemConfig'],
@@ -45,6 +54,12 @@ const SystemConfigPage: React.FC = () => {
     facebookUrl: '',
     telegramUrl: '',
     linkedinUrl: '',
+    aboutTitle: '',
+    aboutSubtitle: '',
+    aboutMission: '',
+    aboutStory: '',
+    aboutStatsJson: '',
+    aboutTimelineJson: '',
   });
   
   const [message, setMessage] = useState<string | null>(null);
@@ -67,6 +82,12 @@ const SystemConfigPage: React.FC = () => {
         facebookUrl: data.facebookUrl || '',
         telegramUrl: data.telegramUrl || '',
         linkedinUrl: data.linkedinUrl || '',
+        aboutTitle: data.aboutTitle || '',
+        aboutSubtitle: data.aboutSubtitle || '',
+        aboutMission: data.aboutMission || '',
+        aboutStory: data.aboutStory || '',
+        aboutStatsJson: data.aboutStatsJson || '',
+        aboutTimelineJson: data.aboutTimelineJson || '',
       });
     }
   }, [data]);
@@ -85,6 +106,35 @@ const SystemConfigPage: React.FC = () => {
   const handleSave = () => {
     saveMutation.mutate(formData);
   };
+
+  type Endorsement = {
+    id: string;
+    organizationName: string;
+    message: string;
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: string;
+  };
+
+  const { data: endorsements } = useQuery<Endorsement[]>({
+    queryKey: ['endorsements'],
+    queryFn: () => api.get('/admin/endorsements').then((r) => r.data),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Endorsement['status'] }) =>
+      api.patch(`/admin/endorsements/${id}/status`, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['endorsements'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/endorsements/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['endorsements'] }),
+  });
+
+  const pendingCount = useMemo(
+    () => (endorsements || []).filter((e) => e.status === 'pending').length,
+    [endorsements]
+  );
 
   if (isLoading) return <div className="p-8 text-slate-500">Loading config…</div>;
 
@@ -117,6 +167,39 @@ const SystemConfigPage: React.FC = () => {
           }`}
         >
           Contact Info
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('about')}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${
+            activeSubTab === 'about'
+              ? 'text-sky-600 border-sky-600'
+              : 'text-slate-500 border-transparent hover:text-slate-700'
+          }`}
+        >
+          Platform About
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('endorsements')}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${
+            activeSubTab === 'endorsements'
+              ? 'text-sky-600 border-sky-600'
+              : 'text-slate-500 border-transparent hover:text-slate-700'
+          }`}
+        >
+          Home endorsements{pendingCount > 0 ? ` (${pendingCount})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('messages')}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${
+            activeSubTab === 'messages'
+              ? 'text-sky-600 border-sky-600'
+              : 'text-slate-500 border-transparent hover:text-slate-700'
+          }`}
+        >
+          Inbox
         </button>
         <button
           type="button"
@@ -292,6 +375,162 @@ const SystemConfigPage: React.FC = () => {
           </div>
         </div>
       )}
+
+          {activeSubTab === 'about' && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-left-2 duration-300">
+              <p className="text-sm text-slate-500">
+                Shown on the public <strong>/about</strong> page for guests and org admins (platform story).
+              </p>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">About title</label>
+                <input
+                  type="text"
+                  value={formData.aboutTitle}
+                  onChange={(e) => setFormData({ ...formData, aboutTitle: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Subtitle</label>
+                <input
+                  type="text"
+                  value={formData.aboutSubtitle}
+                  onChange={(e) => setFormData({ ...formData, aboutSubtitle: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Mission</label>
+                <textarea
+                  rows={3}
+                  value={formData.aboutMission}
+                  onChange={(e) => setFormData({ ...formData, aboutMission: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Story</label>
+                <textarea
+                  rows={4}
+                  value={formData.aboutStory}
+                  onChange={(e) => setFormData({ ...formData, aboutStory: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Stats JSON (optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder='[{"label":"Founded","value":"2022"}]'
+                  value={formData.aboutStatsJson}
+                  onChange={(e) => setFormData({ ...formData, aboutStatsJson: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono"
+                />
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white"
+                >
+                  Save platform about
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      aboutTitle: '',
+                      aboutSubtitle: '',
+                      aboutMission: '',
+                      aboutStory: '',
+                      aboutStatsJson: '',
+                      aboutTimelineJson: '',
+                    }));
+                    saveMutation.mutate({
+                      ...formData,
+                      aboutTitle: '',
+                      aboutSubtitle: '',
+                      aboutMission: '',
+                      aboutStory: '',
+                      aboutStatsJson: '',
+                      aboutTimelineJson: '',
+                    });
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  Clear platform about
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeSubTab === 'endorsements' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+              <p className="text-sm text-slate-500">
+                Organization admins submit endorsements from their Settings page. Approve to show them on the public Home page.
+              </p>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="divide-y divide-slate-100">
+                  {(endorsements || []).length === 0 ? (
+                    <div className="p-6 text-sm text-slate-500">No endorsements yet.</div>
+                  ) : (
+                    (endorsements || []).map((e) => (
+                      <div key={e.id} className="p-5 flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-black text-slate-900">{e.organizationName}</p>
+                            <p className="text-xs text-slate-500">{new Date(e.createdAt).toLocaleString()}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${
+                              e.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                              e.status === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                              'bg-amber-50 text-amber-800 border-amber-100'
+                            }`}>
+                              {e.status}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => statusMutation.mutate({ id: e.id, status: 'approved' })}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => statusMutation.mutate({ id: e.id, status: 'rejected' })}
+                              className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteMutation.mutate(e.id)}
+                              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{e.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSubTab === 'messages' && (
+            <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+              <ContactMessagesInbox
+                mode="platform"
+                title="Contact form inbox"
+                emptyHint="Messages from guests and organization admins appear here."
+              />
+            </div>
+          )}
 
           {activeSubTab === 'general' && (
             <div className="space-y-5 animate-in fade-in slide-in-from-left-2 duration-300">

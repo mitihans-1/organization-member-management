@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { defaultPathForRole } from '../lib/roleRoutes';
@@ -7,36 +7,63 @@ import { LayoutDashboard, Menu, X } from 'lucide-react';
 const navLinkClass =
   'text-gray-800 hover:text-[#3d5a2b] font-semibold text-sm transition-colors whitespace-nowrap';
 
+/** Public site navbar — link targets change by role after login; Home stays /. */
 const GuestNavbar: React.FC = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
+  const navItems = useMemo(() => {
+    const home = { to: '/', label: 'Home' };
+    const about = { to: '/about', label: 'About' };
+    const events = { to: '/events', label: 'Events' };
+    const blog = { to: '/blogs', label: 'Blog' };
+    const contact = { to: '/contact', label: 'Contact' };
+
+    if (user?.role === 'orgAdmin') {
+      return [
+        home,
+        about,
+        { to: '/platform-features', label: 'Platform Features' },
+        events,
+        blog,
+        contact,
+      ];
+    }
+
+    if (user?.role === 'member') {
+      return [
+        home,
+        about,
+        { to: '/services', label: 'Services' },
+        events,
+        blog,
+        contact,
+      ];
+    }
+
+    // Guest (not logged in)
+    return [
+      home,
+      about,
+      { to: '/services', label: 'Services' },
+      events,
+      blog,
+      contact,
+    ];
+  }, [user?.role]);
+
   const links = (
     <>
-      <Link to="/" className={navLinkClass} onClick={() => setOpen(false)}>
-        Home
-      </Link>
-      <Link to="/about" className={navLinkClass} onClick={() => setOpen(false)}>
-        About
-      </Link>
-      {user?.role === 'orgAdmin' ? (
-        <Link to="/platform-features" className={navLinkClass} onClick={() => setOpen(false)}>
-          Platform Features
+      {navItems.map((item) => (
+        <Link
+          key={item.to}
+          to={item.to}
+          className={navLinkClass}
+          onClick={() => setOpen(false)}
+        >
+          {item.label}
         </Link>
-      ) : (
-        <Link to="/services" className={navLinkClass} onClick={() => setOpen(false)}>
-          Services
-        </Link>
-      )}
-      <Link to="/events" className={navLinkClass} onClick={() => setOpen(false)}>
-        Events
-      </Link>
-      <Link to="/blogs" className={navLinkClass} onClick={() => setOpen(false)}>
-        Blog
-      </Link>
-      <Link to="/contact" className={navLinkClass} onClick={() => setOpen(false)}>
-        Contact
-      </Link>
+      ))}
     </>
   );
 

@@ -82,7 +82,8 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
       telebirrPhone, cbeBirrPhone, paymentInstructions,
       contactPhone, contactAddress, contactEmail, contactHours,
       showLiveChat, liveChatUrl,
-      facebookUrl, telegramUrl, linkedinUrl
+      facebookUrl, telegramUrl, linkedinUrl,
+      aboutTitle, aboutSubtitle, aboutMission, aboutStory, aboutStatsJson, aboutTimelineJson,
     } = req.body;
 
     const systemConfigModel = (prisma as any).systemConfig;
@@ -112,6 +113,12 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
           facebookUrl: facebookUrl ?? config.facebookUrl,
           telegramUrl: telegramUrl ?? config.telegramUrl,
           linkedinUrl: linkedinUrl ?? config.linkedinUrl,
+          aboutTitle: aboutTitle ?? config.aboutTitle,
+          aboutSubtitle: aboutSubtitle ?? config.aboutSubtitle,
+          aboutMission: aboutMission ?? config.aboutMission,
+          aboutStory: aboutStory ?? config.aboutStory,
+          aboutStatsJson: aboutStatsJson ?? config.aboutStatsJson,
+          aboutTimelineJson: aboutTimelineJson ?? config.aboutTimelineJson,
         },
       });
     } else {
@@ -132,6 +139,12 @@ export const updateSystemConfig = async (req: Request, res: Response) => {
           facebookUrl: facebookUrl || '',
           telegramUrl: telegramUrl || '',
           linkedinUrl: linkedinUrl || '',
+          aboutTitle: aboutTitle || null,
+          aboutSubtitle: aboutSubtitle || null,
+          aboutMission: aboutMission || null,
+          aboutStory: aboutStory || null,
+          aboutStatsJson: aboutStatsJson || null,
+          aboutTimelineJson: aboutTimelineJson || null,
         },
       });
     }

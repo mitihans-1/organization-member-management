@@ -6,8 +6,8 @@ import api from '../services/api';
 
 const GuestFooter: React.FC = () => {
   const { data: config } = useQuery({
-    queryKey: ['systemConfig'],
-    queryFn: async () => api.get('/admin/system-config').then((r) => r.data),
+    queryKey: ['platform-content-footer'],
+    queryFn: async () => api.get('/public/platform-content').then((r) => r.data),
   });
 
   return (
@@ -24,9 +24,9 @@ const GuestFooter: React.FC = () => {
               one place.
             </p>
             <div className="flex gap-3">
-              {config?.facebookUrl && (
+              {config?.contact?.facebookUrl && (
                 <a
-                  href={config.facebookUrl}
+                  href={config.contact.facebookUrl}
                   target="_blank"
                   rel="noreferrer"
                   title="Facebook"
@@ -35,9 +35,9 @@ const GuestFooter: React.FC = () => {
                   <Facebook size={18} />
                 </a>
               )}
-              {config?.telegramUrl && (
+              {config?.contact?.telegramUrl && (
                 <a
-                  href={config.telegramUrl}
+                  href={config.contact.telegramUrl}
                   target="_blank"
                   rel="noreferrer"
                   title="Telegram"
@@ -46,9 +46,9 @@ const GuestFooter: React.FC = () => {
                   <Send size={18} />
                 </a>
               )}
-              {config?.linkedinUrl && (
+              {config?.contact?.linkedinUrl && (
                 <a
-                  href={config.linkedinUrl}
+                  href={config.contact.linkedinUrl}
                   target="_blank"
                   rel="noreferrer"
                   title="LinkedIn"
@@ -129,23 +129,23 @@ const GuestFooter: React.FC = () => {
             <ul className="space-y-5 text-sm">
               <li className="flex items-start gap-3 text-gray-400">
                 <MapPin size={20} className="text-[#90a955] shrink-0 mt-0.5" />
-                <span>{config?.contactAddress || 'Addis Ababa, Ethiopia'}</span>
+                <span>{config?.contact?.address || 'Addis Ababa, Ethiopia'}</span>
               </li>
               <li className="flex items-center gap-3 text-gray-400">
                 <Mail size={20} className="text-[#90a955] shrink-0" />
-                <a href={`mailto:${config?.contactEmail || 'info@omms.com'}`} className="hover:text-white transition-colors">
-                  {config?.contactEmail || 'info@omms.com'}
+                <a href={`mailto:${config?.contact?.email || 'info@omms.com'}`} className="hover:text-white transition-colors">
+                  {config?.contact?.email || 'info@omms.com'}
                 </a>
               </li>
               <li className="flex items-center gap-3 text-gray-400">
                 <Phone size={20} className="text-[#90a955] shrink-0" />
-                <a href={`tel:${config?.contactPhone || '+251911234567'}`} className="hover:text-white transition-colors">
-                  {config?.contactPhone || '+251 911 234 567'}
+                <a href={`tel:${config?.contact?.phone || '+251911234567'}`} className="hover:text-white transition-colors">
+                  {config?.contact?.phone || '+251 911 234 567'}
                 </a>
               </li>
               <li className="flex items-center gap-3 text-gray-400">
                 <Clock size={20} className="text-[#90a955] shrink-0" />
-                <span>{config?.contactHours || 'Mon - Fri: 8:00 AM - 5:00 PM'}</span>
+                <span>{config?.contact?.hours || 'Mon - Fri: 8:00 AM - 5:00 PM'}</span>
               </li>
             </ul>
           </div>

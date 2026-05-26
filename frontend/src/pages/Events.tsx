@@ -346,7 +346,7 @@ const Events: React.FC = () => {
                             {event.title}
                           </p>
                           {event.description ? (
-                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{event.description}</p>
+                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5 whitespace-pre-wrap break-words">{event.description}</p>
                           ) : null}
                         </td>
                         <td className="px-4 py-4 text-gray-700 whitespace-nowrap font-mono text-xs">

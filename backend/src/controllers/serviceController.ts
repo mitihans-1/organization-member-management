@@ -22,7 +22,8 @@ export const createService = async (req: any, res: Response) => {
   try {
     const { 
       title, description, image, status, category, 
-      contactEmail, price, payment_required 
+      contactEmail, price, payment_required,
+      code, owner, department, duration, requiredDocuments, eligibilityRules
     } = req.body;
     const finalImage = req.file ? req.file.path : image;
     
@@ -41,9 +42,15 @@ export const createService = async (req: any, res: Response) => {
         category: category || 'general',
         contactEmail: contactEmail || null,
         organizationId: orgId || null,
-        status: status || 'draft',
+        status: status || 'Active',
         price: price ? parseFloat(price) : null,
         payment_required: payment_required === true || payment_required === 'true',
+        code: code || null,
+        owner: owner || null,
+        department: department || null,
+        duration: duration || null,
+        requiredDocuments: requiredDocuments ? (Array.isArray(requiredDocuments) ? requiredDocuments : String(requiredDocuments).split(',').map(s => s.trim())) : [],
+        eligibilityRules: eligibilityRules || null,
       },
     });
     res.status(201).json(service);
@@ -57,7 +64,8 @@ export const updateService = async (req: any, res: Response) => {
     const { id } = req.params;
     const { 
       title, description, status, category, 
-      contactEmail, price, payment_required 
+      contactEmail, price, payment_required,
+      code, owner, department, duration, requiredDocuments, eligibilityRules
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
     const service = await prisma.service.update({
@@ -68,9 +76,15 @@ export const updateService = async (req: any, res: Response) => {
         image,
         category: category || undefined,
         contactEmail: contactEmail !== undefined ? contactEmail : null,
-        status: status || 'draft',
+        status: status || 'Active',
         price: price !== undefined ? parseFloat(price) : null,
         payment_required: payment_required !== undefined ? (payment_required === true || payment_required === 'true') : undefined,
+        code: code !== undefined ? code : null,
+        owner: owner !== undefined ? owner : null,
+        department: department !== undefined ? department : null,
+        duration: duration !== undefined ? duration : null,
+        requiredDocuments: requiredDocuments !== undefined ? (Array.isArray(requiredDocuments) ? requiredDocuments : String(requiredDocuments).split(',').map(s => s.trim())) : undefined,
+        eligibilityRules: eligibilityRules !== undefined ? eligibilityRules : null,
       },
     });
     res.status(200).json(service);

@@ -1,31 +1,12 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { resolveCatalogWhere } from '../../../utils/catalogScope';
 
 const prisma = new PrismaClient();
 
 export const getServices = async (req: any, res: Response) => {
   try {
-    let where: any = {};
-    
-    // Fallback: If your token doesn't include organizationId, fetch it
-    let orgId = req.user?.organizationId;
-    if (!orgId && req.user?.userId) {
-      const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-      orgId = user?.organizationId;
-    }
-    
-    if (orgId) {
-      // For organization members/admin: show predefined services + organization-specific services
-      where = {
-        OR: [
-          { isPredefined: true },
-          { organizationId: orgId }
-        ]
-      };
-    } else {
-      // For public/guest: show only predefined services
-      where = { isPredefined: true };
-    }
+    const where = await resolveCatalogWhere(req);
 
     const services = await prisma.service.findMany({
       where,
@@ -58,6 +39,10 @@ export const createService = async (req: any, res: Response) => {
       orgId = user?.organizationId;
     }
 
+    const predefined =
+      req.user?.role === 'SuperAdmin' &&
+      (isPredefined === true || isPredefined === 'true');
+
     const service = await prisma.service.create({
       data: {
         title,
@@ -67,7 +52,7 @@ export const createService = async (req: any, res: Response) => {
         category: category || 'general',
         categoryName: category || 'general',
         contactEmail: contactEmail || null,
-        organizationId: orgId || null,
+        organizationId: predefined ? null : orgId || null,
         status: status || 'Active',
         price: price ? parseFloat(price) : null,
         fee: price ? parseFloat(price) : null,
@@ -79,7 +64,7 @@ export const createService = async (req: any, res: Response) => {
         eligibilityRules: eligibilityRules || null,
         slaHours: slaHours ? parseInt(slaHours) : null,
         renewalRule: renewalRule || null,
-        isPredefined: isPredefined === true || isPredefined === 'true',
+        isPredefined: predefined,
       },
     });
     res.status(201).json(service);
@@ -98,6 +83,12 @@ export const updateService = async (req: any, res: Response) => {
       renewalRule, isPredefined
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
+
+    const existing = await prisma.service.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Service not found' });
+    if ((existing as any).isPredefined && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Platform predefined services can only be edited by SuperAdmin.' });
+    }
     
     const updateData: any = {};
     
@@ -140,6 +131,11 @@ export const updateService = async (req: any, res: Response) => {
 export const deleteService = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.service.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Service not found' });
+    if ((existing as any).isPredefined && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Platform predefined services can only be deleted by SuperAdmin.' });
+    }
     await prisma.service.delete({
       where: { id: id },
     });

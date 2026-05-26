@@ -65,6 +65,7 @@ const OrgAdminLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(true);
   const orgLabel = user?.organization_name || 'Your organization';
+  const mainRef = useRef<HTMLElement>(null);
 
   type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
   type Panel = 'notifications' | 'user' | null;
@@ -110,6 +111,13 @@ const OrgAdminLayout: React.FC = () => {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [close]);
 
+  // Scroll main content area to top on every navigation
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -135,7 +143,7 @@ const OrgAdminLayout: React.FC = () => {
   const userId = `${baseId}-user`;
 
   return (
-    <div className="min-h-screen bg-[#f4f6f9] flex font-poppins relative">
+    <div className="h-screen overflow-hidden bg-[#f4f6f9] flex font-poppins relative">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -313,7 +321,7 @@ const OrgAdminLayout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-[30] min-h-[64px]">
           <button 
             onClick={toggleSidebar}
@@ -544,7 +552,7 @@ const OrgAdminLayout: React.FC = () => {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 xl:p-10 overflow-y-auto w-full max-w-[1600px] mx-auto">
+        <main ref={mainRef} className="flex-1 p-4 sm:p-6 lg:p-8 xl:p-10 overflow-y-auto w-full max-w-[1600px] mx-auto">
           <Outlet />
         </main>
       </div>

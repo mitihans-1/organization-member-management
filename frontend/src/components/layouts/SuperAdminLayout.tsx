@@ -48,6 +48,9 @@ const reportsSubmenu = [
 const otherNavItems = [
   { to: '/super-admin/tickets', label: 'Tickets', icon: FileText, color: 'text-indigo-500' },
   { to: '/super-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-slate-500' },
+  { to: '/super-admin/platform-services', label: 'Platform Services', icon: Settings, color: 'text-emerald-600' },
+  { to: '/super-admin/platform-events', label: 'Platform Events', icon: Settings, color: 'text-blue-600' },
+  { to: '/super-admin/platform-blogs', label: 'Platform Blogs', icon: Settings, color: 'text-orange-600' },
   { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-gray-500' },
 ];
 
@@ -63,6 +66,7 @@ const SuperAdminLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const baseId = useId();
   const queryClient = useQueryClient();
 
@@ -102,6 +106,13 @@ const SuperAdminLayout: React.FC = () => {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [close]);
 
+  // Scroll main content area to top on every navigation
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -126,7 +137,7 @@ const SuperAdminLayout: React.FC = () => {
   const notifId = `${baseId}-notifications`;
   const userId = `${baseId}-user`;
   return (
-    <div className="min-h-screen bg-slate-100 flex font-poppins relative">
+    <div className="h-screen overflow-hidden bg-slate-100 flex font-poppins relative">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -290,7 +301,7 @@ const SuperAdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-[30]">
           <button 
             onClick={toggleSidebar}
@@ -521,7 +532,7 @@ const SuperAdminLayout: React.FC = () => {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 p-4 sm:p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>

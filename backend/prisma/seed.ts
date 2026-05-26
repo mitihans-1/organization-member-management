@@ -173,12 +173,79 @@ async function main() {
           title: b.title,
           content: b.content,
           image: b.image,
+          status: 'published',
           author_id: user.id,
           organizationId: demoOrg.id,
+          isPredefined: false,
         },
       });
     }
     console.log('Sample blogs seeded');
+  }
+
+  const platformBlogTarget = 8;
+  const platformBlogCount = await prisma.blog.count({ where: { isPredefined: true } });
+  if (platformBlogCount < platformBlogTarget) {
+    const platformBlogs = [
+      {
+        title: 'Welcome to OMMS — Your All-in-One Member Management Platform',
+        content:
+          'OMMS is designed from the ground up to help organizations manage members, events, services, and payments with confidence. Whether you run a professional association, a community club, or an NGO, OMMS brings every operational workflow into one place — so your team can focus on people, not paperwork.',
+      },
+      {
+        title: 'How OMMS Keeps Your Member Data Safe',
+        content:
+          'Security is built into every layer of OMMS. We use role-based access control to ensure each user sees only what they need. Organization data is fully isolated — admins can never access another org's records. All data is encrypted in transit and at rest, and audit logs track every sensitive action.',
+      },
+      {
+        title: 'Understanding Platform Services: What They Are and How They Work',
+        content:
+          'Platform services are predefined service offerings created by OMMS Super Admins and made available to all organizations. They appear alongside organization-specific services in member-facing catalogues. Services carry SLA hours, status labels, and renewal rules — giving your members clear expectations from day one.',
+      },
+      {
+        title: 'Running Hybrid Events: A Practical Guide for Org Admins',
+        content:
+          'Hybrid events — part in-person, part online — are the new normal. OMMS helps you manage both channels from a single dashboard. Set a physical location and an online link, accept registrations, send automated reminders, and track attendance across both formats. Post-event reports pull all the data together automatically.',
+      },
+      {
+        title: 'Membership Tiers and Subscription Plans: Getting It Right',
+        content:
+          'A well-designed tier structure is the backbone of sustainable member revenue. OMMS lets you configure multiple subscription plans with custom billing cycles, member caps, and pricing. Members self-select a plan at registration or upgrade later. Admins get a full payment history, renewal alerts, and one-click receipts for every transaction.',
+      },
+      {
+        title: 'The Power of Member Reports: Turning Data into Decisions',
+        content:
+          'OMMS dashboards surface the metrics that matter: new sign-ups, churn rate, event attendance, service utilization, and revenue over time. Board members love our exportable summaries. Operations teams love the drill-down filters. No more cobbling together spreadsheets — your data is always one click away.',
+      },
+      {
+        title: 'Digital ID Cards: Modernizing Member Identity',
+        content:
+          'Plastic cards get lost. Digital ID cards issued through OMMS are always with your members — accessible on any device, scannable, and revocable instantly if a membership lapses. Org admins can customize card layouts, add QR codes, and batch-issue cards to approved members in seconds.',
+      },
+      {
+        title: 'Getting the Most from OMMS Chat and Announcements',
+        content:
+          'Keeping members informed is half the battle of a well-run organization. OMMS gives you two complementary channels: real-time chat for quick conversations and support tickets, and the blog/announcements module for longer, structured updates. Together they replace the email threads and scattered messaging apps that drain admin time.',
+      },
+    ];
+
+    const existing = await prisma.blog.findMany({ where: { isPredefined: true }, select: { title: true } });
+    const existingTitles = new Set(existing.map((b) => b.title));
+    for (const b of platformBlogs) {
+      if (!existingTitles.has(b.title)) {
+        await prisma.blog.create({
+          data: {
+            title: b.title,
+            content: b.content,
+            status: 'published',
+            author_id: user.id,
+            organizationId: null,
+            isPredefined: true,
+          },
+        });
+      }
+    }
+    console.log('Platform predefined blogs seeded');
   }
 
   const eventCount = await prisma.event.count();
@@ -192,6 +259,10 @@ async function main() {
         location: 'Community Center, Main Hall',
         daysFromNow: 14,
         image: '/asset/eventmanagementpowerpointpresentationslides-210810034621-thumbnail.webp',
+        organizer: 'Events Team',
+        status: 'upcoming',
+        category: 'general',
+        contactEmail: 'events@demo-org.local',
       },
       {
         title: 'Workshop: Member onboarding best practices',
@@ -199,6 +270,10 @@ async function main() {
         location: 'Online (video link)',
         daysFromNow: 21,
         image: null,
+        organizer: 'Training Team',
+        status: 'upcoming',
+        category: 'workshop',
+        contactEmail: 'training@demo-org.local',
       },
       {
         title: 'Regional chapter meetup',
@@ -206,6 +281,9 @@ async function main() {
         location: 'Downtown Hub',
         daysFromNow: 30,
         image: null,
+        organizer: 'Regional Coordinators',
+        status: 'upcoming',
+        category: 'networking',
       },
       {
         title: 'Board & finance briefing',
@@ -213,6 +291,9 @@ async function main() {
         location: 'Head office',
         daysFromNow: 45,
         image: null,
+        organizer: 'Finance Committee',
+        status: 'draft',
+        category: 'seminar',
       },
       {
         title: 'Volunteer appreciation evening',
@@ -220,6 +301,9 @@ async function main() {
         location: 'Riverside venue',
         daysFromNow: 60,
         image: null,
+        organizer: 'Volunteer Programs',
+        status: 'upcoming',
+        category: 'general',
       },
       {
         title: 'New member orientation',
@@ -227,6 +311,10 @@ async function main() {
         location: 'Online + in-person hybrid',
         daysFromNow: 10,
         image: null,
+        organizer: 'Membership Team',
+        status: 'ongoing',
+        category: 'virtual',
+        contactEmail: 'membership@demo-org.local',
       },
     ];
 
@@ -239,10 +327,110 @@ async function main() {
           date: new Date(base + e.daysFromNow * 86400000),
           image: e.image,
           organizationId: demoOrg.id,
+          isPredefined: false,
+          organizer: e.organizer,
+          status: e.status,
+          category: e.category,
+          contactEmail: e.contactEmail ?? null,
         },
       });
     }
     console.log('Sample events seeded');
+  }
+
+  const platformEventTarget = 6;
+  const platformEventCount = await prisma.event.count({ where: { isPredefined: true } });
+  if (platformEventCount < platformEventTarget) {
+    const base = Date.now();
+    const platformEvents = [
+      {
+        title: 'OMMS Platform Launch Webinar',
+        description:
+          'Join the OMMS team for a live walkthrough of the platform. Learn how member management, events, services, and payments work together — and ask questions live.',
+        location: 'Online (Zoom)',
+        daysFromNow: 7,
+        status: 'upcoming',
+        category: 'virtual',
+        organizer: 'OMMS Team',
+        contactEmail: 'hello@omms.io',
+      },
+      {
+        title: 'Best Practices for Member Organizations — Admin Workshop',
+        description:
+          'A hands-on workshop for org admins exploring advanced OMMS features: bulk member imports, custom subscription tiers, event automation, and report exports.',
+        location: 'Online (Google Meet)',
+        daysFromNow: 21,
+        status: 'upcoming',
+        category: 'workshop',
+        organizer: 'OMMS Platform Success',
+        contactEmail: 'success@omms.io',
+      },
+      {
+        title: 'OMMS Community Networking Summit',
+        description:
+          'Connect with org admins and member coordinators from across the OMMS network. Share experiences, swap strategies, and hear from organizations that have scaled from 50 to 5,000 members.',
+        location: 'Hybrid — Grand Conference Center & Online',
+        daysFromNow: 35,
+        status: 'upcoming',
+        category: 'networking',
+        organizer: 'OMMS Community Team',
+        contactEmail: 'community@omms.io',
+      },
+      {
+        title: 'Digital ID Cards Deep Dive',
+        description:
+          'A focused session on issuing, customizing, and revoking digital member ID cards. Learn QR code verification, bulk issuance, and how to integrate card workflows with membership renewals.',
+        location: 'Online (Zoom)',
+        daysFromNow: 14,
+        status: 'upcoming',
+        category: 'workshop',
+        organizer: 'OMMS Product Team',
+      },
+      {
+        title: 'Payments & Subscriptions Masterclass',
+        description:
+          'Everything your finance team needs to know: billing cycles, plan migrations, receipt generation, refund workflows, and audit-ready reporting — all inside OMMS.',
+        location: 'Online',
+        daysFromNow: 28,
+        status: 'upcoming',
+        category: 'seminar',
+        organizer: 'OMMS Finance Team',
+        contactEmail: 'finance@omms.io',
+      },
+      {
+        title: 'OMMS Annual Partner Conference',
+        description:
+          'Our flagship annual event bringing together partner organizations, enterprise clients, and the OMMS core team. Keynotes, product roadmap reveal, breakout workshops, and a networking dinner.',
+        location: 'International Convention Center, Main Hall',
+        daysFromNow: 90,
+        status: 'upcoming',
+        category: 'general',
+        organizer: 'OMMS Executive Team',
+        contactEmail: 'conference@omms.io',
+      },
+    ];
+
+    const existingEvents = await prisma.event.findMany({ where: { isPredefined: true }, select: { title: true } });
+    const existingEventTitles = new Set(existingEvents.map((e) => e.title));
+    for (const e of platformEvents) {
+      if (!existingEventTitles.has(e.title)) {
+        await prisma.event.create({
+          data: {
+            title: e.title,
+            description: e.description,
+            location: e.location,
+            date: new Date(base + e.daysFromNow * 86400000),
+            isPredefined: true,
+            organizationId: null,
+            status: e.status,
+            category: e.category,
+            organizer: e.organizer,
+            contactEmail: e.contactEmail ?? null,
+          },
+        });
+      }
+    }
+    console.log('Platform predefined events seeded');
   }
 
   const serviceCount = await prisma.service.count();
@@ -257,6 +445,8 @@ async function main() {
         department: 'Community Management',
         duration: 'Ongoing',
         slaHours: 48,
+        code: 'SVC-COMM-001',
+        renewalRule: 'Annual',
         isPredefined: true,
       },
       {
@@ -268,17 +458,21 @@ async function main() {
         department: 'Member Services',
         duration: 'Ongoing',
         slaHours: 24,
+        code: 'SVC-DIR-002',
+        renewalRule: 'None',
         isPredefined: true,
       },
       {
         title: 'Document Library',
         description: 'Secure storage and sharing of important documents, templates, and resources for organization members.',
         category: 'training',
-        status: 'Active',
+        status: 'Under Maintenance',
         owner: 'Platform Admin',
         department: 'Knowledge Management',
         duration: 'Ongoing',
         slaHours: 72,
+        code: 'SVC-DOC-003',
+        renewalRule: 'Quarterly',
         isPredefined: true,
       },
       {
@@ -286,32 +480,38 @@ async function main() {
         description: 'Complete event planning and management tools including registration, ticketing, and attendee tracking.',
         category: 'general',
         status: 'Active',
-        owner: 'Platform Admin',
+        owner: 'Events Lead',
         department: 'Events Team',
-        duration: 'Ongoing',
+        duration: 'Per event',
         slaHours: 24,
+        code: 'SVC-EVT-004',
+        renewalRule: 'None',
         isPredefined: true,
       },
       {
         title: 'Member Support',
         description: 'Dedicated support desk for member inquiries, technical issues, and general assistance.',
         category: 'support',
-        status: 'Active',
+        status: 'Suspended',
         owner: 'Support Team',
         department: 'Customer Support',
         duration: '24/7',
         slaHours: 12,
+        code: 'SVC-SUP-005',
+        renewalRule: 'Monthly',
         isPredefined: true,
       },
       {
         title: 'Analytics Dashboard',
         description: 'Real-time analytics and reporting on member engagement, event attendance, and service usage.',
         category: 'general',
-        status: 'Active',
-        owner: 'Platform Admin',
+        status: 'Archived',
+        owner: 'Data Team',
         department: 'Analytics',
         duration: 'Ongoing',
         slaHours: 48,
+        code: 'SVC-ANL-006',
+        renewalRule: 'Annual',
         isPredefined: true,
       },
     ];
@@ -327,6 +527,8 @@ async function main() {
           department: service.department,
           duration: service.duration,
           slaHours: service.slaHours,
+          code: service.code,
+          renewalRule: service.renewalRule,
           isPredefined: service.isPredefined,
         },
       });

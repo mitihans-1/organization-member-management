@@ -8,7 +8,7 @@ import {
 type Props = {
   stored?: string | null;
   slotIndex: number;
-  variant: 'event' | 'blog';
+  variant: 'event' | 'blog' | 'service';
   alt?: string;
   className?: string;
 };
@@ -27,7 +27,7 @@ const CoverImage: React.FC<Props> = ({
   const slotDefault =
     variant === 'event'
       ? defaultEventImage(slotIndex)
-      : defaultBlogImage(slotIndex);
+      : defaultBlogImage(slotIndex); // blog + service share palette
 
   const preferred = stored?.trim() ? stored.trim() : slotDefault;
   const [src, setSrc] = useState(preferred);

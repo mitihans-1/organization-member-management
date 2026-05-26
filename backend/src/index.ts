@@ -28,6 +28,7 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import organizationSubscriptionRoutes from './routes/organizationSubscriptionRoutes';
 import { PrismaClient } from '@prisma/client';
 import { startCronJobs } from './services/cronService';
+import publicRoutes from './routes/publicRoutes';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -70,6 +71,7 @@ app.use('/api', memberSubscriptionPlanRoutes);
 app.use('/api', memberSubscriptionRoutes);
 app.use('/api', invoiceRoutes);
 app.use('/api/organization-subscriptions', organizationSubscriptionRoutes);
+app.use('/api/public', publicRoutes);
 
 const userSocketMap = new Map<string, string>();
 
@@ -235,15 +237,6 @@ io.on('connection', (socket) => {
       }
     }
     console.log('User disconnected:', socket.id);
-  });
-});
-
-app.get('/api/public/stats', (req, res) => {
-  res.status(200).json({
-    totalOrganizations: 0,
-    totalMembers: 0,
-    totalEvents: 0,
-    totalServices: 0,
   });
 });
 

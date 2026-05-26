@@ -9,6 +9,8 @@ import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 import { relativeTime } from '../lib/relativeTime';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import BlogDetailsModal from '../components/BlogDetailsModal';
+import { useCardPagination } from '../hooks/useCardPagination';
+import CardPagination from '../components/filters/CardPagination';
 
 /** Allowed categories — stored on the server; user picks one when creating/editing. */
 const BLOG_CATEGORIES = [
@@ -104,6 +106,16 @@ const Blogs: React.FC = () => {
     }
     return list;
   }, [blogs, searchTerm, statusFilter, categoryFilter]);
+
+  const paginationResetKey = `${searchTerm}|${statusFilter}|${categoryFilter}`;
+  const {
+    pagedItems: pagedBlogs,
+    currentPage,
+    totalPages,
+    setPage,
+    totalItems,
+    pageSize,
+  } = useCardPagination(filtered, 6, paginationResetKey);
 
   useEffect(() => {
     const onDoc = () => setOpenActionMenuId(null);
@@ -249,7 +261,7 @@ const Blogs: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filtered.map((blog, index) => (
+          {pagedBlogs.map((blog, index) => (
             <article
               key={blog.id}
               className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row"
@@ -257,7 +269,7 @@ const Blogs: React.FC = () => {
               <div className="relative w-full sm:w-48 h-44 sm:h-auto shrink-0 bg-gray-100">
                 <CoverImage
                   stored={blog.image}
-                  slotIndex={index}
+                  slotIndex={(currentPage - 1) * pageSize + index}
                   variant="blog"
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover"
@@ -359,6 +371,14 @@ const Blogs: React.FC = () => {
               </div>
             </article>
           ))}
+          <CardPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            itemLabel="posts"
+          />
         </div>
       )}
 

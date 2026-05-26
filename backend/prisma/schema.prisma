@@ -34,12 +34,28 @@ model Organization {
   blogs            Blog[]
   events           Event[]
   services         Service[]
+  endorsements     OrganizationEndorsement[]
   users            User[]
   customAttributes CustomAttributeDefinition[]
   plan_id          String?                     @db.ObjectId
   plan_expiry      DateTime?
   plan             Plan?                       @relation(fields: [plan_id], references: [id])
   payment_phone    String?
+
+  // Member-facing About page (set by org admin)
+  aboutTitle       String?
+  aboutSubtitle    String?
+  aboutMission     String?
+  aboutStory       String?
+  aboutStatsJson   String? // JSON array [{label,value}]
+
+  // Member-facing Contact (set by org admin)
+  contactEmail           String?
+  contactPhone           String?
+  contactAddress         String?
+  contactHours           String?
+  contactFormRecipient   String? // where form submissions are sent / stored for admin
+  testimonialQuote       String? // shown on public home "Trusted by Organizations"
 
   conversations           Conversation[]
   idCards                 IdCard[]
@@ -129,9 +145,48 @@ model SystemConfig {
   telegramUrl String?
   linkedinUrl String?
 
+  // Platform About page (super admin)
+  aboutTitle     String?
+  aboutSubtitle  String?
+  aboutMission   String?
+  aboutStory     String?
+  aboutStatsJson String? // JSON [{label,value}]
+  aboutTimelineJson String? // JSON [{year,title,desc,image?}]
+
   updatedAt DateTime @updatedAt
 
   @@map("system_configs")
+}
+
+model ContactMessage {
+  id             String   @id @default(cuid()) @map("_id")
+  scope          String   // platform (→ super admin) | organization (→ org admin)
+  organizationId String?  @db.ObjectId
+  senderUserId   String?  @db.ObjectId
+  senderRole     String?  // guest | member | orgAdmin
+  name           String
+  email          String
+  subject        String?
+  message        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@map("contact_messages")
+}
+
+model OrganizationEndorsement {
+  id             String   @id @default(cuid()) @map("_id")
+  organizationId String   @db.ObjectId
+  organizationName String
+  message        String
+  status         String   @default("pending") // pending | approved | rejected
+  submittedById  String?  @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_endorsements")
 }
 
 model CustomAttributeDefinition {
@@ -268,6 +323,7 @@ model Blog {
   author    User    @relation("BlogAuthor", fields: [author_id], references: [id])
 
   organizationId   String?       @db.ObjectId
+  isPredefined     Boolean       @default(false)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   organizations    Organization? @relation(fields: [organizationId], references: [id])
@@ -296,6 +352,7 @@ model Event {
   virtualLink          String?
   contactEmail         String?
   organizationId       String?       @db.ObjectId
+  isPredefined         Boolean       @default(false)
   price                Float?
   payment_required     Boolean       @default(false)
   createdAt            DateTime      @default(now())

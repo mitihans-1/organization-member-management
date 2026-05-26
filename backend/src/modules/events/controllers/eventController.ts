@@ -1,16 +1,20 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { resolveCatalogWhere } from '../../../utils/catalogScope';
 
 const prisma = new PrismaClient();
 
-export const getEvents = async (req: Request, res: Response) => {
+export const getEvents = async (req: any, res: Response) => {
   try {
+    const where = await resolveCatalogWhere(req);
     const events = await prisma.event.findMany({
+      where,
       include: {
         _count: {
           select: { attendees: true },
         },
       },
+      orderBy: { date: 'asc' },
     });
     res.status(200).json(events);
   } catch (error) {
@@ -22,7 +26,7 @@ export const createEvent = async (req: any, res: Response) => {
   try {
     const { 
       title, description, date, end_date, location, image, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required 
+      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline
     } = req.body;
     const finalImage = req.file ? req.file.path : image;
     
@@ -32,6 +36,10 @@ export const createEvent = async (req: any, res: Response) => {
       const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
       orgId = user?.organizationId;
     }
+
+    const predefined =
+      req.user?.role === 'SuperAdmin' &&
+      (req.body.isPredefined === true || req.body.isPredefined === 'true');
 
     const event = await prisma.event.create({
       data: {
@@ -45,10 +53,13 @@ export const createEvent = async (req: any, res: Response) => {
         capacity: capacity ? parseInt(capacity) : null,
         virtualLink: virtualLink || null,
         contactEmail: contactEmail || null,
-        organizationId: orgId || null,
+        organizationId: predefined ? null : orgId || null,
+        isPredefined: predefined,
         status: status || 'draft',
         price: price ? parseFloat(price) : null,
         payment_required: payment_required === true || payment_required === 'true',
+        organizer: organizer || null,
+        registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : null,
       },
     });
     res.status(201).json(event);
@@ -62,9 +73,16 @@ export const updateEvent = async (req: any, res: Response) => {
     const { id } = req.params;
     const { 
       title, description, date, end_date, location, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required 
+      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
+
+    const existing = await prisma.event.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Event not found' });
+    if ((existing as any).isPredefined && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Platform predefined events can only be edited by SuperAdmin.' });
+    }
+
     const event = await prisma.event.update({
       where: { id: id },
       data: {
@@ -81,6 +99,8 @@ export const updateEvent = async (req: any, res: Response) => {
         status: status || 'draft',
         price: price !== undefined ? parseFloat(price) : null,
         payment_required: payment_required !== undefined ? (payment_required === true || payment_required === 'true') : undefined,
+        organizer: organizer !== undefined ? organizer : null,
+        registrationDeadline: registrationDeadline !== undefined ? (registrationDeadline ? new Date(registrationDeadline) : null) : undefined,
       },
     });
     res.status(200).json(event);
@@ -92,6 +112,11 @@ export const updateEvent = async (req: any, res: Response) => {
 export const deleteEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.event.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Event not found' });
+    if ((existing as any).isPredefined && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Platform predefined events can only be deleted by SuperAdmin.' });
+    }
     await prisma.event.delete({
       where: { id: id },
     });

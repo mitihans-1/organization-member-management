@@ -31,7 +31,6 @@ const navItems = [
   { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500' },
   { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
   { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
-  { to: '/member/reports', label: 'My Reports', icon: FileText, color: 'text-rose-500' },
   { to: '/member/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
   { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
 ];
@@ -56,6 +55,7 @@ const MemberLayout: React.FC = () => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(true);
+  const mainRef = useRef<HTMLElement>(null);
 
   type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
   type Panel = 'notifications' | 'user' | null;
@@ -101,6 +101,13 @@ const MemberLayout: React.FC = () => {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [close]);
 
+  // Scroll main content area to top on every navigation
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -126,7 +133,7 @@ const MemberLayout: React.FC = () => {
   const userId = `${baseId}-user`;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex font-poppins relative">
+    <div className="h-screen overflow-hidden bg-slate-100 flex font-poppins relative">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -295,7 +302,7 @@ const MemberLayout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-[30]">
           <button 
             onClick={toggleSidebar}
@@ -527,7 +534,7 @@ const MemberLayout: React.FC = () => {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 p-4 sm:p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>

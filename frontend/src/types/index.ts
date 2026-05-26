@@ -106,6 +106,8 @@ export interface Event {
   capacity?: number;
   virtualLink?: string;
   contactEmail?: string;
+  organizer?: string;
+  registrationDeadline?: string;
   organizationId?: string;
   _count?: { attendees: number };
   price?: number;
@@ -120,6 +122,14 @@ export interface Service {
   image?: string;
   status?: string;
   category?: string;
+  code?: string;
+  owner?: string;
+  department?: string;
+  duration?: string;
+  requiredDocuments?: string[];
+  eligibilityRules?: string;
+  slaHours?: number;
+  renewalRule?: string;
   contactEmail?: string;
   organizationId?: string;
   _count?: { subscribers: number };
