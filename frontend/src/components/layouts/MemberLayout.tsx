@@ -30,6 +30,10 @@ const navItems = [
   { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500' },
   { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500' },
   { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
+  { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
+  { to: '/member/reports', label: 'My Reports', icon: FileText, color: 'text-rose-500' },
+  { to: '/member/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
+  { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
 ];
 
 const reportsSubmenu = [
@@ -42,8 +46,6 @@ const reportsSubmenu = [
 ];
 
 const otherNavItems = [
-  { to: '/member/tickets', label: 'My Tickets', icon: FileText, color: 'text-violet-500' },
-  { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-indigo-500' },
   { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },
   { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
 ];

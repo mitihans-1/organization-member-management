@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { extractReceiptData } from '../services/ocrService';
 import { sendPaymentConfirmationEmail } from '../services/emailService';
+import { createInvoice } from '../services/invoiceService';
 
 const prisma = new PrismaClient();
 
@@ -555,14 +556,43 @@ export const confirmOrgPayment = async (req: any, res: Response) => {
       data: { status: 'completed' }
     });
 
-    if (payment.payer_type === 'organization' && payment.payer_id) {
+    if (payment.payer_type === 'organization' && payment.payer_id && payment.plan) {
+      const planExpiry = new Date(Date.now() + (payment.plan.duration_days || 30) * 86400000);
+      
       await prisma.organization.update({
         where: { id: payment.payer_id },
         data: {
-          plan_id: payment.plan?.id,
-          plan_expiry: new Date(Date.now() + (payment.plan?.duration_days || 30) * 86400000),
+          plan_id: payment.plan.id,
+          plan_expiry: planExpiry,
         }
       }).catch(() => {});
+
+      // Generate invoice for the organization subscription
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      await createInvoice({
+        organizationId: payment.payer_id,
+        planId: payment.plan.id,
+        planType: 'organization',
+        subtotal: payment.plan.price,
+        tax: 0,
+        discount: 0,
+        total: payment.plan.price,
+        dueDate,
+        billingPeriodStart: new Date(),
+        billingPeriodEnd: planExpiry,
+        isRecurring: true,
+        notes: `${payment.plan.name} - Organization plan (payment confirmed)`,
+        items: [
+          {
+            description: `${payment.plan.name} Organization Plan`,
+            quantity: 1,
+            unitPrice: payment.plan.price,
+            total: payment.plan.price,
+          },
+        ],
+      });
 
       const orgAdmins = await prisma.user.findMany({
         where: { organizationId: payment.payer_id, role: 'orgAdmin' }
@@ -572,7 +602,7 @@ export const confirmOrgPayment = async (req: any, res: Response) => {
         await prisma.notification.create({
           data: {
             userId: admin.id,
-            title: `Your organization payment of ${payment.amount} ETB has been approved! Subscription active until ${new Date(Date.now() + (payment.plan?.duration_days || 30) * 86400000).toLocaleDateString()}.`
+            title: `Your organization payment of ${payment.amount} ETB has been approved! Subscription active until ${planExpiry.toLocaleDateString()}.`
           }
         });
       }

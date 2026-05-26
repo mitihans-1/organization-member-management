@@ -1,3 +1,14 @@
+export interface Organization {
+  id: string;
+  name: string;
+  type: string;
+  plan_id?: string;
+  plan_expiry?: string;
+  plan?: Plan;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -300,5 +311,116 @@ export interface Report {
 export interface OrgAdminReportsResponse {
   memberReports: Report[];
   orgReports: Report[];
+}
+
+// ==========================================
+// MEMBER SUBSCRIPTION & INVOICING - New Types
+// ==========================================
+
+export type BillingCycle = 'monthly' | 'quarterly' | 'annual';
+export type SubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
+
+export interface MemberSubscriptionPlan {
+  id: string;
+  organizationId: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  billingCycle: BillingCycle;
+  durationDays?: number;
+  trialDays?: number;
+  features: string[];
+  isActive: boolean;
+  maxMembers?: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MemberSubscription {
+  id: string;
+  organizationId: string;
+  memberId: string;
+  userId: string;
+  planId: string;
+  status: SubscriptionStatus;
+  startDate: string;
+  endDate?: string;
+  nextBillingDate?: string;
+  autoRenew: boolean;
+  notes?: string;
+  trialEndsAt?: string;
+  plan?: MemberSubscriptionPlan;
+  member?: Member;
+  user?: User;
+  organization?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  organizationId: string;
+  userId?: string;
+  memberId?: string;
+  subscriptionId?: string;
+  status: InvoiceStatus;
+  totalAmount: number;
+  currency: string;
+  dueDate?: string;
+  paidAt?: string;
+  notes?: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
+  isRecurring: boolean;
+  items?: InvoiceItem[];
+  payments?: InvoicePayment[];
+  organization?: any;
+  user?: User;
+  member?: Member;
+  subscription?: MemberSubscription;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvoiceItem {
+  id: string;
+  invoiceId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  createdAt: string;
+}
+
+export interface InvoicePayment {
+  id: string;
+  invoiceId: string;
+  paymentId: string;
+  amount: number;
+  createdAt: string;
+  invoice?: Invoice;
+  payment?: Payment;
+}
+
+export interface InvoiceReminder {
+  id: string;
+  invoiceId: string;
+  type: string;
+  sentAt: string;
+  createdAt: string;
+}
+
+export interface MemberSubscriptionPayment {
+  id: string;
+  subscriptionId: string;
+  paymentId: string;
+  amount: number;
+  createdAt: string;
+  subscription?: MemberSubscription;
+  payment?: Payment;
 }
 

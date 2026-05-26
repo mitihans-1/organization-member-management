@@ -16,13 +16,10 @@ import SuperAdminMembers from './pages/super-admin/SuperAdminMembers';
 import SuperAdminPayments from './pages/super-admin/SuperAdminPayments';
 import PlanManagement from './pages/super-admin/PlanManagement';
 import SuperAdminTickets from './pages/super-admin/SuperAdminTickets';
-import SuperAdminReports from './pages/super-admin/SuperAdminReports';
 import SuperReport from './pages/super-admin/SuperReport';
 import MemberTickets from './pages/member/MemberTickets';
-import MemberReports from './pages/member/MemberReports';
 import MembersReport from './pages/member/MembersReport';
 import OrgTickets from './pages/OrgTickets';
-import OrgReports from './pages/OrgReports';
 import OrganiReport from './pages/OrganiReport';
 import ChatPage from './pages/ChatPage';
 // System configuration
@@ -60,6 +57,9 @@ import PublicBlogs from './pages/PublicBlogs';
 import VerifyId from './pages/VerifyId';
 import { MyIdCard } from './pages/member/MyIdCard';
 import { OrgLegacyRedirect, OrganAdminLegacyRedirect } from './components/OrgPathRedirects';
+
+import OrgSubscriptions from './pages/org/OrgSubscriptions';
+import MemberSubscriptions from './pages/member/MemberSubscriptions';
 
 const queryClient = new QueryClient();
 
@@ -138,6 +138,7 @@ const App: React.FC = () => {
               <Route path="tickets" element={<OrgTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="id-cards" element={<OrgIdCards />} />
+              <Route path="subscriptions" element={<OrgSubscriptions />} />
             </Route>
 
             <Route path="/org/*" element={<OrgLegacyRedirect />} />
@@ -162,6 +163,7 @@ const App: React.FC = () => {
               <Route path="reports/:section" element={<MembersReport />} />
               <Route path="tickets" element={<MemberTickets />} />
               <Route path="chat" element={<ChatPage />} />
+              <Route path="subscriptions" element={<MemberSubscriptions />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

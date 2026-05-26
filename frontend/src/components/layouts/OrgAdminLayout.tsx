@@ -24,6 +24,7 @@ import {
   ChevronDown,
   User as UserIcon,
   Shield,
+  TrendingUp,
   Search,
 } from 'lucide-react';
 
@@ -35,10 +36,13 @@ const navItems = [
   { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500' },
   { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
   { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },
+  { to: '/org-admin/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
+  { to: '/org-admin/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
+  { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
 ];
 
 const reportsSubmenu = [
-  { to: '/org-admin/reports', label: 'Overview', color: 'text-sky-500' },
+  
   { to: '/org-admin/reports/members', label: 'Member Reports', color: 'text-indigo-500' },
   { to: '/org-admin/reports/events', label: 'Event Reports', color: 'text-blue-500' },
   { to: '/org-admin/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
@@ -49,8 +53,6 @@ const reportsSubmenu = [
 ];
 
 const otherNavItems = [
-  { to: '/org-admin/tickets', label: 'Tickets', icon: FileText, color: 'text-violet-500' },
-  { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-indigo-500' },
   { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
   { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500' },
   { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500' },
