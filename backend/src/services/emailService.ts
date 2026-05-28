@@ -48,13 +48,31 @@ const logEmail = async (data: {
   paymentId?: string;
   scheduledAt?: Date;
 }) => {
-  console.log('Logging email (temporary - no database):', data);
-  return { id: 'temp-log-id', ...data, status: 'pending' };
+  const log = await prisma.emailNotificationLog.create({
+    data: {
+      to: data.to,
+      subject: data.subject,
+      type: data.type,
+      userId: data.userId,
+      eventId: data.eventId,
+      paymentId: data.paymentId,
+      scheduledAt: data.scheduledAt,
+      status: 'pending',
+    },
+  });
+  return log;
 };
 
 const updateEmailLog = async (logId: string, status: 'sent' | 'failed', error?: string) => {
-  console.log('Updating email log (temporary - no database):', { logId, status, error });
-  return { id: logId, status, error, sentAt: status === 'sent' ? new Date() : undefined };
+  const log = await prisma.emailNotificationLog.update({
+    where: { id: logId },
+    data: {
+      status,
+      error,
+      sentAt: status === 'sent' ? new Date() : undefined,
+    },
+  });
+  return log;
 };
 
 export const sendOtpEmail = async (to: string, otpCode: string, name: string) => {
@@ -364,5 +382,289 @@ export const sendInvitationEmail = async (
   } catch (error: any) {
     await updateEmailLog(log.id, 'failed', error.message);
     console.error('Failed to send invitation email:', error);
+  }
+};
+
+export const sendNewMemberNotificationToOrgAdmin = async (
+  to: string,
+  orgAdminName: string,
+  newMemberName: string,
+  newMemberEmail: string,
+  organizationName: string,
+  userId?: string
+) => {
+  const log = await logEmail({
+    to,
+    subject: `New Member Joined ${organizationName}`,
+    type: 'new_member',
+    userId,
+  });
+
+  try {
+    const transporter = await getTransporter();
+    const platformLink = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+      from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
+      to,
+      subject: `New Member Joined ${organizationName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #10b981;">New Member Alert! 🎉</h2>
+          <p style="color: #475569; font-size: 16px;">Hi ${orgAdminName}, a new member has joined your organization ${organizationName}!</p>
+          
+          <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #065f46; margin: 0 0 8px;"><strong>Name:</strong> ${newMemberName}</p>
+            <p style="color: #065f46; margin: 0;"><strong>Email:</strong> ${newMemberEmail}</p>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${platformLink}/org-admin/members" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Members</a>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 12px;">You can manage this member in your dashboard.</p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    await updateEmailLog(log.id, 'sent');
+    console.log('New member notification sent to org admin %s', to);
+    
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+    return info;
+  } catch (error: any) {
+    await updateEmailLog(log.id, 'failed', error.message);
+    console.error('Failed to send new member notification email:', error);
+  }
+};
+
+export const sendNewEventNotification = async (
+  to: string,
+  userName: string,
+  eventTitle: string,
+  eventDate: Date,
+  eventLocation?: string | null,
+  organizationName?: string,
+  userId?: string,
+  eventId?: string
+) => {
+  const log = await logEmail({
+    to,
+    subject: `New Event: ${eventTitle}`,
+    type: 'new_event',
+    userId,
+    eventId,
+  });
+
+  try {
+    const transporter = await getTransporter();
+    const formattedDate = eventDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const platformLink = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+      from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
+      to,
+      subject: `New Event: ${eventTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #6366f1;">New Event! 🎉</h2>
+          <p style="color: #475569; font-size: 16px;">Hi ${userName}, ${organizationName ? `${organizationName} has a new event!` : 'there is a new event!'}</p>
+          
+          <div style="background-color: #eef2ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #4338ca; margin: 0 0 8px;">${eventTitle}</h4>
+            <p style="color: #3730a3; margin: 0 0 8px;"><strong>Date:</strong> ${formattedDate}</p>
+            ${eventLocation ? `<p style="color: #3730a3; margin: 0;"><strong>Location:</strong> ${eventLocation}</p>` : ''}
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${platformLink}/${organizationName ? 'org-admin' : 'super-admin'}/events" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Event</a>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    await updateEmailLog(log.id, 'sent');
+    console.log('New event notification sent to %s', to);
+    
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+    return info;
+  } catch (error: any) {
+    await updateEmailLog(log.id, 'failed', error.message);
+    console.error('Failed to send new event notification email:', error);
+  }
+};
+
+export const sendNewServiceNotification = async (
+  to: string,
+  userName: string,
+  serviceName: string,
+  serviceDescription: string,
+  organizationName?: string,
+  userId?: string
+) => {
+  const log = await logEmail({
+    to,
+    subject: `New Service: ${serviceName}`,
+    type: 'new_service',
+    userId,
+  });
+
+  try {
+    const transporter = await getTransporter();
+    const platformLink = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+      from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
+      to,
+      subject: `New Service: ${serviceName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #f59e0b;">New Service Available! 🛠️</h2>
+          <p style="color: #475569; font-size: 16px;">Hi ${userName}, ${organizationName ? `${organizationName} has a new service available!` : 'there is a new service available!'}</p>
+          
+          <div style="background-color: #fffbeb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #92400e; margin: 0 0 8px;">${serviceName}</h4>
+            <p style="color: #78350f; margin: 0;">${serviceDescription}</p>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${platformLink}/${organizationName ? 'org-admin' : 'super-admin'}/services" style="background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Service</a>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    await updateEmailLog(log.id, 'sent');
+    console.log('New service notification sent to %s', to);
+    
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+    return info;
+  } catch (error: any) {
+    await updateEmailLog(log.id, 'failed', error.message);
+    console.error('Failed to send new service notification email:', error);
+  }
+};
+
+export const sendReportNotification = async (
+  to: string,
+  userName: string,
+  reportTitle: string,
+  reportType: string,
+  reportStatus: string,
+  organizationName: string,
+  userId?: string
+) => {
+  const log = await logEmail({
+    to,
+    subject: `New Report: ${reportTitle}`,
+    type: 'new_report',
+    userId,
+  });
+
+  try {
+    const transporter = await getTransporter();
+    const platformLink = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+      from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
+      to,
+      subject: `New Report: ${reportTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #ef4444;">New Report! 📋</h2>
+          <p style="color: #475569; font-size: 16px;">Hi ${userName}, a new report has been submitted!</p>
+          
+          <div style="background-color: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #991b1b; margin: 0 0 8px;"><strong>Title:</strong> ${reportTitle}</p>
+            <p style="color: #991b1b; margin: 0 0 8px;"><strong>Type:</strong> ${reportType}</p>
+            <p style="color: #991b1b; margin: 0;"><strong>Status:</strong> ${reportStatus}</p>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${platformLink}/org-admin/reports" style="background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Report</a>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    await updateEmailLog(log.id, 'sent');
+    console.log('Report notification sent to %s', to);
+    
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+    return info;
+  } catch (error: any) {
+    await updateEmailLog(log.id, 'failed', error.message);
+    console.error('Failed to send report notification email:', error);
+  }
+};
+
+export const sendIdCardNotification = async (
+  to: string,
+  userName: string,
+  idCardStatus: string,
+  organizationName: string,
+  userId?: string
+) => {
+  const log = await logEmail({
+    to,
+    subject: `ID Card Update: ${idCardStatus}`,
+    type: 'id_card',
+    userId,
+  });
+
+  try {
+    const transporter = await getTransporter();
+    const platformLink = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const mailOptions = {
+      from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
+      to,
+      subject: `ID Card Update: ${idCardStatus}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #8b5cf6;">ID Card Update! 🪪</h2>
+          <p style="color: #475569; font-size: 16px;">Hi ${userName}, your ID card status has been updated to: ${idCardStatus}</p>
+          
+          <div style="background-color: #f5f3ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #6d28d9; margin: 0;"><strong>Organization:</strong> ${organizationName}</p>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${platformLink}/member/id-card" style="background-color: #8b5cf6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View ID Card</a>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    await updateEmailLog(log.id, 'sent');
+    console.log('ID card notification sent to %s', to);
+    
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+    return info;
+  } catch (error: any) {
+    await updateEmailLog(log.id, 'failed', error.message);
+    console.error('Failed to send ID card notification email:', error);
   }
 };

@@ -38,6 +38,12 @@ function parseJsonArray<T>(raw: string | null | undefined, fallback: T[]): T[] {
 export const getPlatformContent = async (_req: Request, res: Response) => {
   try {
     const config = await getOrCreateSystemConfig();
+    
+    // Count actual database records
+    const orgCount = await prisma.organization.count();
+    const memberCount = await prisma.user.count({ where: { role: 'member' } });
+    const eventCount = await prisma.event.count();
+    
     res.status(200).json({
       scope: 'platform',
       platformName: config.platformName,
@@ -47,8 +53,9 @@ export const getPlatformContent = async (_req: Request, res: Response) => {
         mission: config.aboutMission || '',
         story: config.aboutStory || '',
         stats: parseJsonArray(config.aboutStatsJson, [
-          { label: 'Founded', value: '2022' },
-          { label: 'Active Orgs', value: '100+' },
+          { label: 'Organizations', value: orgCount.toString() },
+          { label: 'Active Members', value: memberCount.toString() },
+          { label: 'Events', value: eventCount.toString() },
         ]),
         timeline: parseJsonArray(config.aboutTimelineJson, []),
       },

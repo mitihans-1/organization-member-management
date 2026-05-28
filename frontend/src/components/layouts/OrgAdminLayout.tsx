@@ -63,11 +63,11 @@ const OrgAdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isReportsOpen, setIsReportsOpen] = useState(true);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
   const orgLabel = user?.organization_name || 'Your organization';
   const mainRef = useRef<HTMLElement>(null);
 
-  type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
+  type ApiNotification = { id: string; title: string; read: boolean; createdAt: string; link?: string };
   type Panel = 'notifications' | 'user' | null;
 
   const [open, setOpen] = useState<Panel>(null);
@@ -422,6 +422,10 @@ const OrgAdminLayout: React.FC = () => {
                             type="button"
                             onClick={() => {
                               if (!n.read) markReadMut.mutate(n.id);
+                              if (n.link) {
+                                close();
+                                navigate(n.link);
+                              }
                             }}
                             disabled={markReadMut.isPending}
                             className={`flex w-full gap-3 px-3 py-3 text-left text-sm transition hover:bg-gray-50 disabled:opacity-60 ${
@@ -440,6 +444,9 @@ const OrgAdminLayout: React.FC = () => {
                                 {relativeTime(n.createdAt)}
                               </span>
                             </span>
+                            {n.link && (
+                              <ChevronDown className="mt-1.5 h-4 w-4 shrink-0 text-gray-400 rotate-[-90deg]" />
+                            )}
                           </button>
                         </li>
                       ))

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { sendOtpEmail } from '../services/emailService';
 
 const prisma = new PrismaClient();
 
@@ -40,6 +41,9 @@ export const getAllOrganizations = async (req: any, res: Response) => {
   }
 };
 
+// Helper to generate 6-digit OTP
+const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
+
 export const createOrganization = async (req: any, res: Response) => {
   if (req.user.role !== 'SuperAdmin') {
     return res.status(403).json({ message: 'Forbidden: SuperAdmin only' });
@@ -60,19 +64,46 @@ export const createOrganization = async (req: any, res: Response) => {
     let organization;
     if (name && email && password) {
       const hashedPassword = await bcrypt.hash(password, 10);
-      organization = await prisma.user.create({
-        data: {
+      
+      // Generate OTP
+      const otpCode = generateOtp();
+      const hashedOtp = await bcrypt.hash(otpCode, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60000);
+
+      // Create pending user
+      await prisma.pendingUser.upsert({
+        where: { email },
+        update: {
+          name,
+          password: hashedPassword,
+          role: 'orgAdmin',
+          organization_name: orgName,
+          organization_type: orgType,
+          organization_id: organizationRow.id,
+          otp_code: hashedOtp,
+          expiresAt,
+        },
+        create: {
           name,
           email,
           password: hashedPassword,
+          role: 'orgAdmin',
           organization_name: orgName,
           organization_type: orgType,
-          organizationId: organizationRow.id,
-          role: 'orgAdmin',
-          plan_id: plan_id ? plan_id : undefined,
-          is_verified: false,
+          organization_id: organizationRow.id,
+          otp_code: hashedOtp,
+          expiresAt,
         },
       });
+
+      // Send OTP email
+      try {
+        await sendOtpEmail(email, otpCode, name);
+      } catch (emailError) {
+        console.error('Failed to send OTP email:', emailError);
+      }
+
+      organization = organizationRow;
     } else {
       organization = organizationRow;
     }
@@ -191,21 +222,45 @@ export const createOrgAdmin = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'Organization not found' });
     }
 
-    const orgAdmin = await prisma.user.create({
-      data: {
+    // Generate OTP
+    const otpCode = generateOtp();
+    const hashedOtp = await bcrypt.hash(otpCode, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60000);
+
+    // Create pending user
+    await prisma.pendingUser.upsert({
+      where: { email },
+      update: {
+        name,
+        password: hashedPassword,
+        role: 'orgAdmin',
+        organization_name: organization.name,
+        organization_type: organization.type,
+        organization_id: organization.id,
+        otp_code: hashedOtp,
+        expiresAt,
+      },
+      create: {
         name,
         email,
         password: hashedPassword,
+        role: 'orgAdmin',
         organization_name: organization.name,
         organization_type: organization.type,
-        organizationId: organization.id,
-        role: 'orgAdmin',
-        plan_id: plan_id ? plan_id : undefined,
-        is_verified: false,
+        organization_id: organization.id,
+        otp_code: hashedOtp,
+        expiresAt,
       },
     });
 
-    res.status(201).json(orgAdmin);
+    // Send OTP email
+    try {
+      await sendOtpEmail(email, otpCode, name);
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError);
+    }
+
+    res.status(201).json({ message: 'Org admin created successfully. OTP sent to email.' });
   } catch (error) {
     res.status(500).json({ message: 'Error creating org admin', error });
   }

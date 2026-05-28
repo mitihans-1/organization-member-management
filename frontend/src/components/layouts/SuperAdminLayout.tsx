@@ -9,7 +9,6 @@ import {
   Building2,
   UserCog,
   Users,
-  UserRound,
   CreditCard,
   Settings,
   Bell,
@@ -30,7 +29,6 @@ const navItems = [
   { to: '/super-admin', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-sky-500' },
   { to: '/super-admin/organizations', label: 'Organizations', icon: Building2, color: 'text-indigo-500' },
   { to: '/super-admin/org-admins', label: 'OrgAdmins', icon: Users, color: 'text-blue-500' },
-  { to: '/super-admin/members', label: 'Members', icon: UserRound, color: 'text-emerald-500' },
   { to: '/super-admin/plans', label: 'Upgrade Plans', icon: Zap, color: 'text-amber-500' },
   { to: '/super-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-rose-500' },
 ];
@@ -59,12 +57,12 @@ const SuperAdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  type ApiNotification = { id: string; title: string; read: boolean; createdAt: string };
+  type ApiNotification = { id: string; title: string; read: boolean; createdAt: string; link?: string };
   type Panel = 'notifications' | 'user' | null;
 
   const [open, setOpen] = useState<Panel>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isReportsOpen, setIsReportsOpen] = useState(true);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const baseId = useId();
@@ -402,6 +400,10 @@ const SuperAdminLayout: React.FC = () => {
                             type="button"
                             onClick={() => {
                               if (!n.read) markReadMut.mutate(n.id);
+                              if (n.link) {
+                                close();
+                                navigate(n.link);
+                              }
                             }}
                             disabled={markReadMut.isPending}
                             className={`flex w-full gap-3 px-3 py-3 text-left text-sm transition hover:bg-gray-50 disabled:opacity-60 ${
@@ -420,6 +422,9 @@ const SuperAdminLayout: React.FC = () => {
                                 {relativeTime(n.createdAt)}
                               </span>
                             </span>
+                            {n.link && (
+                              <ChevronDown className="mt-1.5 h-4 w-4 shrink-0 text-gray-400 rotate-[-90deg]" />
+                            )}
                           </button>
                         </li>
                       ))

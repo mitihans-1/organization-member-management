@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -29,6 +29,19 @@ const OrganiReport: React.FC = () => {
   const [dateRange, setDateRange] = useState('month');
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  const closeExportDropdown = useCallback(() => setIsExportOpen(false), []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        closeExportDropdown();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [closeExportDropdown]);
 
   // Members filters (columns: Member, Email, Phone, Role, Status, Verified, Gender, Age, Joined, Last Login)
   const [memStatusFilter, setMemStatusFilter] = useState('all');
@@ -260,7 +273,7 @@ const OrganiReport: React.FC = () => {
           <h1 className="text-2xl font-black text-gray-900">Organization Reports</h1>
           <p className="text-sm text-gray-500 mt-1">Analytics and insights for your organization</p>
         </div>
-        <div className="relative">
+        <div className="relative" ref={exportDropdownRef}>
           <button
             onClick={() => setIsExportOpen(!isExportOpen)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"

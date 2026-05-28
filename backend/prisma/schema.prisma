@@ -18,6 +18,10 @@ model PendingUser {
   organization_name String?
   organization_type String?
   organization_id   String?
+  phone             String?
+  address           String?
+  sex               String?
+  join_date         DateTime?
   otp_code          String
   expiresAt         DateTime
   createdAt         DateTime @default(now())
@@ -218,6 +222,7 @@ model Notification {
   userId    String
   title     String
   read      Boolean  @default(false)
+  link      String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -20,6 +20,7 @@ export const listNotifications = async (req: any, res: Response) => {
         id: n.id,
         title: n.title,
         read: n.read,
+        link: n.link,
         createdAt: n.createdAt.toISOString(),
       })),
     );
@@ -35,6 +36,7 @@ export const createTestNotification = async (req: any, res: Response) => {
       data: {
         userId: req.user.userId,
         title: req.body.title || 'Test Notification',
+        link: req.body.link,
       },
     });
 

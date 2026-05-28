@@ -12,7 +12,6 @@ import MemberLayout from './components/layouts/MemberLayout';
 import SuperAdminDashboard from './pages/super-admin/SuperAdminDashboard';
 import SuperAdminOrgAdmins from './pages/super-admin/SuperAdminOrgAdmins';
 import SuperAdminAddAdmin from './pages/super-admin/SuperAdminAddAdmin';
-import SuperAdminMembers from './pages/super-admin/SuperAdminMembers';
 import SuperAdminPayments from './pages/super-admin/SuperAdminPayments';
 import PlanManagement from './pages/super-admin/PlanManagement';
 import SuperAdminTickets from './pages/super-admin/SuperAdminTickets';
@@ -106,7 +105,6 @@ const App: React.FC = () => {
               <Route path="organizations" element={<AdminOrganizations />} />
               <Route path="org-admins" element={<SuperAdminOrgAdmins />} />
               <Route path="add-admin" element={<SuperAdminAddAdmin />} />
-              <Route path="members" element={<SuperAdminMembers />} />
               <Route path="plans" element={<PlanManagement />} />
               <Route path="payments" element={<SuperAdminPayments />} />
               <Route path="reports" element={<SuperReport />} />

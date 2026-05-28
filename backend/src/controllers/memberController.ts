@@ -1,8 +1,12 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { sendOtpEmail } from '../services/emailService';
 
 const prisma = new PrismaClient();
+
+// Helper to generate 6-digit OTP
+const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export const getMembers = async (req: any, res: Response) => {
   try {
@@ -72,23 +76,53 @@ export const createMember = async (req: any, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password || 'password123', 10);
 
-    const member = await prisma.user.create({
-      data: {
+    // Generate OTP
+    const otpCode = generateOtp();
+    const hashedOtp = await bcrypt.hash(otpCode, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60000);
+
+    // Create pending user
+    await prisma.pendingUser.upsert({
+      where: { email },
+      update: {
         name,
-        email,
         password: hashedPassword,
+        role: 'member',
+        organization_name: targetOrgName,
+        organization_type: targetOrgType,
+        organization_id: targetOrgId,
         phone,
         address,
         sex,
         join_date: join_date ? new Date(join_date) : new Date(),
+        otp_code: hashedOtp,
+        expiresAt,
+      },
+      create: {
+        name,
+        email,
+        password: hashedPassword,
         role: 'member',
-        organizationId: targetOrgId,
         organization_name: targetOrgName,
         organization_type: targetOrgType,
-        is_verified: false,
+        organization_id: targetOrgId,
+        phone,
+        address,
+        sex,
+        join_date: join_date ? new Date(join_date) : new Date(),
+        otp_code: hashedOtp,
+        expiresAt,
       },
     });
-    res.status(201).json(member);
+
+    // Send OTP email
+    try {
+      await sendOtpEmail(email, otpCode, name);
+    } catch (emailError) {
+      console.error('Failed to send OTP email to new member:', emailError);
+    }
+
+    res.status(201).json({ message: 'Member created successfully. OTP sent to email.' });
   } catch (error) {
     res.status(500).json({ message: 'Error creating member', error });
   }

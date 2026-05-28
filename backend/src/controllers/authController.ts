@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { PrismaClient } from '@prisma/client';
-import { sendOtpEmail, sendResetPasswordEmail, sendWelcomeEmail } from '../services/emailService';
+import { sendOtpEmail, sendResetPasswordEmail, sendWelcomeEmail, sendNewMemberNotificationToOrgAdmin } from '../services/emailService';
 import { JWT_SECRET } from '../config/jwtConfig';
 import fs from 'fs';
 import path from 'path';
@@ -193,6 +193,10 @@ export const verifyOtp = async (req: Request, res: Response) => {
           organization_name: org.name,
           organization_type: org.type,
           is_verified: true,
+          phone: (pendingUser as any).phone,
+          address: (pendingUser as any).address,
+          sex: (pendingUser as any).sex,
+          join_date: (pendingUser as any).join_date,
         },
       });
     } else {
@@ -211,8 +215,34 @@ export const verifyOtp = async (req: Request, res: Response) => {
           organization_name: org.name,
           organization_type: org.type,
           is_verified: true,
+          phone: (pendingUser as any).phone,
+          address: (pendingUser as any).address,
+          sex: (pendingUser as any).sex,
+          join_date: (pendingUser as any).join_date,
         },
       });
+
+      // Notify org admins of new member
+      const orgAdmins = await prisma.user.findMany({
+        where: {
+          organizationId: org.id,
+          role: 'orgAdmin',
+        },
+      });
+      for (const orgAdmin of orgAdmins) {
+        try {
+          await sendNewMemberNotificationToOrgAdmin(
+            orgAdmin.email,
+            orgAdmin.name,
+            user.name,
+            user.email,
+            org.name,
+            orgAdmin.id
+          );
+        } catch (emailError) {
+          console.error('Failed to send new member notification to org admin:', emailError);
+        }
+      }
     }
 
     // Delete the pending user record

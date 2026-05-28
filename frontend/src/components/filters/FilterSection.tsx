@@ -15,7 +15,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   options,
   selectedValues,
   onChange,
-  defaultExpanded = true,
+  defaultExpanded = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 

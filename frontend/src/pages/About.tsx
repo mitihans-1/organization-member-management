@@ -12,7 +12,7 @@ import {
 
 const About: React.FC = () => {
   const { user } = useAuth();
-  const isOrgUser = user?.role === 'member' || user?.role === 'orgAdmin';
+  const isOrgUser = user?.role === 'member';
 
   const platformQuery = useQuery<PlatformContentResponse>({
     queryKey: ['platform-content'],
