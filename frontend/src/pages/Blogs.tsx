@@ -77,8 +77,21 @@ const Blogs: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/blogs/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blogs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      alert('Blog post deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting blog:', error);
+      alert(error.response?.data?.message || 'Failed to delete blog post.');
+    }
   });
+
+  const handleDeleteBlog = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this blog post?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const categoryOptionsForFilter = useMemo(() => {
     const fromDb = new Set<string>();
@@ -310,32 +323,32 @@ const Blogs: React.FC = () => {
                         <MoreVertical size={18} />
                       </button>
                       {openActionMenuId === blog.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white shadow-lg py-1"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              openModal(blog);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white shadow-lg py-1"
                           >
-                            Edit post
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenActionMenuId(null);
-                              deleteMutation.mutate(blog.id);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            Delete post
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                openModal(blog);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              Edit post
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                handleDeleteBlog(blog.id);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                            >
+                              Delete post
+                            </button>
+                          </div>
+                        )}
                     </div>
                   )}
                 </div>
@@ -359,7 +372,7 @@ const Blogs: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteMutation.mutate(blog.id)}
+                        onClick={() => handleDeleteBlog(blog.id)}
                         className="p-2 rounded-lg border border-gray-200 hover:bg-red-50 text-red-600"
                         title="Delete"
                       >

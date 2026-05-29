@@ -45,8 +45,21 @@ const PlatformBlogs: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/blogs/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-blogs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-blogs'] });
+      alert('Blog deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting blog:', error);
+      alert(error.response?.data?.message || 'Failed to delete blog.');
+    }
   });
+
+  const handleDeleteBlog = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this blog?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const openNew = () => {
     setEditing(null);
@@ -77,7 +90,7 @@ const PlatformBlogs: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-slate-900">Platform Blogs</h1>
           <p className="text-sm text-slate-500">
-            Predefined blogs shown to org admins/guests (controlled by Super Admin).
+            blogs shown to org admins/guests (controlled by Super Admin).
           </p>
         </div>
         <button
@@ -117,7 +130,7 @@ const PlatformBlogs: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteMutation.mutate(b.id)}
+                    onClick={() => handleDeleteBlog(b.id)}
                     className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm font-bold"
                   >
                     Delete

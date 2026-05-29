@@ -60,8 +60,19 @@ interface OrganizationWithAdmin {
     mutationFn: (id: string) => api.delete(`/admin/organizations/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] });
+      alert('Organization deleted successfully!');
     },
+    onError: (error: any) => {
+      console.error('Error deleting organization:', error);
+      alert(error.response?.data?.message || 'Failed to delete organization.');
+    }
   });
+
+  const handleDeleteOrganization = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this organization?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const openModal = (org?: User) => {
     if (org) {
@@ -222,9 +233,9 @@ interface OrganizationWithAdmin {
                             <Edit2 size={16} />
                           </button>
                         )}
-                        <button 
-                        title='Delete organization'
-                          onClick={() => { if (confirm('Are you sure you want to delete this organization?')) deleteMutation.mutate(admin?.id || org.id) }}
+                        <button
+                          title='Delete organization'
+                          onClick={() => handleDeleteOrganization(admin?.id || org.id)}
                           className="p-2 bg-white shadow-sm border border-gray-100 rounded-xl hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 size={16} />

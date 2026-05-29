@@ -27,7 +27,7 @@ const Register: React.FC = () => {
   const [orgsLoading, setOrgsLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // OTP States
   const [step, setStep] = useState<'register' | 'otp'>('register');
   const [registeredEmail, setRegisteredEmail] = useState('');
@@ -84,14 +84,14 @@ const Register: React.FC = () => {
 
     try {
       const response = await api.post('/auth/register', payload);
-      
+
       if (response.data.requiresOtp) {
-          setRegisteredEmail(response.data.email);
-          setStep('otp');
+        setRegisteredEmail(response.data.email);
+        setStep('otp');
       } else {
-          // Fallback if OTP is disabled
-          login(response.data.token, response.data.user);
-          navigate(defaultPathForRole(response.data.user?.role), { replace: true });
+        // Fallback if OTP is disabled
+        login(response.data.token, response.data.user);
+        navigate(defaultPathForRole(response.data.user?.role), { replace: true });
       }
     } catch (err: any) {
       const message = err.response?.data?.message || 'Failed to register';
@@ -147,243 +147,244 @@ const Register: React.FC = () => {
           your organization, or as a <span className="font-semibold text-gray-700">member</span> to join an existing
           one. SuperAdmin accounts are created manually—not through this page.
         </p>
-        <p className="mt-4 text-center text-sm text-brand-deep font-medium">
-          Already have an account?{' '}
-          <Link to="/login" className="font-bold text-brand-medium hover:text-brand-light transition-colors">
-            Sign in
-          </Link>
-        </p>
+
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-10 px-8 shadow-2xl sm:rounded-[2.5rem] border border-gray-100">
-          
+
           {step === 'otp' ? (
-             <form className="space-y-6" onSubmit={handleVerifyOtp}>
-               <div className="text-center mb-6">
-                 <h3 className="text-xl font-bold text-gray-900">Check your email</h3>
-                 <p className="text-sm text-gray-500 mt-2">
-                   We sent a 6-digit code to <span className="font-semibold text-gray-700">{registeredEmail}</span>
-                 </p>
-               </div>
-
-               {otpError && (
-                 <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm font-medium border border-red-100 text-center">
-                   {otpError}
-                 </div>
-               )}
-
-               <div>
-                 <input
-                   type="text"
-                   required
-                   maxLength={6}
-                   value={otpCode}
-                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                   placeholder="000000"
-                   className="block w-full text-center text-3xl tracking-[0.5em] py-4 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-0 transition-all font-bold text-gray-800"
-                 />
-               </div>
-
-               <button
-                 type="submit"
-                 disabled={loading || otpCode.length < 6}
-                 className="w-full flex justify-center py-3.5 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all"
-               >
-                 {loading ? 'Verifying...' : 'Verify Account'}
-               </button>
-
-               <div className="text-center">
-                 <button
-                   type="button"
-                   onClick={handleResendOtp}
-                   disabled={resendLoading}
-                   className="text-sm text-indigo-600 font-bold hover:text-indigo-500 transition-colors disabled:opacity-50"
-                 >
-                   {resendLoading ? 'Sending...' : 'Resend Code'}
-                 </button>
-               </div>
-             </form>
-          ) : (
-             <form className="space-y-5" onSubmit={handleSubmit}>
-               {error && (
-              <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm font-medium border border-red-100">
-                {error}
+            <form className="space-y-6" onSubmit={handleVerifyOtp}>
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Check your email</h3>
+                <p className="text-sm text-gray-500 mt-2">
+                  We sent a 6-digit code to <span className="font-semibold text-gray-700">{registeredEmail}</span>
+                </p>
               </div>
-            )}
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
-                Register as
-              </label>
-              <div className="relative rounded-2xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Users className="h-5 w-5 text-brand-medium/50" />
+              {otpError && (
+                <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm font-medium border border-red-100 text-center">
+                  {otpError}
                 </div>
-                <select
-                title='riole'
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="block w-full pl-12 pr-4 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm appearance-none"
-                >
-                  <option value="orgAdmin">Organization Admin</option>
-                  <option value="member">Member</option>
-                </select>
-              </div>
-            </div>
+              )}
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">Full Name</label>
-              <div className="relative rounded-2xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-brand-medium/50" />
-                </div>
+              <div>
                 <input
-                  name="name"
                   type="text"
-                  autoComplete="name"
                   required
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium"
-                  placeholder="John Doe"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="block w-full text-center text-3xl tracking-[0.5em] py-4 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-0 transition-all font-bold text-gray-800"
                 />
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">Email address</label>
-              <div className="relative rounded-2xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-brand-medium/50" />
+              <button
+                type="submit"
+                disabled={loading || otpCode.length < 6}
+                className="w-full flex justify-center py-3.5 border border-transparent rounded-2xl shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all"
+              >
+                {loading ? 'Verifying...' : 'Verify Account'}
+              </button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendLoading}
+                  className="text-sm text-indigo-600 font-bold hover:text-indigo-500 transition-colors disabled:opacity-50"
+                >
+                  {resendLoading ? 'Sending...' : 'Resend Code'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              {error && (
+                <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-sm font-medium border border-red-100">
+                  {error}
                 </div>
-                <input
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium"
-                  placeholder="you@example.com"
-                />
-              </div>
-            </div>
+              )}
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">Password</label>
-              <div className="relative rounded-2xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-brand-medium/50" />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
+                  Register as
+                </label>
+                <div className="relative rounded-2xl shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Users className="h-5 w-5 text-brand-medium/50" />
+                  </div>
+                  <select
+                    title='riole'
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="block w-full pl-12 pr-4 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm appearance-none"
+                  >
+                    <option value="orgAdmin">Organization Admin</option>
+                    <option value="member">Member</option>
+                  </select>
                 </div>
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium"
-                  placeholder="••••••••"
-                />
               </div>
-            </div>
 
-            {isOrganAdmin && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">Full Name</label>
+                <div className="relative rounded-2xl shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-brand-medium/50" />
+                  </div>
+                  <input
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium"
+                    placeholder="John Doe"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">Email address</label>
+                <div className="relative rounded-2xl shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-brand-medium/50" />
+                  </div>
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium"
+                    placeholder="you@example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">Password</label>
+                <div className="relative rounded-2xl shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-brand-medium/50" />
+                  </div>
+                  <input
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              {isOrganAdmin && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
+                      Organization name
+                    </label>
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Building className="h-5 w-5 text-brand-medium/50" />
+                      </div>
+                      <input
+                        name="organization_name"
+                        type="text"
+                        required
+                        value={formData.organization_name}
+                        onChange={handleChange}
+                        className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm"
+                        placeholder="Company Name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
+                      Organization type
+                    </label>
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Briefcase className="h-5 w-5 text-brand-medium/50" />
+                      </div>
+                      <select
+                        title="Organization type"
+                        name="organization_type"
+                        value={formData.organization_type}
+                        onChange={handleChange}
+                        className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm appearance-none"
+                      >
+                        <option value="business">Business</option>
+                        <option value="nonprofit">Non-Profit</option>
+                        <option value="government">Government</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isOrganAdmin && (
+                <div className="space-y-1.5">
                   <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
-                    Organization name
+                    Select Organization
                   </label>
                   <div className="relative rounded-2xl shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                       <Building className="h-5 w-5 text-brand-medium/50" />
                     </div>
-                    <input
-                      name="organization_name"
-                      type="text"
-                      required
-                      value={formData.organization_name}
-                      onChange={handleChange}
-                      className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm"
-                      placeholder="Company Name"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
-                    Organization type
-                  </label>
-                  <div className="relative rounded-2xl shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Briefcase className="h-5 w-5 text-brand-medium/50" />
-                    </div>
                     <select
-                      title="Organization type"
-                      name="organization_type"
-                      value={formData.organization_type}
+                      title='select organization'
+                      name="organization_id"
+                      required
+                      value={formData.organization_id}
                       onChange={handleChange}
-                      className="block w-full pl-12 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm appearance-none"
+                      disabled={orgsLoading}
+                      className="block w-full pl-12 pr-4 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm appearance-none disabled:opacity-60"
                     >
-                      <option value="business">Business</option>
-                      <option value="nonprofit">Non-Profit</option>
-                      <option value="government">Government</option>
-                      <option value="other">Other</option>
+                      <option value="">
+                        {orgsLoading ? 'Loading organizations…' : 'Choose an organization'}
+                      </option>
+                      {orgs.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
+                  {!orgsLoading && orgs.length === 0 && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      No organizations are available yet. An organization admin must register first.
+                    </p>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {!isOrganAdmin && (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-brand-deep uppercase tracking-widest ml-1">
-                  Select Organization
-                </label>
-                <div className="relative rounded-2xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Building className="h-5 w-5 text-brand-medium/50" />
-                  </div>
-                  <select
-                  title='select organization'
-                    name="organization_id"
-                    required
-                    value={formData.organization_id}
-                    onChange={handleChange}
-                    disabled={orgsLoading}
-                    className="block w-full pl-12 pr-4 py-3.5 border-2 border-gray-50 bg-gray-50 rounded-2xl focus:border-brand-medium focus:ring-0 transition-all font-medium text-sm appearance-none disabled:opacity-60"
-                  >
-                    <option value="">
-                      {orgsLoading ? 'Loading organizations…' : 'Choose an organization'}
-                    </option>
-                    {orgs.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {!orgsLoading && orgs.length === 0 && (
-                  <p className="text-xs text-amber-700 mt-1">
-                    No organizations are available yet. An organization admin must register first.
-                  </p>
-                )}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading || (!isOrganAdmin && orgs.length === 0 && !orgsLoading)}
+                  className="w-full flex justify-center py-4 px-4 border border-transparent rounded-2xl shadow-xl text-lg font-black text-white bg-brand-medium hover:bg-brand-light focus:outline-none transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Creating account...' : 'Create account'}
+                  {!loading && <UserPlus className="ml-2 h-5 w-5" />}
+                </button>
+                <p className="mt-4 text-center text-sm text-brand-deep font-medium">
+                  Already have an account?{' '}
+                  <Link to="/login" className="font-bold text-brand-medium hover:text-brand-light transition-colors">
+                    Sign in
+                  </Link>
+                </p>
               </div>
-            )}
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading || (!isOrganAdmin && orgs.length === 0 && !orgsLoading)}
-                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-2xl shadow-xl text-lg font-black text-white bg-brand-medium hover:bg-brand-light focus:outline-none transition-all disabled:opacity-50"
-              >
-                {loading ? 'Creating account...' : 'Create account'}
-                {!loading && <UserPlus className="ml-2 h-5 w-5" />}
-              </button>
-            </div>
-          </form>
+            </form>
           )}
 
           <div className="mt-8">

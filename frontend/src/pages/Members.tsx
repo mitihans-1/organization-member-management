@@ -96,8 +96,21 @@ const Members: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/members/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+      alert('Member deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting member:', error);
+      alert(error.response?.data?.message || 'Failed to delete member.');
+    }
   });
+
+  const handleDeleteMember = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this member?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -214,6 +227,11 @@ const Members: React.FC = () => {
         setSelected(new Set());
         setOpenActionMenuId(null);
         queryClient.invalidateQueries({ queryKey: ['members'] });
+        alert('Members deleted successfully!');
+      })
+      .catch((error) => {
+        console.error('Error deleting members:', error);
+        alert(error.response?.data?.message || 'Failed to delete members.');
       })
       .finally(() => setIsBulkDeleting(false));
   };
@@ -518,7 +536,7 @@ const Members: React.FC = () => {
                         <button
                           type="button"
                           title="Delete"
-                          onClick={() => deleteMutation.mutate(member.id)}
+                          onClick={() => handleDeleteMember(member.id)}
                           className="p-2 rounded-lg hover:bg-gray-100 text-red-500"
                         >
                           <Trash2 size={16} />
@@ -552,7 +570,7 @@ const Members: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 setOpenActionMenuId(null);
-                                deleteMutation.mutate(member.id);
+                                handleDeleteMember(member.id);
                               }}
                               className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                             >

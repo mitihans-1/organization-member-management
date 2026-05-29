@@ -85,22 +85,38 @@ export const sendOtpEmail = async (to: string, otpCode: string, name: string) =>
   try {
     const transporter = await getTransporter();
 
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const mailOptions = {
       from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
       to,
       subject: 'Your Registration OTP Code',
       html: `
-        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
           <h2 style="color: #4f46e5;">Welcome, ${name}!</h2>
           <p style="color: #475569; font-size: 16px;">Thank you for registering. To complete your account setup, please use the following One-Time Password (OTP):</p>
           <div style="background-color: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
             <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1e293b;">${otpCode}</span>
           </div>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${frontendUrl}" style="background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Go to Platform</a>
+          </div>
           <p style="color: #64748b; font-size: 14px;">This code will expire in 10 minutes.</p>
+          
           <hr style="border-top: 1px solid #e2e8f0; margin: 20px 0;" />
           <p style="color: #94a3b8; font-size: 12px;">If you did not request this code, please ignore this email.</p>
+          
+          <p style="color: #94a3b8; font-size: 11px; margin-top: 30px; text-align: center; line-height: 1.4;">
+            Sent by Organization Management System.<br/>
+            Addis Ababa, Ethiopia | <a href="${frontendUrl}/unsubscribe" style="color: #4f46e5; text-decoration: underline;">Manage Notifications</a>
+          </p>
         </div>
       `,
+      headers: {
+        'Precedence': 'bulk',
+        'X-Auto-Response-Suppress': 'All',
+        'List-Unsubscribe': `<${frontendUrl}/unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+      }
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -186,12 +202,13 @@ export const sendWelcomeEmail = async (to: string, name: string, userId: string)
   try {
     const transporter = await getTransporter();
 
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const mailOptions = {
       from: `"Organization Management" <${process.env.SMTP_USER || 'noreply@orgmanagement.com'}>`,
       to,
       subject: 'Welcome to OMMS!',
       html: `
-        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <div style="font-family: Arial, sans-serif; max-w-lg; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background-color: #ffffff;">
           <h2 style="color: #10b981;">Welcome aboard, ${name}! 🎉</h2>
           <p style="color: #475569; font-size: 16px;">Thank you for joining OMMS. Your account is now active and ready to use!</p>
           
@@ -204,9 +221,24 @@ export const sendWelcomeEmail = async (to: string, name: string, userId: string)
             </ul>
           </div>
 
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${frontendUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block;">Go to Dashboard</a>
+          </div>
+
           <p style="color: #94a3b8; font-size: 12px;">If you have any questions, feel free to contact our support team.</p>
+          
+          <p style="color: #94a3b8; font-size: 11px; margin-top: 30px; text-align: center; line-height: 1.4;">
+            Sent by Organization Management System.<br/>
+            Addis Ababa, Ethiopia | <a href="${frontendUrl}/unsubscribe" style="color: #10b981; text-decoration: underline;">Manage Notifications</a>
+          </p>
         </div>
       `,
+      headers: {
+        'Precedence': 'bulk',
+        'X-Auto-Response-Suppress': 'All',
+        'List-Unsubscribe': `<${frontendUrl}/unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+      }
     };
 
     const info = await transporter.sendMail(mailOptions);

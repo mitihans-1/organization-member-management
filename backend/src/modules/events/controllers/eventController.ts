@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { resolveCatalogWhere } from '../../../utils/catalogScope';
+import { sendNewEventNotification } from '../../../services/emailService';
 
 const prisma = new PrismaClient();
 
@@ -62,6 +63,49 @@ export const createEvent = async (req: any, res: Response) => {
         registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : null,
       },
     });
+
+    // Notify all organization members about the new event
+    if (event.organizationId && event.status !== 'Draft') {
+      const org = await prisma.organization.findUnique({
+        where: { id: event.organizationId }
+      });
+      
+      const members = await prisma.user.findMany({
+        where: {
+          organizationId: event.organizationId,
+          role: 'member',
+          is_verified: true
+        }
+      });
+
+      if (members.length > 0) {
+        // 1. Create in-app notifications
+        await prisma.notification.createMany({
+          data: members.map(member => ({
+            userId: member.id,
+            title: `New Event: ${event.title}`,
+            link: '/member/events'
+          }))
+        });
+
+        // 2. Send email notifications in the background
+        for (const member of members) {
+          sendNewEventNotification(
+            member.email,
+            member.name,
+            event.title,
+            event.date,
+            event.location,
+            org?.name || undefined,
+            member.id,
+            event.id
+          ).catch(emailError => {
+            console.error(`Failed to send event email notification to ${member.email}:`, emailError);
+          });
+        }
+      }
+    }
+
     res.status(201).json(event);
   } catch (error) {
     res.status(500).json({ message: 'Error creating event', error });

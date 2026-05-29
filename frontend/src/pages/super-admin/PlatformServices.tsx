@@ -47,8 +47,21 @@ const PlatformServices: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/services/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-services-admin'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-services-admin'] });
+      alert('Service deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting service:', error);
+      alert(error.response?.data?.message || 'Failed to delete service.');
+    }
   });
+
+  const handleDeleteService = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this service?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const openNew = () => {
     setEditing(null);
@@ -89,7 +102,7 @@ const PlatformServices: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-slate-900">Platform Services</h1>
           <p className="text-sm text-slate-500">
-            Predefined services shown to org admins/guests (controlled by Super Admin).
+            services shown to org admins/guests (controlled by Super Admin).
           </p>
         </div>
         <button
@@ -129,7 +142,7 @@ const PlatformServices: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteMutation.mutate(s.id)}
+                    onClick={() => handleDeleteService(s.id)}
                     className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm font-bold"
                   >
                     Delete

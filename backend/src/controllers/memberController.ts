@@ -154,11 +154,121 @@ export const updateMember = async (req: any, res: Response) => {
 export const deleteMember = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
+    
+    // First delete all related records to maintain database integrity
+    await prisma.memberAttributeValue.deleteMany({ where: { memberId: id } });
+    await prisma.notification.deleteMany({ where: { userId: id } });
+    await prisma.otpToken.deleteMany({ where: { userId: id } });
+    await prisma.member.deleteMany({ where: { user_id: id } });
+    
+    // Clean up IdCard and dependent Print Logs
+    const idCards = await prisma.idCard.findMany({ where: { userId: id } });
+    const idCardIds = idCards.map(c => c.id);
+    if (idCardIds.length > 0) {
+      await prisma.idCardPrintLog.deleteMany({ where: { idCardId: { in: idCardIds } } });
+    }
+    await prisma.idCard.deleteMany({ where: { userId: id } });
+    await prisma.idCardRequest.deleteMany({ where: { userId: id } });
+    await prisma.idCardVerificationLog.deleteMany({ where: { memberId: id } });
+    
+    await prisma.report.deleteMany({ where: { memberId: id } });
+    await prisma.eventMessage.deleteMany({ where: { senderId: id } });
+    await prisma.emailNotificationLog.deleteMany({ where: { userId: id } });
+    
+    // Chat messages and conversations
+    await prisma.message.deleteMany({ where: { senderId: id } });
+    await prisma.conversation.deleteMany({
+      where: {
+        OR: [
+          { participant1Id: id },
+          { participant2Id: id }
+        ]
+      }
+    });
+
+    // Event participants and attendance logs
+    await prisma.eventParticipant.deleteMany({ where: { userId: id } });
+    await prisma.eventAttendance.deleteMany({ where: { userId: id } });
+
+    // Service feedbacks and activity history
+    await prisma.serviceFeedback.deleteMany({ where: { userId: id } });
+    await prisma.activityHistory.deleteMany({ where: { userId: id } });
+    await prisma.notificationCenter.deleteMany({ where: { userId: id } });
+
+    // Delete blogs authored by this member
+    await prisma.blog.deleteMany({ where: { author_id: id } });
+
+    // Service requests and approval workflows
+    const requests = await prisma.serviceRequest.findMany({ where: { userId: id } });
+    const requestIds = requests.map(req => req.id);
+    if (requestIds.length > 0) {
+      await prisma.serviceRequestAttachment.deleteMany({ where: { requestId: { in: requestIds } } });
+      await prisma.serviceInternalNote.deleteMany({ where: { requestId: { in: requestIds } } });
+      await prisma.serviceApproval.deleteMany({ where: { requestId: { in: requestIds } } });
+      await prisma.serviceApprovalAuditLog.deleteMany({ where: { requestId: { in: requestIds } } });
+      await prisma.serviceRequest.deleteMany({ where: { userId: id } });
+    }
+
+    // Invoices and sub-tables
+    const invoices = await prisma.invoice.findMany({ where: { memberId: id } });
+    const invoiceIds = invoices.map(inv => inv.id);
+    if (invoiceIds.length > 0) {
+      await prisma.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      await prisma.invoicePayment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      await prisma.invoiceReminder.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      await prisma.invoice.deleteMany({ where: { memberId: id } });
+    }
+
+    // Member subscriptions and payments
+    const subs = await prisma.memberSubscription.findMany({ where: { memberId: id } });
+    const subIds = subs.map(s => s.id);
+    if (subIds.length > 0) {
+      await prisma.memberSubscriptionPayment.deleteMany({ where: { subscriptionId: { in: subIds } } });
+      await prisma.memberSubscription.deleteMany({ where: { memberId: id } });
+    }
+
+    // Payments made by the user
+    const userPayments = await prisma.payment.findMany({ where: { user_id: id } });
+    const paymentIds = userPayments.map(p => p.id);
+    if (paymentIds.length > 0) {
+      await prisma.invoicePayment.deleteMany({ where: { paymentId: { in: paymentIds } } });
+      await prisma.memberSubscriptionPayment.deleteMany({ where: { paymentId: { in: paymentIds } } });
+      await prisma.payment.deleteMany({ where: { user_id: id } });
+    }
+    
+    // Remove user ID from event attendeesIds arrays (filtered in-memory since MongoDB/Prisma does not support pull in updateMany)
+    const eventsToUpdate = await prisma.event.findMany({
+      where: { attendeesIds: { has: id } }
+    });
+    for (const event of eventsToUpdate) {
+      await prisma.event.update({
+        where: { id: event.id },
+        data: {
+          attendeesIds: event.attendeesIds.filter(attendeeId => attendeeId !== id)
+        }
+      });
+    }
+    
+    // Remove user ID from service subscribersIds arrays (filtered in-memory)
+    const servicesToUpdate = await prisma.service.findMany({
+      where: { subscribersIds: { has: id } }
+    });
+    for (const service of servicesToUpdate) {
+      await prisma.service.update({
+        where: { id: service.id },
+        data: {
+          subscribersIds: service.subscribersIds.filter(subId => subId !== id)
+        }
+      });
+    }
+    
+    // Now delete the user
     await prisma.user.delete({
       where: { id: id },
     });
     res.status(204).send();
   } catch (error) {
+    console.error('Error deleting member:', error);
     res.status(500).json({ message: 'Error deleting member', error });
   }
 };

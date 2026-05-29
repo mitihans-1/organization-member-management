@@ -59,8 +59,19 @@ const PlanManagement: React.FC = () => {
     mutationFn: (id: string) => api.delete(`/plans/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
+      alert('Plan deleted successfully!');
     },
+    onError: (error: any) => {
+      console.error('Error deleting plan:', error);
+      alert(error.response?.data?.message || 'Failed to delete plan.');
+    }
   });
+
+  const handleDeletePlan = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this plan? This may affect existing organizations.')) {
+      deleteMutation.mutate(String(id));
+    }
+  };
 
   const openModal = (plan?: Plan) => {
     if (plan) {
@@ -215,11 +226,7 @@ const PlanManagement: React.FC = () => {
                         </button>
                         <button
                           title="Delete plan"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this plan? This may affect existing organizations.')) {
-                              deleteMutation.mutate(String(plan.id));
-                            }
-                          }}
+                          onClick={() => handleDeletePlan(plan.id)}
                           className="p-2 bg-white shadow-sm border border-slate-100 rounded-xl hover:text-red-600 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 size={16} />

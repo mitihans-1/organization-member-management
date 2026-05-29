@@ -79,8 +79,21 @@ const Events: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/events/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      alert('Event deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting event:', error);
+      alert(error.response?.data?.message || 'Failed to delete event.');
+    }
   });
+
+  const handleDeleteEvent = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const filtered = useMemo(() => {
     const list = events ?? [];
@@ -379,7 +392,7 @@ const Events: React.FC = () => {
                                 <button
                                   type="button"
                                   title="Delete"
-                                  onClick={() => deleteMutation.mutate(event.id)}
+                                  onClick={() => handleDeleteEvent(event.id)}
                                   className="p-2 rounded-lg hover:bg-gray-100 text-red-500"
                                 >
                                   <Trash2 size={16} />
@@ -411,7 +424,7 @@ const Events: React.FC = () => {
                                   type="button"
                                   onClick={() => {
                                     setOpenActionMenuId(null);
-                                    deleteMutation.mutate(event.id);
+                                    handleDeleteEvent(event.id);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                                 >

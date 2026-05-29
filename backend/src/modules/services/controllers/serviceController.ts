@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { resolveCatalogWhere } from '../../../utils/catalogScope';
+import { sendNewServiceNotification } from '../../../services/emailService';
 
 const prisma = new PrismaClient();
 
@@ -67,6 +68,47 @@ export const createService = async (req: any, res: Response) => {
         isPredefined: predefined,
       },
     });
+
+    // Notify all organization members about the new service
+    if (service.organizationId && service.status === 'Active') {
+      const org = await prisma.organization.findUnique({
+        where: { id: service.organizationId }
+      });
+      
+      const members = await prisma.user.findMany({
+        where: {
+          organizationId: service.organizationId,
+          role: 'member',
+          is_verified: true
+        }
+      });
+
+      if (members.length > 0) {
+        // 1. Create in-app notifications
+        await prisma.notification.createMany({
+          data: members.map(member => ({
+            userId: member.id,
+            title: `New Service: ${service.title}`,
+            link: '/member/services'
+          }))
+        });
+
+        // 2. Send email notifications in the background
+        for (const member of members) {
+          sendNewServiceNotification(
+            member.email,
+            member.name,
+            service.title || 'New Service',
+            service.description,
+            org?.name || undefined,
+            member.id
+          ).catch(emailError => {
+            console.error(`Failed to send service email notification to ${member.email}:`, emailError);
+          });
+        }
+      }
+    }
+
     res.status(201).json(service);
   } catch (error) {
     res.status(500).json({ message: 'Error creating service', error });

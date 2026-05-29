@@ -47,8 +47,21 @@ const PlatformEvents: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/events/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-events'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-events'] });
+      alert('Event deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting event:', error);
+      alert(error.response?.data?.message || 'Failed to delete event.');
+    }
   });
+
+  const handleDeleteEvent = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const openNew = () => {
     setEditing(null);
@@ -93,7 +106,7 @@ const PlatformEvents: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-slate-900">Platform Events</h1>
           <p className="text-sm text-slate-500">
-            Predefined events shown to org admins/guests (controlled by Super Admin).
+            events shown to org admins/guests (controlled by Super Admin).
           </p>
         </div>
         <button
@@ -133,7 +146,7 @@ const PlatformEvents: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteMutation.mutate(e.id)}
+                    onClick={() => handleDeleteEvent(e.id)}
                     className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm font-bold"
                   >
                     Delete

@@ -175,16 +175,54 @@ export const deleteOrganization = async (req: any, res: Response) => {
     // First check if id is a user or organization
     const user = await prisma.user.findUnique({ where: { id } });
     if (user && user.organizationId) {
-      // Delete both user and organization
-      await prisma.user.delete({ where: { id } });
-      await prisma.organization.delete({ where: { id: user.organizationId } });
+      // Delete all related records for the organization first
+      const orgId = user.organizationId;
+      
+      // Delete organization-related records
+      await prisma.blog.deleteMany({ where: { organizationId: orgId } });
+      await prisma.event.deleteMany({ where: { organizationId: orgId } });
+      await prisma.service.deleteMany({ where: { organizationId: orgId } });
+      await prisma.customAttributeDefinition.deleteMany({ where: { organizationId: orgId } });
+      await prisma.idCard.deleteMany({ where: { organizationId: orgId } });
+      await prisma.idCardRequest.deleteMany({ where: { organizationId: orgId } });
+      await prisma.idCardVerificationLog.deleteMany({ where: { organizationId: orgId } });
+      await prisma.report.deleteMany({ where: { organizationId: orgId } });
+      await prisma.memberSubscriptionPlan.deleteMany({ where: { organizationId: orgId } });
+      await prisma.memberSubscription.deleteMany({ where: { organizationId: orgId } });
+      await prisma.invoice.deleteMany({ where: { organizationId: orgId } });
+      
+      // Delete all users in the organization
+      await prisma.user.deleteMany({ where: { organizationId: orgId } });
+      
+      // Delete the organization
+      await prisma.organization.delete({ where: { id: orgId } });
     } else {
       // Delete organization directly
-      await prisma.organization.delete({ where: { id } });
+      const orgId = id;
+      
+      // Delete organization-related records
+      await prisma.blog.deleteMany({ where: { organizationId: orgId } });
+      await prisma.event.deleteMany({ where: { organizationId: orgId } });
+      await prisma.service.deleteMany({ where: { organizationId: orgId } });
+      await prisma.customAttributeDefinition.deleteMany({ where: { organizationId: orgId } });
+      await prisma.idCard.deleteMany({ where: { organizationId: orgId } });
+      await prisma.idCardRequest.deleteMany({ where: { organizationId: orgId } });
+      await prisma.idCardVerificationLog.deleteMany({ where: { organizationId: orgId } });
+      await prisma.report.deleteMany({ where: { organizationId: orgId } });
+      await prisma.memberSubscriptionPlan.deleteMany({ where: { organizationId: orgId } });
+      await prisma.memberSubscription.deleteMany({ where: { organizationId: orgId } });
+      await prisma.invoice.deleteMany({ where: { organizationId: orgId } });
+      
+      // Delete all users in the organization
+      await prisma.user.deleteMany({ where: { organizationId: orgId } });
+      
+      // Delete the organization
+      await prisma.organization.delete({ where: { id: orgId } });
     }
     
     res.status(204).send();
   } catch (error) {
+    console.error('Error deleting organization:', error);
     res.status(500).json({ message: 'Error deleting organization', error });
   }
 };
