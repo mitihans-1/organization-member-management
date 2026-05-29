@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
@@ -9,6 +10,7 @@ import {
   Ticket, Filter, Printer, Mail, 
   FileSpreadsheet, Shield, Briefcase, ChevronDown, Search
 } from 'lucide-react';
+import { reportService } from '../services/reportService';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -43,187 +45,99 @@ const OrganiReport: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [closeExportDropdown]);
 
-  // Members filters (columns: Member, Email, Phone, Role, Status, Verified, Gender, Age, Joined, Last Login)
+  // Members filters
   const [memStatusFilter, setMemStatusFilter] = useState('all');
   const [memVerifiedFilter, setMemVerifiedFilter] = useState('all');
   const [memRoleFilter, setMemRoleFilter] = useState('all');
   const [memGenderFilter, setMemGenderFilter] = useState('all');
 
-  // Events filters (columns: Event, Type, Status, Date, Time, Attendance, Capacity, Location, Organizer)
+  // Events filters
   const [evtStatusFilter, setEvtStatusFilter] = useState('all');
   const [evtTypeFilter, setEvtTypeFilter] = useState('all');
   const [evtLocationFilter, setEvtLocationFilter] = useState('all');
 
-  // Services filters (columns: Service, Category, Total Requests, Approved, Rejected, Pending, Status, Last Updated)
+  // Services filters
   const [svcStatusFilter, setSvcStatusFilter] = useState('all');
   const [svcCategoryFilter, setSvcCategoryFilter] = useState('all');
 
-  // Tickets filters (columns: Ticket ID, Title, Description, Category, Priority, Status, Created, Last Updated, Escalated, Assigned To)
+  // Tickets filters
   const [tkStatusFilter, setTkStatusFilter] = useState('all');
   const [tkPriorityFilter, setTkPriorityFilter] = useState('all');
   const [tkCategoryFilter, setTkCategoryFilter] = useState('all');
   const [tkEscalatedFilter, setTkEscalatedFilter] = useState('all');
   const [tkAssignedFilter, setTkAssignedFilter] = useState('all');
 
-  // Blogs filters (columns: Title, Excerpt, Author, Category, Views, Likes, Comments, Status, Date)
+  // Blogs filters
   const [blogStatusFilter, setBlogStatusFilter] = useState('all');
   const [blogCategoryFilter, setBlogCategoryFilter] = useState('all');
   const [blogAuthorFilter, setBlogAuthorFilter] = useState('all');
 
-  // Payments filters (columns: Invoice, Member, Amount, Method, Type, Transaction ID, Status, Date)
+  // Payments filters
   const [payStatusFilter, setPayStatusFilter] = useState('all');
   const [payMethodFilter, setPayMethodFilter] = useState('all');
   const [payTypeFilter, setPayTypeFilter] = useState('all');
 
-  // ID Cards filters (columns: Card Number, Member, Status, Generated, Expires, Verification, Last Renewed)
+  // ID Cards filters
   const [idStatusFilter, setIdStatusFilter] = useState('all');
   const [idVerificationFilter, setIdVerificationFilter] = useState('all');
 
-  const memberStatsData = [
-    { name: 'Jan', new: 40, active: 380 },
-    { name: 'Feb', new: 30, active: 350 },
-    { name: 'Mar', new: 50, active: 400 },
-    { name: 'Apr', new: 35, active: 385 },
-    { name: 'May', new: 45, active: 420 },
-    { name: 'Jun', new: 55, active: 460 },
-  ];
-
-  const eventAttendanceData = [
-    { name: 'Tech Summit', attendance: 120, capacity: 150 },
-    { name: 'Workshop', attendance: 80, capacity: 100 },
-    { name: 'Networking', attendance: 200, capacity: 200 },
-    { name: 'Webinar', attendance: 150, capacity: 200 },
-  ];
-
-  const ticketCategoriesData = [
-    { name: 'Technical', value: 45 },
-    { name: 'Billing', value: 30 },
-    { name: 'General', value: 80 },
-    { name: 'Event', value: 25 },
-  ];
-
-  const paymentData = [
-    { name: 'Jan', amount: 2400 },
-    { name: 'Feb', amount: 1398 },
-    { name: 'Mar', amount: 9800 },
-    { name: 'Apr', amount: 3908 },
-    { name: 'May', amount: 4800 },
-  ];
-
-  const memberTableData = [
-    { id: 1, name: 'Abel Tekle', email: 'abel@example.com', phone: '+251 911 001 001', role: 'Member', status: 'Active', verified: 'Yes', gender: 'Male', age: 28, joined: '2024-01-20', lastLogin: '2024-06-10' },
-    { id: 2, name: 'Sara Ahmed', email: 'sara@example.com', phone: '+251 911 002 002', role: 'Admin', status: 'Active', verified: 'Yes', gender: 'Female', age: 32, joined: '2024-02-25', lastLogin: '2024-06-10' },
-    { id: 3, name: 'Daniel Kebede', email: 'daniel@example.com', phone: '+251 911 003 003', role: 'Member', status: 'Inactive', verified: 'No', gender: 'Male', age: 45, joined: '2023-11-15', lastLogin: '2024-05-20' },
-    { id: 4, name: 'Hana Mekonnen', email: 'hana@example.com', phone: '+251 911 004 004', role: 'Moderator', status: 'Active', verified: 'Yes', gender: 'Female', age: 29, joined: '2024-03-10', lastLogin: '2024-06-09' },
-    { id: 5, name: 'Yonas Tesfaye', email: 'yonas@example.com', phone: '+251 911 005 005', role: 'Member', status: 'Active', verified: 'Yes', gender: 'Male', age: 35, joined: '2024-04-18', lastLogin: '2024-06-08' },
-  ];
-
-  const eventTableData = [
-    { id: 1, name: 'Tech Summit 2025', type: 'Conference', status: 'Upcoming', date: '2024-07-15', time: '09:00 AM', attendance: 0, capacity: 150, location: 'Addis Ababa', organizer: 'Events Team' },
-    { id: 2, name: 'Web Development Workshop', type: 'Workshop', status: 'Completed', date: '2024-06-01', time: '02:00 PM', attendance: 80, capacity: 100, location: 'Online', organizer: 'Tech Team' },
-    { id: 3, name: 'Networking Event', type: 'Social', status: 'Completed', date: '2024-05-20', time: '06:00 PM', attendance: 200, capacity: 200, location: 'Bole', organizer: 'Admin' },
-    { id: 4, name: 'Digital Marketing Webinar', type: 'Seminar', status: 'Upcoming', date: '2024-06-25', time: '11:00 AM', attendance: 0, capacity: 200, location: 'Online', organizer: 'Marketing Team' },
-    { id: 5, name: 'AI & ML Conference', type: 'Conference', status: 'Completed', date: '2024-04-10', time: '10:00 AM', attendance: 120, capacity: 150, location: 'Meskel Square', organizer: 'Tech Team' },
-  ];
-
-  const serviceTableData = [
-    { id: 1, name: 'ID Card Printing', category: 'Admin', requests: 45, approved: 42, rejected: 3, pending: 0, status: 'Active', lastUpdated: '2024-06-10' },
-    { id: 2, name: 'Event Booking', category: 'Events', requests: 32, approved: 28, rejected: 4, pending: 0, status: 'Active', lastUpdated: '2024-06-09' },
-    { id: 3, name: 'Consultation', category: 'Support', requests: 28, approved: 25, rejected: 3, pending: 0, status: 'Active', lastUpdated: '2024-06-08' },
-    { id: 4, name: 'Training', category: 'Education', requests: 19, approved: 15, rejected: 4, pending: 0, status: 'Inactive', lastUpdated: '2024-05-15' },
-  ];
-
-  const ticketTableData = [
-    { id: 'TK-001', title: 'Login not working', description: 'Cannot access admin dashboard after password reset', category: 'Technical', priority: 'High', status: 'Open', created: '2024-06-10', lastUpdated: '2024-06-10', escalated: 'No', assignedTo: 'Admin' },
-    { id: 'TK-002', title: 'Payment failed', description: 'Subscription payment not going through with Telebirr', category: 'Billing', priority: 'Medium', status: 'In Progress', created: '2024-06-09', lastUpdated: '2024-06-09', escalated: 'No', assignedTo: 'Support' },
-    { id: 'TK-003', title: 'Event registration', description: 'Need help registering for upcoming Tech Summit', category: 'Event', priority: 'Low', status: 'Resolved', created: '2024-06-05', lastUpdated: '2024-06-06', escalated: 'No', assignedTo: 'Events Team' },
-    { id: 'TK-004', title: 'Need help with profile', description: 'Profile picture not updating correctly', category: 'General', priority: 'Medium', status: 'Resolved', created: '2024-06-03', lastUpdated: '2024-06-04', escalated: 'Yes', assignedTo: 'Support' },
-  ];
-
-  const blogTableData = [
-    { id: 1, title: 'Welcome to OMMS', excerpt: 'Introduction to our organization management system', author: 'Admin', category: 'Announcement', views: 1245, likes: 45, comments: 12, status: 'Published', date: '2024-06-01' },
-    { id: 2, title: 'Membership Benefits', excerpt: 'Learn about all the benefits of being a member', author: 'Admin', category: 'Information', views: 890, likes: 32, comments: 8, status: 'Published', date: '2024-05-20' },
-    { id: 3, title: 'Upcoming Events', excerpt: 'Check out our exciting events for this month', author: 'Events Team', category: 'Events', views: 567, likes: 28, comments: 5, status: 'Published', date: '2024-05-15' },
-    { id: 4, title: 'How to use ID Card', excerpt: 'Complete guide to using your digital ID card', author: 'Support', category: 'Tutorial', views: 423, likes: 18, comments: 3, status: 'Draft', date: '2024-06-08' },
-  ];
-
-  const paymentTableData = [
-    { id: 1, member: 'Abel Tekle', invoice: 'INV-001', amount: 'ETB 500', method: 'Telebirr', type: 'Membership', status: 'Completed', date: '2024-06-01', transactionId: 'TXN-001' },
-    { id: 2, member: 'Sara Ahmed', invoice: 'INV-002', amount: 'ETB 1,000', method: 'CBE Birr', type: 'Service', status: 'Completed', date: '2024-06-02', transactionId: 'TXN-002' },
-    { id: 3, member: 'Daniel Kebede', invoice: 'INV-003', amount: 'ETB 500', method: 'Chapa', type: 'Membership', status: 'Pending', date: '2024-06-03', transactionId: 'TXN-003' },
-    { id: 4, member: 'Hana Mekonnen', invoice: 'INV-004', amount: 'ETB 750', method: 'Cash', type: 'Event', status: 'Completed', date: '2024-06-04', transactionId: 'TXN-004' },
-  ];
-
-  const idCardTableData = [
-    { id: 1, member: 'Abel Tekle', cardNumber: 'OMMS-0001', status: 'Active', generated: '2024-01-20', expires: '2025-01-20', verification: 'Verified', lastRenewed: '2024-01-20' },
-    { id: 2, member: 'Sara Ahmed', cardNumber: 'OMMS-0002', status: 'Active', generated: '2024-02-25', expires: '2025-02-25', verification: 'Verified', lastRenewed: '2024-02-25' },
-    { id: 3, member: 'Daniel Kebede', cardNumber: 'OMMS-0003', status: 'Expired', generated: '2023-11-15', expires: '2024-11-15', verification: 'Pending', lastRenewed: '2023-11-15' },
-    { id: 4, member: 'Hana Mekonnen', cardNumber: 'OMMS-0004', status: 'Active', generated: '2024-03-10', expires: '2025-03-10', verification: 'Verified', lastRenewed: '2024-03-10' },
-  ];
-
-  // --- Filtered data ---
-  const filteredMembers = memberTableData.filter((m) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !m.name.toLowerCase().includes(q) && !m.email.toLowerCase().includes(q)) return false;
-    if (memStatusFilter !== 'all' && m.status.toLowerCase() !== memStatusFilter) return false;
-    if (memVerifiedFilter !== 'all' && m.verified.toLowerCase() !== memVerifiedFilter) return false;
-    if (memRoleFilter !== 'all' && m.role.toLowerCase() !== memRoleFilter) return false;
-    if (memGenderFilter !== 'all' && m.gender.toLowerCase() !== memGenderFilter) return false;
-    return true;
-  });
-
-  const filteredEvents = eventTableData.filter((e) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !e.name.toLowerCase().includes(q)) return false;
-    if (evtStatusFilter !== 'all' && e.status.toLowerCase() !== evtStatusFilter) return false;
-    if (evtTypeFilter !== 'all' && e.type.toLowerCase() !== evtTypeFilter) return false;
-    if (evtLocationFilter !== 'all' && e.location.toLowerCase().replace(' ', '-') !== evtLocationFilter) return false;
-    return true;
-  });
-
-  const filteredServices = serviceTableData.filter((s) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !s.name.toLowerCase().includes(q)) return false;
-    if (svcStatusFilter !== 'all' && s.status.toLowerCase() !== svcStatusFilter) return false;
-    if (svcCategoryFilter !== 'all' && s.category.toLowerCase() !== svcCategoryFilter) return false;
-    return true;
-  });
-
-  const filteredTickets = ticketTableData.filter((t) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !t.title.toLowerCase().includes(q) && !t.id.toLowerCase().includes(q)) return false;
-    if (tkStatusFilter !== 'all' && t.status.toLowerCase().replace(' ', '-') !== tkStatusFilter) return false;
-    if (tkPriorityFilter !== 'all' && t.priority.toLowerCase() !== tkPriorityFilter) return false;
-    if (tkCategoryFilter !== 'all' && t.category.toLowerCase() !== tkCategoryFilter) return false;
-    if (tkEscalatedFilter !== 'all' && t.escalated.toLowerCase() !== tkEscalatedFilter) return false;
-    if (tkAssignedFilter !== 'all' && t.assignedTo.toLowerCase().replace(' ', '-') !== tkAssignedFilter) return false;
-    return true;
-  });
-
-  const filteredBlogs = blogTableData.filter((b) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !b.title.toLowerCase().includes(q)) return false;
-    if (blogStatusFilter !== 'all' && b.status.toLowerCase() !== blogStatusFilter) return false;
-    if (blogCategoryFilter !== 'all' && b.category.toLowerCase() !== blogCategoryFilter) return false;
-    if (blogAuthorFilter !== 'all' && b.author.toLowerCase().replace(' ', '-') !== blogAuthorFilter) return false;
-    return true;
-  });
-
-  const filteredPayments = paymentTableData.filter((p) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !p.invoice.toLowerCase().includes(q) && !p.member.toLowerCase().includes(q)) return false;
-    if (payStatusFilter !== 'all' && p.status.toLowerCase() !== payStatusFilter) return false;
-    if (payMethodFilter !== 'all' && p.method.toLowerCase().replace(' ', '-') !== payMethodFilter) return false;
-    if (payTypeFilter !== 'all' && p.type.toLowerCase() !== payTypeFilter) return false;
-    return true;
-  });
-
-  const filteredIdCards = idCardTableData.filter((c) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !c.member.toLowerCase().includes(q) && !c.cardNumber.toLowerCase().includes(q)) return false;
-    if (idStatusFilter !== 'all' && c.status.toLowerCase() !== idStatusFilter) return false;
-    if (idVerificationFilter !== 'all' && c.verification.toLowerCase() !== idVerificationFilter) return false;
-    return true;
+  // Fetch report data dynamically
+  const { data: reportData, isLoading } = useQuery({
+    queryKey: [
+      'org-analytics',
+      activeReport,
+      dateRange,
+      searchQuery,
+      memStatusFilter,
+      memVerifiedFilter,
+      memRoleFilter,
+      memGenderFilter,
+      evtStatusFilter,
+      evtTypeFilter,
+      evtLocationFilter,
+      svcStatusFilter,
+      svcCategoryFilter,
+      tkStatusFilter,
+      tkPriorityFilter,
+      tkCategoryFilter,
+      tkEscalatedFilter,
+      tkAssignedFilter,
+      blogStatusFilter,
+      blogCategoryFilter,
+      blogAuthorFilter,
+      payStatusFilter,
+      payMethodFilter,
+      payTypeFilter,
+      idStatusFilter,
+      idVerificationFilter
+    ],
+    queryFn: () => reportService.getOrgAnalytics({
+      tab: activeReport,
+      dateRange,
+      search: searchQuery,
+      memStatus: memStatusFilter,
+      memVerified: memVerifiedFilter,
+      memRole: memRoleFilter,
+      memGender: memGenderFilter,
+      evtStatus: evtStatusFilter,
+      evtType: evtTypeFilter,
+      evtLocation: evtLocationFilter,
+      svcStatus: svcStatusFilter,
+      svcCategory: svcCategoryFilter,
+      tkStatus: tkStatusFilter,
+      tkPriority: tkPriorityFilter,
+      tkCategory: tkCategoryFilter,
+      tkEscalated: tkEscalatedFilter,
+      tkAssigned: tkAssignedFilter,
+      blogStatus: blogStatusFilter,
+      blogCategory: blogCategoryFilter,
+      blogAuthor: blogAuthorFilter,
+      payStatus: payStatusFilter,
+      payMethod: payMethodFilter,
+      payType: payTypeFilter,
+      idStatus: idStatusFilter,
+      idVerification: idVerificationFilter
+    })
   });
 
   const hasActiveFilters = (() => {
@@ -249,12 +163,28 @@ const OrganiReport: React.FC = () => {
     setIdStatusFilter('all'); setIdVerificationFilter('all');
   };
 
-  const quickStats = [
-    { label: 'Total Members', value: '456', icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50' },
-    { label: 'Total Events', value: '24', icon: Calendar, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: 'Active Services', value: '12', icon: Briefcase, color: 'text-amber-500', bg: 'bg-amber-50' },
-    { label: 'Total Revenue', value: 'ETB 45,600', icon: CreditCard, color: 'text-rose-500', bg: 'bg-rose-50' },
-  ];
+  const getQuickStats = () => {
+    if (activeReport === 'overview' && reportData?.quickStats) {
+      const statsIcons = [Users, Calendar, Briefcase, CreditCard];
+      const statsBgs = ['bg-indigo-50', 'bg-emerald-50', 'bg-amber-50', 'bg-rose-50'];
+      const statsColors = ['text-indigo-500', 'text-emerald-500', 'text-amber-500', 'text-rose-500'];
+      return reportData.quickStats.map((stat: any, idx: number) => ({
+        label: stat.label,
+        value: stat.value,
+        icon: statsIcons[idx] || Briefcase,
+        color: statsColors[idx] || 'text-rose-500',
+        bg: statsBgs[idx] || 'bg-rose-50'
+      }));
+    }
+    return [
+      { label: 'Total Members', value: '...', icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+      { label: 'Total Events', value: '...', icon: Calendar, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+      { label: 'Active Services', value: '...', icon: Briefcase, color: 'text-amber-500', bg: 'bg-amber-50' },
+      { label: 'Total Revenue', value: '...', icon: CreditCard, color: 'text-rose-500', bg: 'bg-rose-50' },
+    ];
+  };
+
+  const quickStats = getQuickStats();
 
   const exportOptions = [
     { label: 'Export PDF', icon: FileText },
@@ -264,7 +194,7 @@ const OrganiReport: React.FC = () => {
     { label: 'Email Report', icon: Mail },
   ];
 
-  const selectClass = 'rounded-xl border border-gray-200 px-3 py-2 text-sm';
+  const selectClass = 'rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white';
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -299,7 +229,7 @@ const OrganiReport: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {quickStats.map((stat, idx) => {
+        {quickStats.map((stat: any, idx: number) => {
           const Icon = stat.icon;
           return (
             <div key={idx} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
@@ -333,7 +263,7 @@ const OrganiReport: React.FC = () => {
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm"
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </div>
         )}
@@ -348,7 +278,6 @@ const OrganiReport: React.FC = () => {
         </select>
 
         {/* ── Members filters ── */}
-        {/* Columns: Member, Email, Phone, Role, Status, Verified, Gender, Age, Joined, Last Login */}
         {activeReport === 'members' && (
           <>
             <select title="Status" value={memStatusFilter} onChange={(e) => setMemStatusFilter(e.target.value)} className={selectClass}>
@@ -378,7 +307,6 @@ const OrganiReport: React.FC = () => {
         )}
 
         {/* ── Events filters ── */}
-        {/* Columns: Event, Type, Status, Date, Time, Attendance, Capacity, Location, Organizer */}
         {activeReport === 'events' && (
           <>
             <select title="Status" value={evtStatusFilter} onChange={(e) => setEvtStatusFilter(e.target.value)} className={selectClass}>
@@ -406,7 +334,6 @@ const OrganiReport: React.FC = () => {
         )}
 
         {/* ── Services filters ── */}
-        {/* Columns: Service, Category, Total Requests, Approved, Rejected, Pending, Status, Last Updated */}
         {activeReport === 'services' && (
           <>
             <select title="Status" value={svcStatusFilter} onChange={(e) => setSvcStatusFilter(e.target.value)} className={selectClass}>
@@ -425,7 +352,6 @@ const OrganiReport: React.FC = () => {
         )}
 
         {/* ── Tickets filters ── */}
-        {/* Columns: Ticket ID, Title, Description, Category, Priority, Status, Created, Last Updated, Escalated, Assigned To */}
         {activeReport === 'tickets' && (
           <>
             <select title="Status" value={tkStatusFilter} onChange={(e) => setTkStatusFilter(e.target.value)} className={selectClass}>
@@ -463,7 +389,6 @@ const OrganiReport: React.FC = () => {
         )}
 
         {/* ── Blogs filters ── */}
-        {/* Columns: Title, Excerpt, Author, Category, Views, Likes, Comments, Status, Date */}
         {activeReport === 'blogs' && (
           <>
             <select title="Status" value={blogStatusFilter} onChange={(e) => setBlogStatusFilter(e.target.value)} className={selectClass}>
@@ -489,7 +414,6 @@ const OrganiReport: React.FC = () => {
         )}
 
         {/* ── Payments filters ── */}
-        {/* Columns: Invoice, Member, Amount, Method, Type, Transaction ID, Status, Date */}
         {activeReport === 'payments' && (
           <>
             <select title="Status" value={payStatusFilter} onChange={(e) => setPayStatusFilter(e.target.value)} className={selectClass}>
@@ -515,7 +439,6 @@ const OrganiReport: React.FC = () => {
         )}
 
         {/* ── ID Cards filters ── */}
-        {/* Columns: Card Number, Member, Status, Generated, Expires, Verification, Last Renewed */}
         {activeReport === 'idcards' && (
           <>
             <select title="Status" value={idStatusFilter} onChange={(e) => setIdStatusFilter(e.target.value)} className={selectClass}>
@@ -533,408 +456,415 @@ const OrganiReport: React.FC = () => {
         )}
 
         {hasActiveFilters && (
-          <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl">
+          <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl bg-white hover:bg-gray-50">
             Clear Filters
           </button>
         )}
       </div>
 
-      {/* ── Overview ── */}
-      {activeReport === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-gray-900">Member Growth</h3>
-              <Users size={20} className="text-indigo-500" />
+      {isLoading ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-500 animate-pulse font-medium">
+          Loading report metrics...
+        </div>
+      ) : (
+        <>
+          {/* ── Overview ── */}
+          {activeReport === 'overview' && reportData && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-black text-gray-900">Member Growth</h3>
+                  <Users size={20} className="text-indigo-500" />
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={reportData.memberStatsData || []}>
+                    <defs>
+                      <linearGradient id="colorActive" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                    <Area type="monotone" dataKey="active" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorActive)" />
+                    <Line type="monotone" dataKey="new" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-black text-gray-900">Ticket Categories</h3>
+                  <Ticket size={20} className="text-indigo-500" />
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={reportData.ticketCategoriesData || []} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`} outerRadius={100} fill="#8884d8" dataKey="value">
+                      {(reportData.ticketCategoriesData || []).map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-black text-gray-900">Event Attendance</h3>
+                  <Calendar size={20} className="text-indigo-500" />
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={reportData.eventAttendanceData || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }} />
+                    <Bar dataKey="attendance" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="capacity" fill="#e0e7ff" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-black text-gray-900">Revenue Trend</h3>
+                  <CreditCard size={20} className="text-indigo-500" />
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={reportData.paymentData || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }} />
+                    <Line type="monotone" dataKey="amount" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: '#f59e0b' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={memberStatsData}>
-                <defs>
-                  <linearGradient id="colorActive" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} />
-                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
-                <Area type="monotone" dataKey="active" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorActive)" />
-                <Line type="monotone" dataKey="new" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-gray-900">Ticket Categories</h3>
-              <Ticket size={20} className="text-indigo-500" />
+          {/* ── Members ── */}
+          {activeReport === 'members' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">Member Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1100px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Verified</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Age</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={10} className="px-6 py-8 text-center text-sm text-gray-400">No members match the selected filters.</td></tr>
+                    ) : reportData.map((member: any) => (
+                      <tr key={member.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{member.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{member.role}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${member.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{member.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${member.verified === 'Yes' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{member.verified}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{member.gender}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{member.age}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.joined}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.lastLogin}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={ticketCategoriesData} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`} outerRadius={100} fill="#8884d8" dataKey="value">
-                  {ticketCategoriesData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-gray-900">Event Attendance</h3>
-              <Calendar size={20} className="text-indigo-500" />
+          {/* ── Events ── */}
+          {activeReport === 'events' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">Event Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1000px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Event</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Time</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Attendance</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Capacity</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Organizer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-400">No events match the selected filters.</td></tr>
+                    ) : reportData.map((event: any) => (
+                      <tr key={event.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{event.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{event.type}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${event.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : event.status === 'Upcoming' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{event.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.time}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 font-bold">{event.attendance}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.capacity}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.location}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.organizer}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={eventAttendanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} />
-                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }} />
-                <Bar dataKey="attendance" fill="#6366f1" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="capacity" fill="#e0e7ff" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-gray-900">Revenue Trend</h3>
-              <CreditCard size={20} className="text-indigo-500" />
+          {/* ── Services ── */}
+          {activeReport === 'services' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">Service Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Service</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Requests</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Approved</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Rejected</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pending</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">No services match the selected filters.</td></tr>
+                    ) : reportData.map((service: any) => (
+                      <tr key={service.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{service.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{service.category}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{service.requests}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 font-bold">{service.approved}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-rose-600 font-bold">{service.rejected}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-600 font-bold">{service.pending}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${service.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{service.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{service.lastUpdated}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={paymentData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} />
-                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }} />
-                <Line type="monotone" dataKey="amount" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: '#f59e0b' }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ── Members ── */}
-      {activeReport === 'members' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">Member Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Verified</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Age</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Login</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMembers.length === 0 ? (
-                  <tr><td colSpan={10} className="px-6 py-8 text-center text-sm text-gray-400">No members match the selected filters.</td></tr>
-                ) : filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{member.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.phone}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{member.role}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${member.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{member.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${member.verified === 'Yes' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{member.verified}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{member.gender}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{member.age}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.joined}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.lastLogin}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+          {/* ── Tickets ── */}
+          {activeReport === 'tickets' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">Ticket Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1100px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Ticket ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Updated</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Escalated</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned To</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={10} className="px-6 py-8 text-center text-sm text-gray-400">No tickets match the selected filters.</td></tr>
+                    ) : reportData.map((ticket: any) => (
+                      <tr key={ticket.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{ticket.id}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{ticket.title}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={ticket.description}>{ticket.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket.category}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.priority === 'High' ? 'bg-rose-100 text-rose-800' : ticket.priority === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'}`}>{ticket.priority}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.status === 'Open' ? 'bg-rose-100 text-rose-800' : ticket.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{ticket.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.created}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.lastUpdated}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.escalated === 'Yes' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'}`}>{ticket.escalated}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket.assignedTo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-      {/* ── Events ── */}
-      {activeReport === 'events' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">Event Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Event</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Time</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Attendance</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Capacity</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Organizer</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredEvents.length === 0 ? (
-                  <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-400">No events match the selected filters.</td></tr>
-                ) : filteredEvents.map((event) => (
-                  <tr key={event.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{event.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{event.type}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${event.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : event.status === 'Upcoming' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{event.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.time}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 font-bold">{event.attendance}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.capacity}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.location}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{event.organizer}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+          {/* ── Blogs ── */}
+          {activeReport === 'blogs' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">Blog & Announcement Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1000px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Excerpt</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Author</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Views</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Likes</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Comments</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-400">No blogs match the selected filters.</td></tr>
+                    ) : reportData.map((blog: any) => (
+                      <tr key={blog.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{blog.title}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={blog.excerpt}>{blog.excerpt}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{blog.author}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{blog.category}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{blog.views.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 font-bold">{blog.likes}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-600 font-bold">{blog.comments}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${blog.status === 'Published' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{blog.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{blog.date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-      {/* ── Services ── */}
-      {activeReport === 'services' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">Service Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Service</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Requests</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Approved</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Rejected</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pending</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Updated</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredServices.length === 0 ? (
-                  <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">No services match the selected filters.</td></tr>
-                ) : filteredServices.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{service.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{service.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{service.requests}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 font-bold">{service.approved}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-rose-600 font-bold">{service.rejected}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-600 font-bold">{service.pending}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${service.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{service.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{service.lastUpdated}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+          {/* ── Payments ── */}
+          {activeReport === 'payments' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">Payment Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Invoice</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Method</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">No payments match the selected filters.</td></tr>
+                    ) : reportData.map((payment: any) => (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{payment.invoice}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{payment.member}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">{payment.amount}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.method}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.type}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.transactionId}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${payment.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{payment.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-      {/* ── Tickets ── */}
-      {activeReport === 'tickets' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">Ticket Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Ticket ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Priority</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Created</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Updated</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Escalated</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Assigned To</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTickets.length === 0 ? (
-                  <tr><td colSpan={10} className="px-6 py-8 text-center text-sm text-gray-400">No tickets match the selected filters.</td></tr>
-                ) : filteredTickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{ticket.id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{ticket.title}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={ticket.description}>{ticket.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.priority === 'High' ? 'bg-rose-100 text-rose-800' : ticket.priority === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'}`}>{ticket.priority}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.status === 'Open' ? 'bg-rose-100 text-rose-800' : ticket.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{ticket.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.created}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ticket.lastUpdated}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${ticket.escalated === 'Yes' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'}`}>{ticket.escalated}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket.assignedTo}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Blogs ── */}
-      {activeReport === 'blogs' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">Blog & Announcement Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Excerpt</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Author</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Views</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Likes</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Comments</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredBlogs.length === 0 ? (
-                  <tr><td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-400">No blogs match the selected filters.</td></tr>
-                ) : filteredBlogs.map((blog) => (
-                  <tr key={blog.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{blog.title}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={blog.excerpt}>{blog.excerpt}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{blog.author}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{blog.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">{blog.views.toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-emerald-600 font-bold">{blog.likes}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-600 font-bold">{blog.comments}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${blog.status === 'Published' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}`}>{blog.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{blog.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Payments ── */}
-      {activeReport === 'payments' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">Payment Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Invoice</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Method</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Transaction ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.length === 0 ? (
-                  <tr><td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">No payments match the selected filters.</td></tr>
-                ) : filteredPayments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{payment.invoice}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{payment.member}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">{payment.amount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.method}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.type}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.transactionId}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${payment.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : payment.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>{payment.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── ID Cards ── */}
-      {activeReport === 'idcards' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-xl font-black text-gray-900">ID Card Reports</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Card Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Generated</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Expires</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Verification</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Renewed</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredIdCards.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-400">No ID cards match the selected filters.</td></tr>
-                ) : filteredIdCards.map((card) => (
-                  <tr key={card.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{card.cardNumber}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{card.member}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${card.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : card.status === 'Expired' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'}`}>{card.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{card.generated}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{card.expires}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${card.verification === 'Verified' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{card.verification}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{card.lastRenewed}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          {/* ── ID Cards ── */}
+          {activeReport === 'idcards' && reportData && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-black text-gray-900">ID Card Reports</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Card Number</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Member</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Generated</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Expires</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Verification</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.length === 0 ? (
+                      <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-400">No ID cards match the selected filters.</td></tr>
+                    ) : reportData.map((card: any) => (
+                      <tr key={card.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{card.cardNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{card.member}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${card.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{card.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{card.generated}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{card.expires}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800`}>{card.verification}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 };
 
 export default OrganiReport;
+

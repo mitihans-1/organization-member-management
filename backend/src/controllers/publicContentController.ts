@@ -110,6 +110,7 @@ export const getOrganizationContent = async (req: any, res: Response) => {
         mission: org.aboutMission || '',
         story: org.aboutStory || '',
         stats: parseJsonArray(org.aboutStatsJson, []),
+        timeline: parseJsonArray(org.aboutTimelineJson, []),
       },
       contact: {
         email: org.contactEmail,
@@ -141,6 +142,7 @@ export const updateOrganizationContent = async (req: any, res: Response) => {
       aboutMission,
       aboutStory,
       aboutStatsJson,
+      aboutTimelineJson,
       contactEmail,
       contactPhone,
       contactAddress,
@@ -156,6 +158,7 @@ export const updateOrganizationContent = async (req: any, res: Response) => {
         aboutMission: aboutMission ?? undefined,
         aboutStory: aboutStory ?? undefined,
         aboutStatsJson: aboutStatsJson ?? undefined,
+        aboutTimelineJson: aboutTimelineJson ?? undefined,
         contactEmail: contactEmail ?? undefined,
         contactPhone: contactPhone ?? undefined,
         contactAddress: contactAddress ?? undefined,

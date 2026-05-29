@@ -39,6 +39,10 @@ const OrgSettings: React.FC = () => {
   const [aboutSubtitle, setAboutSubtitle] = useState('');
   const [aboutMission, setAboutMission] = useState('');
   const [aboutStory, setAboutStory] = useState('');
+  const [aboutStats, setAboutStats] = useState<{ label: string; value: string }[]>([]);
+  const [aboutTimeline, setAboutTimeline] = useState<{ year: string; title: string; desc: string }[]>([]);
+  const [newStat, setNewStat] = useState({ label: '', value: '' });
+  const [newMilestone, setNewMilestone] = useState({ year: '', title: '', desc: '' });
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactAddress, setContactAddress] = useState('');
@@ -70,6 +74,8 @@ const OrgSettings: React.FC = () => {
       setAboutSubtitle(d.about?.subtitle || '');
       setAboutMission(d.about?.mission || '');
       setAboutStory(d.about?.story || '');
+      setAboutStats(d.about?.stats || []);
+      setAboutTimeline(d.about?.timeline || []);
       setContactEmail(d.contact?.email || '');
       setContactPhone(d.contact?.phone || '');
       setContactAddress(d.contact?.address || '');
@@ -533,6 +539,135 @@ const OrgSettings: React.FC = () => {
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Our story</label>
             <textarea className={input} rows={4} value={aboutStory} onChange={(e) => setAboutStory(e.target.value)} />
           </div>
+
+          {/* Key Statistics Builder */}
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <label className="block text-xs font-bold text-gray-500 uppercase">Key Statistics</label>
+            <p className="text-xs text-gray-400">Add metrics to show on your About page (e.g., "Active Members: 1,500+", "Founded: 2018").</p>
+            
+            {aboutStats.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                {aboutStats.map((stat, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-gray-150">
+                    <div>
+                      <span className="text-sm font-black text-slate-800">{stat.value}</span>
+                      <span className="text-xs text-slate-500 block">{stat.label}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAboutStats(aboutStats.filter((_, idx) => idx !== i))}
+                      className="text-gray-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                placeholder="Value (e.g. 1,500+)"
+                value={newStat.value}
+                onChange={(e) => setNewStat({ ...newStat, value: e.target.value })}
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none"
+              />
+              <input
+                type="text"
+                placeholder="Label (e.g. Members)"
+                value={newStat.label}
+                onChange={(e) => setNewStat({ ...newStat, label: e.target.value })}
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newStat.label.trim() && newStat.value.trim()) {
+                    setAboutStats([...aboutStats, { label: newStat.label.trim(), value: newStat.value.trim() }]);
+                    setNewStat({ label: '', value: '' });
+                  }
+                }}
+                className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2.5 rounded-xl transition-colors shrink-0"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline Milestones Builder */}
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <label className="block text-xs font-bold text-gray-500 uppercase">Historical Timeline Milestones</label>
+            <p className="text-xs text-gray-400">Add milestones to outline your organization's journey.</p>
+            
+            {aboutTimeline.length > 0 && (
+              <div className="space-y-3 mb-3">
+                {aboutTimeline.map((item, i) => (
+                  <div key={i} className="flex gap-4 items-start p-4 bg-slate-50 rounded-2xl border border-gray-150">
+                    <div className="bg-indigo-600 text-white font-black text-xs px-2.5 py-1.5 rounded-xl">
+                      {item.year}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-slate-800">{item.title}</h4>
+                      <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{item.desc}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAboutTimeline(aboutTimeline.filter((_, idx) => idx !== i))}
+                      className="text-gray-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 self-start"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-2 rounded-xl bg-slate-50/50 p-3 border border-dashed border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  placeholder="Year (e.g. 2018)"
+                  value={newMilestone.year}
+                  onChange={(e) => setNewMilestone({ ...newMilestone, year: e.target.value })}
+                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none bg-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Milestone Title"
+                  value={newMilestone.title}
+                  onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
+                  className="sm:col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none bg-white"
+                />
+              </div>
+              <textarea
+                placeholder="Description of this milestone..."
+                rows={2}
+                value={newMilestone.desc}
+                onChange={(e) => setNewMilestone({ ...newMilestone, desc: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none bg-white resize-y"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newMilestone.year.trim() && newMilestone.title.trim() && newMilestone.desc.trim()) {
+                      setAboutTimeline([...aboutTimeline, { 
+                        year: newMilestone.year.trim(), 
+                        title: newMilestone.title.trim(), 
+                        desc: newMilestone.desc.trim() 
+                      }]);
+                      setNewMilestone({ year: '', title: '', desc: '' });
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+                >
+                  <Plus size={14} /> Add Milestone
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact email</label>
@@ -565,6 +700,8 @@ const OrgSettings: React.FC = () => {
                   aboutSubtitle,
                   aboutMission,
                   aboutStory,
+                  aboutStatsJson: JSON.stringify(aboutStats),
+                  aboutTimelineJson: JSON.stringify(aboutTimeline),
                   contactEmail,
                   contactPhone,
                   contactAddress,

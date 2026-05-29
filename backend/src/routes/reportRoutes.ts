@@ -13,8 +13,17 @@ import {
   acceptReport,
   replyToReport
 } from '../controllers/reportController';
+import {
+  getSuperAdminAnalytics,
+  getOrgAnalytics,
+  getMemberAnalytics
+} from '../controllers/analyticsReportController';
 
 const router = express.Router();
+
+router.get('/analytics/superadmin', authenticateToken, getSuperAdminAnalytics);
+router.get('/analytics/org', authenticateToken, getOrgAnalytics);
+router.get('/analytics/member', authenticateToken, getMemberAnalytics);
 
 router.get('/member', authenticateToken, getMemberReports);
 router.get('/org', authenticateToken, getOrgReports);
@@ -28,3 +37,4 @@ router.put('/:id/reply', authenticateToken, replyToReport);
 router.delete('/:id', authenticateToken, deleteReport);
 
 export default router;
+

@@ -58,4 +58,20 @@ export const reportService = {
   async deleteReport(id: string): Promise<void> {
     await api.delete(`/reports/${id}`);
   },
+
+  async getSuperAdminAnalytics(params: any): Promise<any> {
+    const response = await api.get('/reports/analytics/superadmin', { params });
+    return response.data;
+  },
+
+  async getOrgAnalytics(params: any): Promise<any> {
+    const response = await api.get('/reports/analytics/org', { params });
+    return response.data;
+  },
+
+  async getMemberAnalytics(params: any): Promise<any> {
+    const response = await api.get('/reports/analytics/member', { params });
+    return response.data;
+  },
 };
+

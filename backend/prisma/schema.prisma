@@ -52,6 +52,7 @@ model Organization {
   aboutMission     String?
   aboutStory       String?
   aboutStatsJson   String? // JSON array [{label,value}]
+  aboutTimelineJson String? // JSON array [{year,title,desc,image?}]
 
   // Member-facing Contact (set by org admin)
   contactEmail           String?
