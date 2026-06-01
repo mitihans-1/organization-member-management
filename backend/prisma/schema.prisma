@@ -69,6 +69,10 @@ model Organization {
   memberSubscriptionPlans MemberSubscriptionPlan[]
   memberSubscriptions     MemberSubscription[]
   invoices                Invoice[]
+  licenses                License[]
+  licenseRequests         LicenseRequest[]
+  licenseVerificationLogs LicenseVerificationLog[]
+  licensePlans            LicensePlan[]
 
   @@map("organizations")
 }
@@ -84,16 +88,16 @@ model User {
   organization_type     String?
   password              String
   profile_photo_path    String?
-  email_verified_at     DateTime?
+  email_verified_at DateTime?
   google_id             String?
   sex                   String?
-  join_date             DateTime?
+  join_date           DateTime?
   address               String?
-  plan_id               String?                @db.ObjectId
-  plan_expiry           DateTime?
+  plan_id          String?                @db.ObjectId
+  plan_expiry         DateTime?
   fayda_id              String?
-  is_fayda_verified     Boolean                @default(false)
-  is_verified           Boolean                @default(false)
+  is_fayda_verified Boolean                @default(false)
+  is_verified         Boolean                @default(false)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   members               Member[]
@@ -117,6 +121,9 @@ model User {
   idCardRequests         IdCardRequest[]
   idCardVerificationLogs IdCardVerificationLog[]
   reports                Report[]
+  licenses               License[]
+  licenseRequests        LicenseRequest[]
+  licenseVerificationLogs LicenseVerificationLog[]
   conversations1         Conversation[]          @relation("ConversationParticipant1")
   conversations2         Conversation[]          @relation("ConversationParticipant2")
   sentMessages           Message[]
@@ -311,6 +318,8 @@ model Payment {
   emailNotificationLogs      EmailNotificationLog[]
   invoicePayments            InvoicePayment[]
   memberSubscriptionPayments MemberSubscriptionPayment[]
+  idCardRequests             IdCardRequest[]
+  licenseRequests          LicenseRequest[]
 
   @@map("payments")
 }
@@ -329,6 +338,7 @@ model Blog {
 
   organizationId   String?       @db.ObjectId
   isPredefined     Boolean       @default(false)
+  visibility       String        @default("public") // "public" or "private"
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   organizations    Organization? @relation(fields: [organizationId], references: [id])
@@ -358,6 +368,7 @@ model Event {
   contactEmail         String?
   organizationId       String?       @db.ObjectId
   isPredefined         Boolean       @default(false)
+  visibility           String        @default("public") // "public" or "private"
   price                Float?
   payment_required     Boolean       @default(false)
   createdAt            DateTime      @default(now())
@@ -488,6 +499,7 @@ model Service {
   renewalRule       String?
   contactEmail      String? // Keep for backward compatibility
   organizationId    String?       @db.ObjectId
+  visibility        String        @default("public") // "public" or "private"
   payment_required  Boolean       @default(false)
   isPredefined      Boolean       @default(false) // true = global platform service, false = organization-specific
   createdAt         DateTime      @default(now())
@@ -656,6 +668,7 @@ model IdCardRequest {
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+  payment      Payment?     @relation(fields: [paymentId], references: [id])
 
   @@map("id_card_requests")
 }
@@ -706,6 +719,76 @@ model Report {
   organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@map("reports")
+}
+
+model License {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String    @db.ObjectId
+  organizationId        String    @db.ObjectId
+  licenseNumber         String    @unique
+  qrToken               String    @unique
+  version               Int       @default(1)
+  status                String    @default("ACTIVE")
+  generatedByOrgAdminId String?   @db.ObjectId
+  generatedAt           DateTime  @default(now())
+  expiresAt             DateTime?
+  printCount            Int       @default(0)
+  licenseType           String    @default("MEMBER")
+  details               String?
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("licenses")
+}
+
+model LicenseRequest {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String   @db.ObjectId
+  organizationId       String   @db.ObjectId
+  licensePlanId        String?  @db.ObjectId
+  requestType          String
+  reason               String?
+  paymentStatus        String?
+  requestStatus        String   @default("PENDING")
+  paymentId            String?  @db.ObjectId
+  approvedByOrgAdminId String?  @db.ObjectId
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  licensePlan  LicensePlan? @relation(fields: [licensePlanId], references: [id])
+  payment      Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@map("license_requests")
+}
+
+model LicensePrintLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  licenseId     String   @db.ObjectId
+  printedById   String   @db.ObjectId
+  printedByRole String
+  printedAt     DateTime @default(now())
+
+  @@map("license_print_logs")
+}
+
+model LicenseVerificationLog {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  licenseId          String?  @db.ObjectId
+  qrTokenScanned     String
+  memberId           String?  @db.ObjectId
+  organizationId     String?  @db.ObjectId
+  scanTime           DateTime @default(now())
+  verificationResult String
+  deviceInfo         String?
+  ipAddress          String?
+
+  member       User?         @relation(fields: [memberId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("license_verification_logs")
 }
 
 // ==========================================
@@ -803,6 +886,27 @@ model MemberSubscriptionPlan {
   invoices      Invoice[]            @relation("InvoiceMemberPlan")
 
   @@map("member_subscription_plans")
+}
+
+model LicensePlan {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  name           String
+  description    String?
+  price          Float
+  currency       String   @default("ETB")
+  licenseType    String // "FIRST_TIME", "RENEWAL", "REPLACEMENT", "UPGRADE"
+  durationDays   Int     // How long the license is valid
+  features       String[] @default([])
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  licenseRequests LicenseRequest[]
+
+  @@map("license_plans")
 }
 
 model MemberSubscription {

@@ -3,12 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { Eye, ShieldAlert, X } from 'lucide-react';
 
-export const IdRequestsTab = () => {
+export const LicenseRequestsTab = () => {
   const queryClient = useQueryClient();
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [configModalRequest, setConfigModalRequest] = useState<any>(null);
   const [formatConfig, setFormatConfig] = useState({
-    prefix: 'ID-',
+    prefix: 'LIC-',
     length: 6,
     includeNumbers: true,
     includeLetters: true,
@@ -17,17 +17,17 @@ export const IdRequestsTab = () => {
   });
 
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['idCardRequests'],
-    queryFn: () => api.get('/id-cards/requests').then(res => res.data),
+    queryKey: ['licenseRequests'],
+    queryFn: () => api.get('/licenses/requests').then(res => res.data),
   });
 
   const approveMutation = useMutation({
     mutationFn: ({ id, formatConfig }: { id: string; formatConfig: any }) => 
-      api.post(`/id-cards/requests/${id}/approve`, { formatConfig }),
+      api.post(`/licenses/requests/${id}/approve`, { formatConfig }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idCardRequests'] });
-      queryClient.invalidateQueries({ queryKey: ['generatedCards'] });
-      alert('Request approved and ID Card generated.');
+      queryClient.invalidateQueries({ queryKey: ['licenseRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['generatedLicenses'] });
+      alert('Request approved and License generated.');
     },
     onError: (err: any) => {
       alert(err.response?.data?.message || 'Error approving request.');
@@ -35,16 +35,16 @@ export const IdRequestsTab = () => {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/id-cards/requests/${id}/reject`),
+    mutationFn: (id: string) => api.post(`/licenses/requests/${id}/reject`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idCardRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['licenseRequests'] });
     }
   });
 
   const verifyPaymentMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/id-cards/requests/${id}/verify-payment`),
+    mutationFn: (id: string) => api.post(`/licenses/requests/${id}/verify-payment`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idCardRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['licenseRequests'] });
       alert('Payment verified. You can now approve this request.');
     }
   });
@@ -204,6 +204,19 @@ export const IdRequestsTab = () => {
                     <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-xl">{selectedRequest.reason}</p>
                   </div>
                 )}
+                {selectedRequest.payment?.receipt_url && (
+                  <div>
+                    <span className="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Receipt</span>
+                    <a
+                      href={`http://localhost:5000/${selectedRequest.payment.receipt_url.replace(/\\/g, '/')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-xl text-xs font-bold"
+                    >
+                      <Eye size={14} /> View Receipt
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -223,7 +236,7 @@ export const IdRequestsTab = () => {
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-500 text-sm shadow-sm"
                 >
-                  Approve ID
+                  Approve License
                 </button>
               )}
             </div>
@@ -235,14 +248,14 @@ export const IdRequestsTab = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-gray-100 overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h3 className="text-lg font-black text-gray-900">Configure ID Format</h3>
+              <h3 className="text-lg font-black text-gray-900">Configure License Format</h3>
               <button onClick={() => setConfigModalRequest(null)} className="p-2 rounded-lg hover:bg-gray-200 text-gray-500">
                 <X size={20} />
               </button>
             </div>
             
             <div className="p-6 overflow-y-auto space-y-5">
-              <p className="text-xs text-gray-500 font-medium">Define the format for {configModalRequest.user?.name}'s new ID card number.</p>
+              <p className="text-xs text-gray-500 font-medium">Define the format for {configModalRequest.user?.name}'s new License number.</p>
               
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Prefix (Optional)</label>
@@ -321,7 +334,7 @@ export const IdRequestsTab = () => {
                 disabled={approveMutation.isPending || (!formatConfig.includeLetters && !formatConfig.includeNumbers)}
                 className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 text-sm shadow-sm disabled:opacity-50"
               >
-                {approveMutation.isPending ? 'Generating...' : 'Confirm & Generate ID'}
+                {approveMutation.isPending ? 'Generating...' : 'Confirm & Generate License'}
               </button>
             </div>
           </div>

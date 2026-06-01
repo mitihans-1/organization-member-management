@@ -31,6 +31,9 @@ router.put('/event/:id/reject', authenticateToken, rejectEventPayment);
 router.put('/service/:id/confirm', authenticateToken, confirmServicePayment);
 router.put('/service/:id/reject', authenticateToken, rejectServicePayment);
 
+// Alias for backward compatibility
+router.post('/member-receipt', authenticateToken, uploadReceipt.single('receipt'), uploadMemberPaymentReceipt);
+// Main route
 router.post('/member-to-org/upload-receipt', authenticateToken, uploadReceipt.single('receipt'), uploadMemberPaymentReceipt);
 router.put('/member-to-org/:id/confirm', authenticateToken, confirmMemberPayment);
 router.put('/member-to-org/:id/reject', authenticateToken, rejectMemberPayment);

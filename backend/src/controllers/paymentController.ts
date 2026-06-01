@@ -994,6 +994,27 @@ export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
           }
       });
 
+      // Link payment to corresponding ID card or license request
+      if (reason === 'ID_CARD_REPLACEMENT') {
+        await prisma.idCardRequest.updateMany({
+          where: {
+            userId: req.user.userId,
+            organizationId: user.organizationId,
+            requestStatus: 'PENDING_PAYMENT_VERIFICATION',
+          },
+          data: { paymentId: payment.id }
+        });
+      } else if (reason === 'LICENSE_REPLACEMENT') {
+        await prisma.licenseRequest.updateMany({
+          where: {
+            userId: req.user.userId,
+            organizationId: user.organizationId,
+            requestStatus: 'PENDING_PAYMENT_VERIFICATION',
+          },
+          data: { paymentId: payment.id }
+        });
+      }
+
       const orgAdmins = await prisma.user.findMany({ 
         where: { role: 'orgAdmin', organizationId: user.organizationId } 
       });
@@ -1146,11 +1167,43 @@ export const confirmMemberPayment = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Only the organization admin can confirm this payment.' });
     }
 
+    // Update payment status
     const updatedPayment = await prisma.payment.update({
       where: { id: payment.id },
       data: { status: 'completed' }
     });
 
+    // Handle ID Card Replacement
+    if (payment.reference_id === 'ID_CARD_REPLACEMENT') {
+      await prisma.idCardRequest.updateMany({
+        where: {
+          userId: payment.user_id,
+          organizationId: user.organizationId,
+          requestStatus: 'PENDING_PAYMENT_VERIFICATION'
+        },
+        data: {
+          paymentStatus: 'COMPLETED',
+          requestStatus: 'PENDING'
+        }
+      });
+    }
+
+    // Handle License Replacement
+    if (payment.reference_id === 'LICENSE_REPLACEMENT') {
+      await prisma.licenseRequest.updateMany({
+        where: {
+          userId: payment.user_id,
+          organizationId: user.organizationId,
+          requestStatus: 'PENDING_PAYMENT_VERIFICATION'
+        },
+        data: {
+          paymentStatus: 'COMPLETED',
+          requestStatus: 'PENDING'
+        }
+      });
+    }
+
+    // Notify member
     const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
     if (member) {
       await prisma.notification.create({
@@ -1185,6 +1238,30 @@ export const rejectMemberPayment = async (req: any, res: Response) => {
       where: { id: id },
       data: { status: 'rejected', rejection_reason: reason || 'Payment rejected by Organization.' }
     });
+
+    // Handle ID Card Replacement
+    if (payment.reference_id === 'ID_CARD_REPLACEMENT') {
+      await prisma.idCardRequest.updateMany({
+        where: {
+          userId: payment.user_id,
+          organizationId: user.organizationId,
+          requestStatus: 'PENDING_PAYMENT_VERIFICATION'
+        },
+        data: { requestStatus: 'REJECTED' }
+      });
+    }
+
+    // Handle License Replacement
+    if (payment.reference_id === 'LICENSE_REPLACEMENT') {
+      await prisma.licenseRequest.updateMany({
+        where: {
+          userId: payment.user_id,
+          organizationId: user.organizationId,
+          requestStatus: 'PENDING_PAYMENT_VERIFICATION'
+        },
+        data: { requestStatus: 'REJECTED' }
+      });
+    }
 
     const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
     if (member) {

@@ -1,16 +1,21 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { resolveCatalogWhere } from '../../../utils/catalogScope';
+import { resolveCatalogWhere, resolveRequestContext } from '../../../utils/catalogScope';
 import { sendNewServiceNotification } from '../../../services/emailService';
 
 const prisma = new PrismaClient();
 
 export const getServices = async (req: any, res: Response) => {
   try {
+    const ctx = await resolveRequestContext(req);
     const where = await resolveCatalogWhere(req);
+    const isPublicOnly = ctx.role === 'guest';
 
     const services = await prisma.service.findMany({
-      where,
+      where: {
+        ...where,
+        ...(isPublicOnly && { visibility: 'public' })
+      },
       include: {
         _count: {
           select: { subscribers: true },
@@ -29,7 +34,7 @@ export const createService = async (req: any, res: Response) => {
       title, code, description, image, status, category, 
       contactEmail, price, payment_required, owner, department, 
       duration, requiredDocuments, eligibilityRules, slaHours, 
-      renewalRule, isPredefined
+      renewalRule, isPredefined, visibility
     } = req.body;
     const finalImage = req.file ? req.file.path : image;
     
@@ -55,6 +60,7 @@ export const createService = async (req: any, res: Response) => {
         contactEmail: contactEmail || null,
         organizationId: predefined ? null : orgId || null,
         status: status || 'Active',
+        visibility: visibility || 'public',
         price: price ? parseFloat(price) : null,
         fee: price ? parseFloat(price) : null,
         payment_required: payment_required === true || payment_required === 'true',
@@ -122,7 +128,7 @@ export const updateService = async (req: any, res: Response) => {
       title, code, description, status, category, 
       contactEmail, price, payment_required, owner, department, 
       duration, requiredDocuments, eligibilityRules, slaHours, 
-      renewalRule, isPredefined
+      renewalRule, isPredefined, visibility
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
 
@@ -144,6 +150,7 @@ export const updateService = async (req: any, res: Response) => {
     }
     if (contactEmail !== undefined) updateData.contactEmail = contactEmail;
     if (status !== undefined) updateData.status = status;
+    if (visibility !== undefined) updateData.visibility = visibility;
     if (price !== undefined) {
       updateData.price = price ? parseFloat(price) : null;
       updateData.fee = price ? parseFloat(price) : null;

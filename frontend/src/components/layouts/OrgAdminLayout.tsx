@@ -33,6 +33,7 @@ const navItems = [
   { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-indigo-500' },
   { to: '/org-admin/members', label: 'Member Management', icon: Users, color: 'text-blue-500' },
   { to: '/org-admin/id-cards', label: 'ID Card Management', icon: Shield, color: 'text-cyan-500' },
+  { to: '/org-admin/licenses', label: 'License Management', icon: Shield, color: 'text-violet-500' },
   { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500' },
   { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
   { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },

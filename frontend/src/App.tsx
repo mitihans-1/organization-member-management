@@ -42,8 +42,10 @@ import AdminOrganizations from './pages/AdminOrganizations';
 import UpgradePlan from './pages/org/UpgradePlan';
 import OrgSettings from './pages/org/OrgSettings';
 import OrgIdCards from './pages/org/OrgIdCards';
+import OrgLicenses from './pages/org/OrgLicenses';
 
 import MemberOverview from './pages/member/MemberOverview';
+import { MyLicense } from './pages/member/MyLicense';
 import MemberEvents from './pages/member/MemberEvents';
 import MemberServices from './pages/member/MemberServices';
 import MemberBlog from './pages/member/MemberBlog';
@@ -57,6 +59,7 @@ import Contact from './pages/Contact';
 import PublicEvents from './pages/PublicEvents';
 import PublicBlogs from './pages/PublicBlogs';
 import VerifyId from './pages/VerifyId';
+import VerifyLicense from './pages/VerifyLicense';
 import { MyIdCard } from './pages/member/MyIdCard';
 import { OrgLegacyRedirect, OrganAdminLegacyRedirect } from './components/OrgPathRedirects';
 
@@ -83,6 +86,7 @@ const App: React.FC = () => {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/verify/:token" element={<VerifyId />} />
+<Route path="/verify-license/:token" element={<VerifyLicense />} />
 
             <Route
               path="/dashboard/*"
@@ -142,6 +146,7 @@ const App: React.FC = () => {
               <Route path="tickets" element={<OrgTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="id-cards" element={<OrgIdCards />} />
+              <Route path="licenses" element={<OrgLicenses />} />
               <Route path="subscriptions" element={<OrgSubscriptions />} />
             </Route>
 
@@ -162,6 +167,7 @@ const App: React.FC = () => {
               <Route path="services" element={<MemberServices />} />
               <Route path="blog" element={<MemberBlog />} />
               <Route path="id-card" element={<MyIdCard />} />
+              <Route path="license" element={<MyLicense />} />
               <Route path="payments" element={<MemberPayments />} />
               <Route path="reports" element={<MembersReport />} />
               <Route path="reports/:section" element={<MembersReport />} />
