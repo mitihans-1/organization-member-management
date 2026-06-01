@@ -159,7 +159,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
       await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
 
       // Send welcome email (if needed)
-      await sendWelcomeEmail(existingUser.email, existingUser.name, existingUser.id);
+      await sendWelcomeEmail(existingUser.email, existingUser.name, existingUser.id, existingUser.role);
 
       // Log the user in
       const token = jwt.sign({ userId: existingUser.id, role: existingUser.role }, JWT_SECRET, { expiresIn: '30d' });
@@ -269,7 +269,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     await prisma.pendingUser.delete({ where: { id: pendingUser.id } });
 
     // Send welcome email
-    await sendWelcomeEmail(user.email, user.name, user.id);
+    await sendWelcomeEmail(user.email, user.name, user.id, user.role);
 
     // Log the user in
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
