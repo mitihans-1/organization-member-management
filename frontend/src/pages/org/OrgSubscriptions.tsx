@@ -18,7 +18,7 @@ const OrgSubscriptions: React.FC = () => {
       <div>
         <h1 className="text-2xl font-black text-slate-900">Subscriptions & Invoicing</h1>
         <p className="text-slate-500 text-sm">
-          Admin roles: Manage plans, invoices, reminders, and analytics. Members self-subscribe primarily.
+          Manage plans, assign subscriptions to members, and view analytics.
         </p>
       </div>
 

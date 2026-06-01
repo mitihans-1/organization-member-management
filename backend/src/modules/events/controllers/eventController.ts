@@ -2,18 +2,31 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { resolveCatalogWhere, resolveRequestContext } from '../../../utils/catalogScope';
 import { sendNewEventNotification } from '../../../services/emailService';
+import {
+  countPlatformEventAttendees,
+  createPlatformEvent,
+  deletePlatformEvent,
+  filterPlatformEventsForBrowse,
+  getPlatformEventById,
+  listPlatformEvents,
+  registerUserForPlatformEvent,
+  shouldMergePlatformCatalog,
+  updatePlatformEvent,
+} from '../../../data/predefinedCatalogStore';
 
 const prisma = new PrismaClient();
 
 export const getEvents = async (req: any, res: Response) => {
   try {
     const ctx = await resolveRequestContext(req);
-    const where = await resolveCatalogWhere(req);
+    const mode = req.query.mode === 'dashboard' ? 'browse_dashboard' : 'browse_navbar';
+    const where = await resolveCatalogWhere(req, mode);
     const isPublicOnly = ctx.role === 'guest';
-    const events = await prisma.event.findMany({
+
+    const dbEvents = await prisma.event.findMany({
       where: {
         ...where,
-        ...(isPublicOnly && { visibility: 'public' })
+        ...(isPublicOnly && { visibility: 'public' }),
       },
       include: {
         _count: {
@@ -22,6 +35,21 @@ export const getEvents = async (req: any, res: Response) => {
       },
       orderBy: { date: 'asc' },
     });
+
+    let events: any[] = dbEvents;
+    if (shouldMergePlatformCatalog(mode)) {
+      const platform = filterPlatformEventsForBrowse(listPlatformEvents(), isPublicOnly);
+      const withCounts = await Promise.all(
+        platform.map(async (e) => ({
+          ...e,
+          _count: { attendees: await countPlatformEventAttendees(e.id) },
+        })),
+      );
+      events = [...withCounts, ...dbEvents].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      );
+    }
+
     res.status(200).json(events);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching events', error });
@@ -30,13 +58,26 @@ export const getEvents = async (req: any, res: Response) => {
 
 export const createEvent = async (req: any, res: Response) => {
   try {
-    const { 
-      title, description, date, end_date, location, image, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline, visibility
+    const {
+      title,
+      description,
+      date,
+      end_date,
+      location,
+      image,
+      status,
+      category,
+      capacity,
+      virtualLink,
+      contactEmail,
+      price,
+      payment_required,
+      organizer,
+      registrationDeadline,
+      visibility,
     } = req.body;
     const finalImage = req.file ? req.file.path : image;
-    
-    // Fallback: If your token doesn't include organizationId, fetch it
+
     let orgId = req.user?.organizationId;
     if (!orgId && req.user?.userId) {
       const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
@@ -47,6 +88,28 @@ export const createEvent = async (req: any, res: Response) => {
       req.user?.role === 'SuperAdmin' &&
       (req.body.isPredefined === true || req.body.isPredefined === 'true');
 
+    if (predefined) {
+      const event = createPlatformEvent({
+        title,
+        description,
+        date: new Date(date),
+        end_date: end_date ? new Date(end_date) : null,
+        location,
+        image: finalImage ?? null,
+        category: category || 'general',
+        capacity: capacity ? parseInt(capacity, 10) : null,
+        virtualLink: virtualLink || null,
+        contactEmail: contactEmail || null,
+        status: status || 'upcoming',
+        visibility: visibility || 'public',
+        price: price ? parseFloat(price) : null,
+        payment_required: payment_required === true || payment_required === 'true',
+        organizer: organizer || null,
+        registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : null,
+      });
+      return res.status(201).json(event);
+    }
+
     const event = await prisma.event.create({
       data: {
         title,
@@ -56,11 +119,11 @@ export const createEvent = async (req: any, res: Response) => {
         location,
         image: finalImage,
         category: category || 'general',
-        capacity: capacity ? parseInt(capacity) : null,
+        capacity: capacity ? parseInt(capacity, 10) : null,
         virtualLink: virtualLink || null,
         contactEmail: contactEmail || null,
-        organizationId: predefined ? null : orgId || null,
-        isPredefined: predefined,
+        organizationId: orgId || null,
+        isPredefined: false,
         status: status || 'draft',
         visibility: visibility || 'public',
         price: price ? parseFloat(price) : null,
@@ -70,31 +133,28 @@ export const createEvent = async (req: any, res: Response) => {
       },
     });
 
-    // Notify all organization members about the new event
     if (event.organizationId && event.status !== 'Draft') {
       const org = await prisma.organization.findUnique({
-        where: { id: event.organizationId }
+        where: { id: event.organizationId },
       });
-      
+
       const members = await prisma.user.findMany({
         where: {
           organizationId: event.organizationId,
           role: 'member',
-          is_verified: true
-        }
+          is_verified: true,
+        },
       });
 
       if (members.length > 0) {
-        // 1. Create in-app notifications
         await prisma.notification.createMany({
-          data: members.map(member => ({
+          data: members.map((member) => ({
             userId: member.id,
             title: `New Event: ${event.title}`,
-            link: '/member/events'
-          }))
+            link: '/member/events',
+          })),
         });
 
-        // 2. Send email notifications in the background
         for (const member of members) {
           sendNewEventNotification(
             member.email,
@@ -104,8 +164,8 @@ export const createEvent = async (req: any, res: Response) => {
             event.location,
             org?.name || undefined,
             member.id,
-            event.id
-          ).catch(emailError => {
+            event.id,
+          ).catch((emailError) => {
             console.error(`Failed to send event email notification to ${member.email}:`, emailError);
           });
         }
@@ -121,37 +181,88 @@ export const createEvent = async (req: any, res: Response) => {
 export const updateEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { 
-      title, description, date, end_date, location, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline, visibility
+    const {
+      title,
+      description,
+      date,
+      end_date,
+      location,
+      status,
+      category,
+      capacity,
+      virtualLink,
+      contactEmail,
+      price,
+      payment_required,
+      organizer,
+      registrationDeadline,
+      visibility,
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
 
-    const existing = await prisma.event.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ message: 'Event not found' });
-    if ((existing as any).isPredefined && req.user?.role !== 'SuperAdmin') {
-      return res.status(403).json({ message: 'Platform predefined events can only be edited by SuperAdmin.' });
+    const platform = getPlatformEventById(id);
+    if (platform) {
+      if (req.user?.role !== 'SuperAdmin') {
+        return res.status(403).json({
+          message: 'Platform predefined events can only be edited by SuperAdmin.',
+        });
+      }
+      const updated = updatePlatformEvent(id, {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(date !== undefined && { date: new Date(date) }),
+        ...(end_date !== undefined && { end_date: end_date ? new Date(end_date) : null }),
+        ...(location !== undefined && { location }),
+        ...(image !== undefined && { image }),
+        ...(category !== undefined && { category }),
+        ...(capacity !== undefined && { capacity: capacity !== null ? parseInt(capacity, 10) : null }),
+        ...(virtualLink !== undefined && { virtualLink }),
+        ...(contactEmail !== undefined && { contactEmail }),
+        ...(status !== undefined && { status }),
+        ...(visibility !== undefined && { visibility }),
+        ...(price !== undefined && { price: price !== null ? parseFloat(price) : null }),
+        ...(payment_required !== undefined && {
+          payment_required: payment_required === true || payment_required === 'true',
+        }),
+        ...(organizer !== undefined && { organizer }),
+        ...(registrationDeadline !== undefined && {
+          registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : null,
+        }),
+      });
+      if (!updated) return res.status(404).json({ message: 'Event not found' });
+      return res.status(200).json(updated);
     }
 
+    const existing = await prisma.event.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Event not found' });
+
     const event = await prisma.event.update({
-      where: { id: id },
+      where: { id },
       data: {
         title,
         description,
-        date: new Date(date),
+        date: date ? new Date(date) : undefined,
         end_date: end_date ? new Date(end_date) : undefined,
         location,
         image,
         category: category || undefined,
-        capacity: capacity !== undefined ? parseInt(capacity) : null,
+        capacity: capacity !== undefined ? parseInt(capacity, 10) : null,
         virtualLink: virtualLink !== undefined ? virtualLink : null,
         contactEmail: contactEmail !== undefined ? contactEmail : null,
-        status: status || 'draft',
+        status: status || undefined,
         visibility: visibility !== undefined ? visibility : undefined,
         price: price !== undefined ? parseFloat(price) : null,
-        payment_required: payment_required !== undefined ? (payment_required === true || payment_required === 'true') : undefined,
+        payment_required:
+          payment_required !== undefined
+            ? payment_required === true || payment_required === 'true'
+            : undefined,
         organizer: organizer !== undefined ? organizer : null,
-        registrationDeadline: registrationDeadline !== undefined ? (registrationDeadline ? new Date(registrationDeadline) : null) : undefined,
+        registrationDeadline:
+          registrationDeadline !== undefined
+            ? registrationDeadline
+              ? new Date(registrationDeadline)
+              : null
+            : undefined,
       },
     });
     res.status(200).json(event);
@@ -163,14 +274,23 @@ export const updateEvent = async (req: any, res: Response) => {
 export const deleteEvent = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
+
+    if (getPlatformEventById(id)) {
+      if (req.user?.role !== 'SuperAdmin') {
+        return res.status(403).json({
+          message: 'Platform predefined events can only be deleted by SuperAdmin.',
+        });
+      }
+      if (!deletePlatformEvent(id)) {
+        return res.status(404).json({ message: 'Event not found' });
+      }
+      return res.status(204).send();
+    }
+
     const existing = await prisma.event.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ message: 'Event not found' });
-    if ((existing as any).isPredefined && req.user?.role !== 'SuperAdmin') {
-      return res.status(403).json({ message: 'Platform predefined events can only be deleted by SuperAdmin.' });
-    }
-    await prisma.event.delete({
-      where: { id: id },
-    });
+
+    await prisma.event.delete({ where: { id } });
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ message: 'Error deleting event', error });
@@ -182,8 +302,32 @@ export const registerForEvent = async (req: any, res: Response) => {
     const { id } = req.params;
     const userId = req.user.userId;
 
+    const platform = getPlatformEventById(id);
+    if (platform) {
+      if (platform.payment_required) {
+        return res.status(400).json({
+          message: 'This event requires payment. Please use the payment registration flow.',
+        });
+      }
+      if (platform.capacity) {
+        const count = await countPlatformEventAttendees(id);
+        if (count >= platform.capacity) {
+          return res.status(400).json({ message: 'Event capacity has been reached.' });
+        }
+      }
+      try {
+        await registerUserForPlatformEvent(userId, id);
+      } catch (e: any) {
+        if (e.message === 'ALREADY_REGISTERED') {
+          return res.status(400).json({ message: 'You are already registered for this event.' });
+        }
+        throw e;
+      }
+      return res.status(200).json({ message: 'Successfully registered for event' });
+    }
+
     const event = await prisma.event.findUnique({
-      where: { id: id },
+      where: { id },
       include: {
         _count: {
           select: { attendees: true },
@@ -196,35 +340,31 @@ export const registerForEvent = async (req: any, res: Response) => {
     }
 
     if (event.payment_required) {
-      return res.status(400).json({ message: 'This event requires payment. Please use the payment registration flow.' });
+      return res.status(400).json({
+        message: 'This event requires payment. Please use the payment registration flow.',
+      });
     }
 
     if (event.capacity && event._count.attendees >= event.capacity) {
       return res.status(400).json({ message: 'Event capacity has been reached.' });
     }
 
-    // Check if already registered
     const alreadyRegistered = await prisma.event.findFirst({
       where: {
-        id: id,
-        attendees: {
-          some: { id: userId }
-        }
-      }
+        id,
+        attendees: { some: { id: userId } },
+      },
     });
 
     if (alreadyRegistered) {
       return res.status(400).json({ message: 'You are already registered for this event.' });
     }
 
-    // Add user to event attendees
     await prisma.event.update({
-      where: { id: id },
+      where: { id },
       data: {
-        attendees: {
-          connect: { id: userId }
-        }
-      }
+        attendees: { connect: { id: userId } },
+      },
     });
 
     res.status(200).json({ message: 'Successfully registered for event' });

@@ -26,7 +26,6 @@ import {
   Shield,
   TrendingUp,
   Search,
-  Mail,
 } from 'lucide-react';
 
 const OrgAdminLayout: React.FC = () => {
@@ -40,21 +39,18 @@ const OrgAdminLayout: React.FC = () => {
   const navItems = [
     { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-indigo-500', featureId: 'overview' },
     { to: '/org-admin/members', label: 'Member Management', icon: Users, color: 'text-blue-500', featureId: 'members' },
-    { to: '/org-admin/contact', label: 'Contact', icon: Mail, color: 'text-pink-500', featureId: 'contact' },
     { to: '/org-admin/id-cards', label: 'ID Card Management', icon: Shield, color: 'text-cyan-500', featureId: 'id-cards' },
     { to: '/org-admin/licenses', label: 'License Management', icon: Shield, color: 'text-violet-500', featureId: 'licenses' },
     { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500', featureId: 'events' },
     { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500', featureId: 'services' },
     { to: '/org-admin/blogs', label: 'News & Announcements', icon: FileText, narrow: true, color: 'text-orange-500', featureId: 'news' },
     { to: '/org-admin/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600', featureId: 'subscriptions' },
-    { to: '/org-admin/member-subscriptions', label: 'Member Subscriptions', icon: Users, color: 'text-emerald-600', featureId: 'subscriptions' },
-    { to: '/org-admin/member-payments', label: 'Member Payments', icon: CreditCard, color: 'text-rose-600', featureId: 'payments' },
     { to: '/org-admin/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600', featureId: 'tickets' },
     { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500', featureId: 'chat' },
   ].filter((item) => item.featureId === null || allowedFeatures.includes(item.featureId));
 
   const reportsSubmenu = [
-  
+
     { to: '/org-admin/reports/members', label: 'Member Reports', color: 'text-indigo-500' },
     { to: '/org-admin/reports/events', label: 'Event Reports', color: 'text-blue-500' },
     { to: '/org-admin/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
@@ -66,9 +62,10 @@ const OrgAdminLayout: React.FC = () => {
 
   const otherNavItems = [
     { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500', featureId: 'payments' },
-    { to: '/org-admin/profile', label: 'Profile', icon: UserIcon, color: 'text-indigo-500', featureId: 'profile' },
     { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500', featureId: null }, // Always show upgrade
-    { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500', featureId: null }, // Always show settings
+    { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500', featureId: null },
+    { to: '/org-admin/profile', label: 'Profile', icon: UserIcon, color: 'text-indigo-500', featureId: 'profile' },
+    // Always show settings
   ].filter((item) => item.featureId === null || allowedFeatures.includes(item.featureId));
   const location = useLocation();
   const navigate = useNavigate();
@@ -156,7 +153,7 @@ const OrgAdminLayout: React.FC = () => {
     <div className="h-screen overflow-hidden bg-[#f4f6f9] flex font-poppins relative">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-brand-dark/40 backdrop-blur-sm z-[40] lg:hidden animate-in fade-in duration-300"
           onClick={closeSidebar}
         ></div>
@@ -184,7 +181,7 @@ const OrgAdminLayout: React.FC = () => {
               {orgLabel}
             </p>
           </div>
-          <button 
+          <button
             onClick={closeSidebar}
             className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-400"
           >
@@ -202,9 +199,8 @@ const OrgAdminLayout: React.FC = () => {
                 key={item.to}
                 to={item.to}
                 onClick={closeSidebar}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
-                }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
+                  }`}
               >
                 <Icon size={18} className={active ? '' : (item as any).color} />
                 <span className={active ? 'text-white' : 'text-gray-600'}>
@@ -219,11 +215,10 @@ const OrgAdminLayout: React.FC = () => {
             <div>
               <button
                 onClick={() => setIsReportsOpen(!isReportsOpen)}
-                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                  location.pathname.startsWith('/org-admin/reports')
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${location.pathname.startsWith('/org-admin/reports')
                     ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
                     : 'hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <FileText
@@ -256,9 +251,8 @@ const OrgAdminLayout: React.FC = () => {
                         key={item.to}
                         to={item.to}
                         onClick={closeSidebar}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                          active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
-                        }`}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
+                          }`}
                       >
                         <span className={active ? 'text-indigo-700' : item.color}>•</span>
                         <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
@@ -280,9 +274,8 @@ const OrgAdminLayout: React.FC = () => {
                 key={item.to}
                 to={item.to}
                 onClick={closeSidebar}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                  active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
-                }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${active ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'hover:bg-gray-50'
+                  }`}
               >
                 <Icon size={18} className={active ? '' : (item as any).color} />
                 <span className={active ? 'text-white' : 'text-gray-600'}>
@@ -296,10 +289,10 @@ const OrgAdminLayout: React.FC = () => {
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm overflow-hidden border border-indigo-200/50">
               {user?.profile_photo_path ? (
-                <img 
-                  src={`http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`} 
-                  alt="" 
-                  className="w-full h-full object-cover" 
+                <img
+                  src={`http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`}
+                  alt=""
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 user?.name?.charAt(0) ?? '?'
@@ -335,13 +328,13 @@ const OrgAdminLayout: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-[30] min-h-[64px]">
-          <button 
+          <button
             onClick={toggleSidebar}
             className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
           >
             <Menu size={24} />
           </button>
-          
+
           <div className="flex-1 max-w-xl relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
@@ -352,45 +345,45 @@ const OrgAdminLayout: React.FC = () => {
           </div>
           <div className="flex items-center gap-4 ml-auto" ref={containerRef}>
             <div className="relative">
-                {open === 'notifications' ? (
-                  <button
-                    title="notifications"
-                    type="button"
-                    className={`${iconBtn} relative`}
-                    aria-label="Notifications"
-                    aria-expanded="true"
-                    aria-haspopup="true"
-                    aria-controls={notifId}
-                    id={`${notifId}-trigger`}
-                    onClick={() => toggle('notifications')}
-                  >
-                    <Bell size={20} />
-                    {unread > 0 ? (
-                      <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white sm:right-1.5 sm:top-1.5">
-                        {unread > 9 ? '9+' : unread}
-                      </span>
-                    ) : null}
-                  </button>
-                ) : (
-                  <button
-                    title="notifications"
-                    type="button"
-                    className={`${iconBtn} relative`}
-                    aria-label="Notifications"
-                    aria-expanded="false"
-                    aria-haspopup="true"
-                    aria-controls={notifId}
-                    id={`${notifId}-trigger`}
-                    onClick={() => toggle('notifications')}
-                  >
-                    <Bell size={20} />
-                    {unread > 0 ? (
-                      <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white sm:right-1.5 sm:top-1.5">
-                        {unread > 9 ? '9+' : unread}
-                      </span>
-                    ) : null}
-                  </button>
-                )}
+              {open === 'notifications' ? (
+                <button
+                  title="notifications"
+                  type="button"
+                  className={`${iconBtn} relative`}
+                  aria-label="Notifications"
+                  aria-expanded="true"
+                  aria-haspopup="true"
+                  aria-controls={notifId}
+                  id={`${notifId}-trigger`}
+                  onClick={() => toggle('notifications')}
+                >
+                  <Bell size={20} />
+                  {unread > 0 ? (
+                    <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white sm:right-1.5 sm:top-1.5">
+                      {unread > 9 ? '9+' : unread}
+                    </span>
+                  ) : null}
+                </button>
+              ) : (
+                <button
+                  title="notifications"
+                  type="button"
+                  className={`${iconBtn} relative`}
+                  aria-label="Notifications"
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-controls={notifId}
+                  id={`${notifId}-trigger`}
+                  onClick={() => toggle('notifications')}
+                >
+                  <Bell size={20} />
+                  {unread > 0 ? (
+                    <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white sm:right-1.5 sm:top-1.5">
+                      {unread > 9 ? '9+' : unread}
+                    </span>
+                  ) : null}
+                </button>
+              )}
 
               {open === 'notifications' ? (
                 <div
@@ -440,14 +433,12 @@ const OrgAdminLayout: React.FC = () => {
                               }
                             }}
                             disabled={markReadMut.isPending}
-                            className={`flex w-full gap-3 px-3 py-3 text-left text-sm transition hover:bg-gray-50 disabled:opacity-60 ${
-                              n.read ? 'opacity-75' : 'bg-indigo-50/40'
-                            }`}
+                            className={`flex w-full gap-3 px-3 py-3 text-left text-sm transition hover:bg-gray-50 disabled:opacity-60 ${n.read ? 'opacity-75' : 'bg-indigo-50/40'
+                              }`}
                           >
                             <span
-                              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                                n.read ? 'bg-gray-300' : 'bg-indigo-500'
-                              }`}
+                              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? 'bg-gray-300' : 'bg-indigo-500'
+                                }`}
                               aria-hidden
                             />
                             <span className="min-w-0 flex-1">
@@ -483,7 +474,7 @@ const OrgAdminLayout: React.FC = () => {
                   <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200">
                     <img
                       src={
-                        user?.profile_photo_path 
+                        user?.profile_photo_path
                           ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
                           : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
                       }
@@ -511,7 +502,7 @@ const OrgAdminLayout: React.FC = () => {
                   <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200">
                     <img
                       src={
-                        user?.profile_photo_path 
+                        user?.profile_photo_path
                           ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
                           : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
                       }

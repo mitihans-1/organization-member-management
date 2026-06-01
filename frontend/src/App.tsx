@@ -63,8 +63,6 @@ import { OrgLegacyRedirect, OrganAdminLegacyRedirect } from './components/OrgPat
 
 import OrgSubscriptions from './pages/org/OrgSubscriptions';
 import MemberSubscriptions from './pages/member/MemberSubscriptions';
-import OrgMemberPayments from './pages/org/OrgMemberPayments';
-import OrgMemberSubscriptions from './pages/org/OrgMemberSubscriptions';
 
 const queryClient = new QueryClient();
 
@@ -131,7 +129,6 @@ const App: React.FC = () => {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="members" element={<Members />} />
-              <Route path="contact" element={<MemberContact />} />
               <Route path="events" element={<Events />} />
               <Route path="services" element={<OrgServices />} />
               <Route path="blogs" element={<Blogs />} />
@@ -146,8 +143,6 @@ const App: React.FC = () => {
               <Route path="id-cards" element={<OrgIdCards />} />
               <Route path="licenses" element={<OrgLicenses />} />
               <Route path="subscriptions" element={<OrgSubscriptions />} />
-              <Route path="member-subscriptions" element={<OrgMemberSubscriptions />} />
-              <Route path="member-payments" element={<OrgMemberPayments />} />
             </Route>
 
             <Route path="/org/*" element={<OrgLegacyRedirect />} />

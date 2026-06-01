@@ -31,23 +31,21 @@ export async function resolveRequestContext(req: any): Promise<{
   return { role: 'guest' };
 }
 
-/** Guest: only public items from any org + platform predefined. */
+/** Guest: public org catalog items only (platform predefined merged in controllers). */
 export function guestBrowseWhere() {
   return {
-    OR: [
-      { isPredefined: true },
-      { visibility: 'public' },
-    ],
+    isPredefined: false,
+    visibility: 'public',
   };
 }
 
-/** Member/OrgAdmin navbar: own org (public + private) + other orgs public + platform predefined. */
+/** Member/OrgAdmin navbar: own org + other orgs' public items (platform predefined merged in controllers). */
 export function navbarBrowseWhere(organizationId: string) {
   return {
+    isPredefined: false,
     OR: [
-      { isPredefined: true },
-      { organizationId, isPredefined: false },
-      { visibility: 'public', organizationId: { not: organizationId }, isPredefined: false },
+      { organizationId },
+      { visibility: 'public', organizationId: { not: organizationId } },
     ],
   };
 }

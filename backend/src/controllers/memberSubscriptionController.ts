@@ -1,10 +1,53 @@
-
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { createInvoice } from '../services/invoiceService';
 import { getRecurringPaymentsBySubscription } from '../services/invoiceService';
+import { predefinedMemberPlans } from '../data/predefinedData';
 
 const prisma = new PrismaClient();
+
+type ResolvedMemberPlan = {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  billingCycle: string;
+  durationDays: number;
+  trialDays: number | null;
+};
+
+async function resolveMemberPlanForOrg(
+  planId: string,
+  organizationId: string,
+): Promise<ResolvedMemberPlan | null> {
+  const dbPlan = await prisma.memberSubscriptionPlan.findFirst({
+    where: { id: planId, organizationId, isActive: true },
+  });
+  if (dbPlan) {
+    return {
+      id: dbPlan.id,
+      name: dbPlan.name,
+      price: dbPlan.price,
+      currency: dbPlan.currency,
+      billingCycle: dbPlan.billingCycle,
+      durationDays: dbPlan.durationDays,
+      trialDays: dbPlan.trialDays,
+    };
+  }
+  const predefined = predefinedMemberPlans.find((p) => p.id === planId);
+  if (predefined) {
+    return {
+      id: predefined.id,
+      name: predefined.name,
+      price: predefined.price,
+      currency: predefined.currency,
+      billingCycle: predefined.billingCycle,
+      durationDays: predefined.durationDays,
+      trialDays: predefined.trialDays ?? null,
+    };
+  }
+  return null;
+}
 
 export const getMemberSubscriptions = async (req: any, res: Response) => {
   try {
@@ -19,12 +62,21 @@ export const getMemberSubscriptions = async (req: any, res: Response) => {
       where,
       include: {
         member: true,
-        plan: true,
         organization: true,
+        plan: true,
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.status(200).json(subscriptions);
+
+    const subscriptionsWithPlans = subscriptions.map((sub) => {
+      const plan =
+        sub.plan ||
+        predefinedMemberPlans.find((p) => p.id === sub.planId) ||
+        null;
+      return { ...sub, plan };
+    });
+    
+    res.status(200).json(subscriptionsWithPlans);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching subscriptions', error });
   }
@@ -35,12 +87,18 @@ export const getMemberSubscriptionsForMember = async (req: any, res: Response) =
     const subscriptions = await prisma.memberSubscription.findMany({
       where: { memberId: req.user.userId },
       include: {
-        plan: true,
         organization: true,
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.status(200).json(subscriptions);
+    
+    // Attach plan details
+    const subscriptionsWithPlans = subscriptions.map(sub => {
+      const plan = predefinedMemberPlans.find(p => p.id === sub.planId);
+      return { ...sub, plan: plan || null };
+    });
+    
+    res.status(200).json(subscriptionsWithPlans);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching member subscriptions', error });
   }
@@ -53,13 +111,15 @@ export const getMemberSubscriptionById = async (req: any, res: Response) => {
       where: { id },
       include: {
         member: true,
-        plan: true,
         organization: true,
         invoices: true,
       },
     });
     if (!subscription) return res.status(404).json({ message: 'Subscription not found' });
-    res.status(200).json(subscription);
+    
+    // Attach plan details
+    const plan = predefinedMemberPlans.find(p => p.id === subscription.planId);
+    res.status(200).json({ ...subscription, plan: plan || null });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching subscription', error });
   }
@@ -101,7 +161,7 @@ export const createMemberSubscription = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } }) as any;
+    const plan = await resolveMemberPlanForOrg(planId, orgId);
     if (!plan) return res.status(404).json({ message: 'Plan not found' });
 
     const actualStartDate = startDate ? new Date(startDate) : new Date();
@@ -112,7 +172,7 @@ export const createMemberSubscription = async (req: any, res: Response) => {
       data: {
         memberId,
         organizationId: orgId,
-        planId,
+        planId: plan.id,
         status: 'active',
         startDate: actualStartDate,
         nextBillingDate,
@@ -120,7 +180,7 @@ export const createMemberSubscription = async (req: any, res: Response) => {
       },
       include: {
         member: true,
-        plan: true,
+        organization: true,
       },
     });
 
@@ -131,7 +191,7 @@ export const createMemberSubscription = async (req: any, res: Response) => {
       organizationId: orgId,
       memberId,
       subscriptionId: subscription.id,
-      planId,
+      planId: plan.id,
       planType: 'member',
       subtotal: plan.price,
       tax: 0,
@@ -152,7 +212,7 @@ export const createMemberSubscription = async (req: any, res: Response) => {
       ],
     });
 
-    res.status(201).json(subscription);
+    res.status(201).json({ ...subscription, plan });
   } catch (error) {
     res.status(500).json({ message: 'Error creating subscription', error });
   }
@@ -183,8 +243,9 @@ export const updateMemberSubscription = async (req: any, res: Response) => {
         autoRenew,
       },
     });
-
-    res.status(200).json(updatedSubscription);
+    
+    const plan = predefinedMemberPlans.find(p => p.id === updatedSubscription.planId);
+    res.status(200).json({ ...updatedSubscription, plan: plan || null });
   } catch (error) {
     res.status(500).json({ message: 'Error updating subscription', error });
   }
@@ -284,14 +345,12 @@ export const getAvailablePlansForMember = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'User not part of any organization' });
     }
 
-    const plans = await prisma.memberSubscriptionPlan.findMany({
-      where: {
-        organizationId: user.organizationId,
-        isActive: true,
-      },
-      orderBy: { sortOrder: 'asc' },
-    });
-
+    // Always return the predefined plans
+    const plans = predefinedMemberPlans.map(p => ({
+      ...p,
+      organizationId: user.organizationId,
+    }));
+    
     res.status(200).json(plans);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching available plans', error });
@@ -307,9 +366,9 @@ export const memberSelfSubscribe = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'User not part of any organization' });
     }
 
-    const plan = await prisma.memberSubscriptionPlan.findUnique({
-      where: { id: planId },
-    }) as any;
+    // Get plan from predefined plans
+    const plan = predefinedMemberPlans.find(p => p.id === planId);
+
     if (!plan) return res.status(404).json({ message: 'Plan not found' });
 
     if (!plan.isActive) {
@@ -361,7 +420,6 @@ export const memberSelfSubscribe = async (req: any, res: Response) => {
           },
           include: {
             member: true,
-            plan: true,
             organization: true,
           },
         });
@@ -379,7 +437,6 @@ export const memberSelfSubscribe = async (req: any, res: Response) => {
           },
           include: {
             member: true,
-            plan: true,
             organization: true,
           },
         });
@@ -415,7 +472,7 @@ export const memberSelfSubscribe = async (req: any, res: Response) => {
         ],
       });
 
-      return res.status(201).json(subscription);
+      return res.status(201).json({ ...subscription, plan });
     }
 
     // If plan is paid, return message that payment is required

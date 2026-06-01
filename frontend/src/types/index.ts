@@ -108,7 +108,7 @@ export interface Event {
   capacity?: number;
   virtualLink?: string;
   contactEmail?: string;
-  
+  organizer?: string;
   registrationDeadline?: string;
   organizationId?: string;
   _count?: { attendees: number };
@@ -125,6 +125,7 @@ export interface Service {
   status?: string;
   category?: string;
   code?: string;
+  owner?: string;
   department?: string;
   duration?: string;
   requiredDocuments?: string[];

@@ -1,309 +1,316 @@
-
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Eye, Pause, Play, XCircle, CheckCircle, Calendar } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { MemberSubscription, MemberSubscriptionPlan, Member } from '../../types';
+import { MemberSubscription, MemberSubscriptionPlan, User } from '../../types';
+import { Users, Clock, CreditCard, Plus, X, UserPlus } from 'lucide-react';
+import useBodyScrollLock from '../../hooks/useBodyScrollLock';
+
+const statusStyles: Record<string, string> = {
+  active: 'bg-emerald-100 text-emerald-800',
+  paused: 'bg-amber-100 text-amber-800',
+  cancelled: 'bg-rose-100 text-rose-800',
+  expired: 'bg-slate-100 text-slate-700',
+};
 
 const OrgMemberSubscriptions: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string>('');
-  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const orgId = user?.organizationId;
 
-  const { data: members, isLoading: loadingMembers } = useQuery<Member[]>({
-    queryKey: ['orgMembers'],
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [assignForm, setAssignForm] = useState({
+    memberId: '',
+    planId: '',
+    startDate: new Date().toISOString().slice(0, 10),
+  });
+
+  useBodyScrollLock(isAssignOpen);
+
+  const { data: subscriptions, isLoading } = useQuery<MemberSubscription[]>({
+    queryKey: ['orgMemberSubscriptions', orgId],
+    queryFn: () =>
+      api.get(`/member-subscriptions/organizations/${orgId}`).then((r) => r.data),
+    enabled: !!orgId,
+  });
+
+  const { data: members = [] } = useQuery<User[]>({
+    queryKey: ['members'],
     queryFn: () => api.get('/members').then((r) => r.data),
+    enabled: !!orgId && isAssignOpen,
   });
 
-  const { data: plans, isLoading: loadingPlans } = useQuery<MemberSubscriptionPlan[]>({
-    queryKey: ['orgSubscriptionPlans'],
+  const { data: plans = [] } = useQuery<MemberSubscriptionPlan[]>({
+    queryKey: ['orgSubscriptionPlans', orgId],
     queryFn: () =>
-      api.get(`/member-subscription-plans/organizations/${user?.organizationId}`).then((r) => r.data),
-    enabled: !!user?.organizationId,
+      api.get(`/member-subscription-plans/organizations/${orgId}`).then((r) => r.data),
+    enabled: !!orgId && isAssignOpen,
   });
 
-  const { data: subscriptions, isLoading: loadingSubscriptions } = useQuery<MemberSubscription[]>({
-    queryKey: ['orgSubscriptions'],
-    queryFn: () =>
-      api.get(`/member-subscriptions/organizations/${user?.organizationId}`).then((r) => r.data),
-    enabled: !!user?.organizationId,
-  });
-
-  const createSubscriptionMutation = useMutation({
-    mutationFn: (data: any) =>
-      api.post(
-        `/member-subscriptions/organizations/${user?.organizationId}/members/${selectedMember?.id}/subscriptions`,
-        data
-      ),
+  const assignMutation = useMutation({
+    mutationFn: (data: { memberId: string; planId: string; startDate: string }) =>
+      api.post(`/member-subscriptions/organizations/${orgId}/members/${data.memberId}`, {
+        planId: data.planId,
+        startDate: data.startDate,
+      }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orgMemberSubscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['orgSubscriptions'] });
-      setIsModalOpen(false);
-      setSelectedMember(null);
-      setSelectedPlan('');
+      setIsAssignOpen(false);
+      setAssignForm({
+        memberId: '',
+        planId: '',
+        startDate: new Date().toISOString().slice(0, 10),
+      });
     },
   });
 
-  const pauseSubscriptionMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/member-subscriptions/subscriptions/${id}/pause`),
+  const cancelMutation = useMutation({
+    mutationFn: (subscriptionId: string) =>
+      api.post(`/member-subscriptions/${subscriptionId}/cancel`, {
+        reason: 'Cancelled by organization admin',
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orgSubscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['orgMemberSubscriptions'] });
     },
   });
 
-  const resumeSubscriptionMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/member-subscriptions/subscriptions/${id}/resume`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orgSubscriptions'] });
-    },
-  });
+  const orgMembers = members.filter((m) => m.role === 'member');
+  const activePlans = plans.filter((p) => p.isActive);
+  const list = subscriptions ?? [];
 
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/member-subscriptions/subscriptions/${id}/cancel`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orgSubscriptions'] });
-    },
-  });
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-emerald-100 text-emerald-800';
-      case 'paused':
-        return 'bg-amber-100 text-amber-800';
-      case 'cancelled':
-        return 'bg-rose-100 text-rose-800';
-      case 'expired':
-        return 'bg-slate-100 text-slate-800';
-      default:
-        return 'bg-slate-100 text-slate-800';
-    }
+  const handleAssignSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignForm.memberId || !assignForm.planId) return;
+    assignMutation.mutate(assignForm);
   };
 
   return (
     <div className="space-y-6 font-poppins">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-900">Member Subscriptions</h2>
           <p className="text-slate-500 text-sm">
-            Members should primarily self-subscribe via their dashboard. Use manual assignment only for special cases.
+            View subscriptions and manually assign a plan to a member when needed.
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition"
+          type="button"
+          onClick={() => setIsAssignOpen(true)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-bold hover:bg-sky-700 transition-colors"
         >
-          <Plus size={18} />
-          Manual Assign (Special Case)
+          <UserPlus size={18} />
+          Assign plan to member
         </button>
       </div>
 
-      {loadingSubscriptions || loadingMembers || loadingPlans ? (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          <div className="p-6">
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 bg-slate-100 rounded-lg" />
-              ))}
-            </div>
-          </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
+          ))}
         </div>
-      ) : subscriptions?.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-          <p className="text-slate-500 text-lg">No member subscriptions yet. Members can self-subscribe via their dashboard!</p>
+      ) : list.length === 0 ? (
+        <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+          <Users className="mx-auto text-slate-300 mb-3" size={40} />
+          <p className="text-slate-600 font-semibold">No member subscriptions yet</p>
+          <p className="text-slate-400 text-sm mt-1">
+            Assign a plan manually or let members subscribe from their dashboard.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsAssignOpen(true)}
+            className="mt-4 inline-flex items-center gap-2 text-sky-600 font-bold text-sm hover:underline"
+          >
+            <Plus size={16} />
+            Assign first subscription
+          </button>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="text-left p-4 font-bold text-slate-600">Member</th>
-                  <th className="text-left p-4 font-bold text-slate-600">Plan</th>
-                  <th className="text-left p-4 font-bold text-slate-600">Status</th>
-                  <th className="text-left p-4 font-bold text-slate-600">Start Date</th>
-                  <th className="text-left p-4 font-bold text-slate-600">Next Billing</th>
-                  <th className="text-left p-4 font-bold text-slate-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptions?.map((sub) => (
-                  <tr key={sub.id} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="p-4">
-                      <div className="font-semibold text-slate-900">{sub.member?.name}</div>
-                      <div className="text-xs text-slate-500">{sub.member?.email}</div>
-                    </td>
-                    <td className="p-4 font-medium text-slate-700">{sub.plan?.name}</td>
-                    <td className="p-4">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-bold text-slate-600">Member</th>
+                <th className="px-4 py-3 text-left font-bold text-slate-600">Plan</th>
+                <th className="px-4 py-3 text-left font-bold text-slate-600">Status</th>
+                <th className="px-4 py-3 text-left font-bold text-slate-600">Started</th>
+                <th className="px-4 py-3 text-left font-bold text-slate-600">Next billing</th>
+                <th className="px-4 py-3 text-right font-bold text-slate-600">Price</th>
+                <th className="px-4 py-3 text-right font-bold text-slate-600">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {list.map((sub) => {
+                const memberName = sub.member?.name || sub.user?.name || 'Unknown member';
+                const planName = sub.plan?.name || sub.planId;
+                const status = sub.status || 'active';
+                return (
+                  <tr key={sub.id} className="hover:bg-slate-50/80">
+                    <td className="px-4 py-3 font-medium text-slate-900">{memberName}</td>
+                    <td className="px-4 py-3 text-slate-700">{planName}</td>
+                    <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusBadgeClass(
-                          sub.status
-                        )}`}
+                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${
+                          statusStyles[status] || statusStyles.active
+                        }`}
                       >
-                        {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                        {status}
                       </span>
                     </td>
-                    <td className="p-4 text-slate-600">
-                      {new Date(sub.startDate).toLocaleDateString()}
+                    <td className="px-4 py-3 text-slate-600">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock size={14} className="text-slate-400" />
+                        {sub.startDate ? new Date(sub.startDate).toLocaleDateString() : '—'}
+                      </span>
                     </td>
-                    <td className="p-4 text-slate-600">
-                      {sub.nextBillingDate ? new Date(sub.nextBillingDate).toLocaleDateString() : '—'}
+                    <td className="px-4 py-3 text-slate-600">
+                      {sub.nextBillingDate
+                        ? new Date(sub.nextBillingDate).toLocaleDateString()
+                        : '—'}
                     </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        {sub.status === 'active' && (
-                          <button
-                            onClick={() => pauseSubscriptionMutation.mutate(sub.id)}
-                            className="p-2 hover:bg-amber-50 rounded-lg text-amber-600 transition"
-                            title="Pause"
-                          >
-                            <Pause size={16} />
-                          </button>
-                        )}
-                        {sub.status === 'paused' && (
-                          <button
-                            onClick={() => resumeSubscriptionMutation.mutate(sub.id)}
-                            className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600 transition"
-                            title="Resume"
-                          >
-                            <Play size={16} />
-                          </button>
-                        )}
-                        {sub.status === 'active' && (
-                          <button
-                            onClick={() => cancelSubscriptionMutation.mutate(sub.id)}
-                            className="p-2 hover:bg-red-50 rounded-lg text-red-600 transition"
-                            title="Cancel"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        )}
-                      </div>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        <CreditCard size={14} className="text-slate-400" />
+                        {sub.plan?.price != null
+                          ? `${sub.plan.currency || 'ETB'} ${sub.plan.price.toLocaleString()}`
+                          : '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {status === 'active' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Cancel subscription for ${memberName}?`,
+                              )
+                            ) {
+                              cancelMutation.mutate(sub.id);
+                            }
+                          }}
+                          disabled={cancelMutation.isPending}
+                          className="text-xs font-bold text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="p-6 border-b border-slate-200 flex justify-between items-center">
-              <h2 className="text-xl font-black text-slate-900">Assign Subscription</h2>
+      {isAssignOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Assign plan to member</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Creates an active subscription without member payment.
+                </p>
+              </div>
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
+                type="button"
+                onClick={() => setIsAssignOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-500"
               >
-                <XCircle size={20} />
+                <X size={20} />
               </button>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (selectedMember && selectedPlan) {
-                  const plan = plans?.find(p => p.id === selectedPlan);
-                  const trialEndsAt = plan?.trialDays
-                    ? new Date(new Date(startDate).getTime() + plan.trialDays * 24 * 60 * 60 * 1000).toISOString()
-                    : undefined;
-
-                  createSubscriptionMutation.mutate({
-                    planId: selectedPlan,
-                    startDate,
-                    trialEndsAt,
-                  });
-                }
-              }}
-              className="p-6 space-y-4"
-            >
+            <form onSubmit={handleAssignSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Select Member</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                  Member
+                </label>
                 <select
                   required
-                  value={selectedMember?.id || ''}
-                  onChange={(e) => {
-                    const member = members?.find((m) => m.id === e.target.value);
-                    setSelectedMember(member || null);
-                  }}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
+                  value={assignForm.memberId}
+                  onChange={(e) =>
+                    setAssignForm((f) => ({ ...f, memberId: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
                 >
-                  <option value="">Select a member</option>
-                  {members?.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name} ({member.email})
+                  <option value="">Select member…</option>
+                  {orgMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.email})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Select Plan</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                  Subscription plan
+                </label>
                 <select
                   required
-                  value={selectedPlan}
-                  onChange={(e) => setSelectedPlan(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
+                  value={assignForm.planId}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, planId: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
                 >
-                  <option value="">Select a plan</option>
-                  {plans?.filter((p) => p.isActive).map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name} - {plan.currency} {plan.price.toLocaleString()}/{plan.billingCycle}
+                  <option value="">Select plan…</option>
+                  {activePlans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {p.currency} {p.price} / {p.billingCycle}
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Start Date</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="date"
-                      required
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 pl-12 pr-4 py-2.5 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
-                    />
-                  </div>
-                </div>
-                {selectedPlan && (
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Trial Ends At</label>
-                    <input
-                      type="date"
-                      disabled
-                      value={
-                        selectedPlan && plans?.find(p => p.id === selectedPlan)?.trialDays
-                          ? new Date(new Date(startDate).getTime() + plans?.find(p => p.id === selectedPlan)!.trialDays! * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-                          : ''
-                      }
-                      className="w-full rounded-xl border border-slate-300 px-4 py-2.5 bg-slate-50 text-slate-500"
-                    />
-                  </div>
+                {activePlans.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Create a plan under the Subscription Plans tab first.
+                  </p>
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                  Start date
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={assignForm.startDate}
+                  onChange={(e) =>
+                    setAssignForm((f) => ({ ...f, startDate: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                />
+              </div>
+
+              {assignMutation.isError && (
+                <p className="text-sm text-rose-600">
+                  {(assignMutation.error as any)?.response?.data?.message ||
+                    'Failed to assign plan.'}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition"
+                  onClick={() => setIsAssignOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedMember || !selectedPlan || createSubscriptionMutation.isPending}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-sky-600 text-white font-bold hover:bg-sky-500 transition disabled:opacity-50"
+                  disabled={
+                    assignMutation.isPending ||
+                    !assignForm.memberId ||
+                    !assignForm.planId ||
+                    activePlans.length === 0
+                  }
+                  className="flex-1 py-2.5 rounded-xl bg-sky-600 text-white font-bold text-sm hover:bg-sky-700 disabled:opacity-50"
                 >
-                  {createSubscriptionMutation.isPending ? 'Assigning...' : 'Assign Subscription'}
+                  {assignMutation.isPending ? 'Assigning…' : 'Assign plan'}
                 </button>
               </div>
             </form>

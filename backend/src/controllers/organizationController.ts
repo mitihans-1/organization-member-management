@@ -84,6 +84,70 @@ export const listPublicOrganizations = async (_req: Request, res: Response) => {
   }
 };
 
+// Super admin: get all organizations
+export const getAllOrganizations = async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Only super admin can view all organizations.' });
+    }
+
+    const organizations = await prisma.organization.findMany({
+      include: { plan: true },
+      orderBy: { name: 'asc' },
+    });
+    res.status(200).json(organizations);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching organizations', error });
+  }
+};
+
+// Super admin: assign plan to organization
+export const assignPlanToOrganization = async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'SuperAdmin') {
+      return res.status(403).json({ message: 'Only super admin can assign plans.' });
+    }
+
+    const { organizationId, planId, planExpiryDays } = req.body;
+
+    if (!organizationId || !planId) {
+      return res.status(400).json({ message: 'Organization ID and Plan ID are required.' });
+    }
+
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found.' });
+    }
+
+    const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!organization) {
+      return res.status(404).json({ message: 'Organization not found.' });
+    }
+
+    let planExpiry = null;
+    if (planExpiryDays) {
+      planExpiry = new Date();
+      planExpiry.setDate(planExpiry.getDate() + planExpiryDays);
+    } else if (plan.duration_days) {
+      planExpiry = new Date();
+      planExpiry.setDate(planExpiry.getDate() + plan.duration_days);
+    }
+
+    const updatedOrganization = await prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        plan_id: planId,
+        plan_expiry: planExpiry,
+      },
+      include: { plan: true },
+    });
+
+    res.status(200).json({ message: 'Plan assigned successfully.', organization: updatedOrganization });
+  } catch (error) {
+    res.status(500).json({ message: 'Error assigning plan', error });
+  }
+};
+
 export const getMyOrganization = async (req: any, res: Response) => {
   try {
     const user = await prisma.user.findUnique({

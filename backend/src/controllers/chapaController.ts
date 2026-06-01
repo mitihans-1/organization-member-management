@@ -2,6 +2,12 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import * as chapaService from '../services/chapaService';
 import crypto from 'crypto';
+import {
+  getPlatformEventById,
+  getPlatformServiceById,
+  registerUserForPlatformEvent,
+  subscribeUserToPlatformService,
+} from '../data/predefinedCatalogStore';
 
 const prisma = new PrismaClient();
 
@@ -145,8 +151,10 @@ export const initializeEventPayment = async (req: any, res: Response) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event || !event.price) return res.status(404).json({ message: 'Event or price not found' });
+    const platformEvent = getPlatformEventById(eventId);
+    const event =
+      platformEvent ?? (await prisma.event.findUnique({ where: { id: eventId } }));
+    if (!event || event.price == null) return res.status(404).json({ message: 'Event or price not found' });
 
     const tx_ref = `e-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const callback_url = `${process.env.BACKEND_URL}/api/chapa/webhook`;
@@ -207,7 +215,8 @@ export const initializeEventPayment = async (req: any, res: Response) => {
           payment_method: 'chapa',
           status: 'pending',
           transaction_id: tx_ref,
-          reference_id: `Ticket for ${event.title}`,
+          reference_id: eventId,
+          reference_type: 'event',
         },
       });
       console.log('Pending event payment record created in DB');
@@ -280,18 +289,64 @@ export const initializeMemberSubscriptionPayment = async (req: any, res: Respons
     const userId = req.user.userId;
     const isInline = mode === 'inline';
 
-    if (!userId || !isValidId(userId)) {
+    if (!userId || !isValidId(userId) && !planId.startsWith('default-')) {
       return res.status(400).json({ message: 'Invalid User ID format' });
     }
 
-    if (!planId || !isValidId(planId)) {
-      return res.status(400).json({ message: 'Invalid Plan ID format' });
+    if (!planId) {
+      return res.status(400).json({ message: 'Plan ID is required' });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+    // Default plans
+    const defaultPlans: Record<string, any> = {
+      'default-free': {
+        id: 'default-free',
+        name: 'Free',
+        price: 0,
+        currency: 'ETB',
+        billingCycle: 'monthly',
+        durationDays: 30,
+        features: ['overview', 'profile'],
+        trialDays: null,
+      },
+      'default-basic': {
+        id: 'default-basic',
+        name: 'Basic',
+        price: 100,
+        currency: 'ETB',
+        billingCycle: 'monthly',
+        durationDays: 30,
+        features: ['overview', 'profile', 'events', 'services', 'news', 'contact'],
+        trialDays: 7,
+      },
+      'default-premium': {
+        id: 'default-premium',
+        name: 'Premium',
+        price: 300,
+        currency: 'ETB',
+        billingCycle: 'monthly',
+        durationDays: 30,
+        features: [
+          'overview', 'profile', 'events', 'services', 'news', 'contact',
+          'subscriptions', 'payments', 'tickets', 'chat', 'id-cards', 'licenses'
+        ],
+        trialDays: 14,
+      }
+    };
+
+    let plan;
+    if (defaultPlans[planId]) {
+      plan = defaultPlans[planId];
+    } else {
+      if (!isValidId(planId)) {
+        return res.status(400).json({ message: 'Invalid Plan ID format' });
+      }
+      plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+    }
+
     if (!plan) return res.status(404).json({ message: 'Member Subscription Plan not found' });
 
     const tx_ref = `ms-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
@@ -390,8 +445,10 @@ export const initializeServicePayment = async (req: any, res: Response) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
-    if (!service || !service.price) return res.status(404).json({ message: 'Service or price not found' });
+    const platformService = getPlatformServiceById(serviceId);
+    const service =
+      platformService ?? (await prisma.service.findUnique({ where: { id: serviceId } }));
+    if (!service || service.price == null) return res.status(404).json({ message: 'Service or price not found' });
 
     const tx_ref = `s-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const callback_url = `${process.env.BACKEND_URL}/api/chapa/webhook`;
@@ -450,7 +507,7 @@ export const initializeServicePayment = async (req: any, res: Response) => {
           payment_method: 'chapa',
           status: 'pending',
           transaction_id: tx_ref,
-          reference_id: `Subscription for ${service.title}`,
+          reference_id: serviceId,
           reference_type: 'service',
         },
       });
@@ -512,26 +569,33 @@ async function processSuccessfulTransaction(tx_ref: string) {
     });
 
     if (eventPayment && eventPayment.reference_id) {
-      await prisma.$transaction([
-        prisma.payment.update({
-          where: { id: eventPayment.id },
-          data: { status: 'completed' },
-        }),
-        prisma.event.update({
-          where: { id: eventPayment.reference_id },
-          data: {
-            attendees: {
-              connect: { id: eventPayment.user_id }
-            }
-          }
-        }),
-        prisma.notification.create({
-          data: {
-            userId: eventPayment.user_id,
-            title: `Ticket purchase successful! You are now registered for the event.`,
-          },
-        }),
-      ]);
+      const eventId = eventPayment.reference_id;
+      const platformEvent = getPlatformEventById(eventId);
+
+      await prisma.payment.update({
+        where: { id: eventPayment.id },
+        data: { status: 'completed' },
+      });
+
+      if (platformEvent) {
+        await registerUserForPlatformEvent(eventPayment.user_id, eventId).catch(() => {});
+      } else {
+        await prisma.event
+          .update({
+            where: { id: eventId },
+            data: {
+              attendees: { connect: { id: eventPayment.user_id } },
+            },
+          })
+          .catch(() => {});
+      }
+
+      await prisma.notification.create({
+        data: {
+          userId: eventPayment.user_id,
+          title: `Ticket purchase successful! You are now registered for the event.`,
+        },
+      });
     }
   }
   // 3. Check if it's a Member Subscription Payment
@@ -546,7 +610,50 @@ async function processSuccessfulTransaction(tx_ref: string) {
         where: { id: memberSubscriptionPayment.user_id },
         include: { organization: true },
       });
-      const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+
+      // Default plans
+      const defaultPlans: Record<string, any> = {
+        'default-free': {
+          id: 'default-free',
+          name: 'Free',
+          price: 0,
+          currency: 'ETB',
+          billingCycle: 'monthly',
+          durationDays: 30,
+          features: ['overview', 'profile'],
+          trialDays: null,
+        },
+        'default-basic': {
+          id: 'default-basic',
+          name: 'Basic',
+          price: 100,
+          currency: 'ETB',
+          billingCycle: 'monthly',
+          durationDays: 30,
+          features: ['overview', 'profile', 'events', 'services', 'news', 'contact'],
+          trialDays: 7,
+        },
+        'default-premium': {
+          id: 'default-premium',
+          name: 'Premium',
+          price: 300,
+          currency: 'ETB',
+          billingCycle: 'monthly',
+          durationDays: 30,
+          features: [
+            'overview', 'profile', 'events', 'services', 'news', 'contact',
+            'subscriptions', 'payments', 'tickets', 'chat', 'id-cards', 'licenses'
+          ],
+          trialDays: 14,
+        }
+      };
+
+      let plan;
+      if (defaultPlans[planId]) {
+        plan = defaultPlans[planId];
+      } else {
+        plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+      }
 
       if (!user || !plan || !user.organizationId) {
         console.error('Missing user, plan, or organization for member subscription payment');
@@ -677,35 +784,38 @@ async function processSuccessfulTransaction(tx_ref: string) {
     });
 
     if (servicePayment && servicePayment.reference_id) {
-      // We need to get the service ID - wait, how? Oh, right, we can use reference_type!
-      const service = await prisma.service.findFirst({
-        where: {
-          title: servicePayment.reference_id.replace('Subscription for ', '')
-        }
+      const serviceId = servicePayment.reference_id;
+      const platformService = getPlatformServiceById(serviceId);
+      const dbService = platformService
+        ? null
+        : await prisma.service.findUnique({ where: { id: serviceId } });
+      const serviceTitle =
+        platformService?.title ?? dbService?.title ?? 'service';
+
+      await prisma.payment.update({
+        where: { id: servicePayment.id },
+        data: { status: 'completed' },
       });
 
-      if (service) {
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: servicePayment.id },
-            data: { status: 'completed' },
-          }),
-          prisma.service.update({
-            where: { id: service.id },
+      if (platformService) {
+        await subscribeUserToPlatformService(servicePayment.user_id, serviceId).catch(() => {});
+      } else if (dbService) {
+        await prisma.service
+          .update({
+            where: { id: serviceId },
             data: {
-              subscribers: {
-                connect: { id: servicePayment.user_id }
-              }
-            }
-          }),
-          prisma.notification.create({
-            data: {
-              userId: servicePayment.user_id,
-              title: `Service subscription successful! You are now subscribed to "${service.title}".`,
+              subscribers: { connect: { id: servicePayment.user_id } },
             },
-          }),
-        ]);
+          })
+          .catch(() => {});
       }
+
+      await prisma.notification.create({
+        data: {
+          userId: servicePayment.user_id,
+          title: `Service subscription successful! You are now subscribed to "${serviceTitle}".`,
+        },
+      });
     }
   }
 }

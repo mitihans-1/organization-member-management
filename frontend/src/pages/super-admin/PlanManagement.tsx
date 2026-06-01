@@ -14,7 +14,8 @@ import {
   Clock, 
   CheckCircle2,
   MoreVertical,
-  DollarSign
+  DollarSign,
+  Send
 } from 'lucide-react';
 import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
@@ -36,9 +37,19 @@ const ALL_FEATURES = [
   { id: 'profile', label: 'Profile' },
 ];
 
+type Organization = {
+  id: string;
+  name: string;
+  type: string;
+  plan_id?: string | null;
+  plan?: Plan | null;
+  plan_expiry?: string | null;
+};
+
 const PlanManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -49,13 +60,23 @@ const PlanManagement: React.FC = () => {
     duration_days: 30,
     allowed_features: [] as string[]
   });
+  const [assignFormData, setAssignFormData] = useState({
+    organizationId: '',
+    planId: '',
+    planExpiryDays: ''
+  });
 
   const queryClient = useQueryClient();
-  useBodyScrollLock(isModalOpen);
+  useBodyScrollLock(isModalOpen || isAssignModalOpen);
 
   const { data: plans, isLoading } = useQuery<Plan[]>({
     queryKey: ['plans'],
     queryFn: () => api.get('/plans').then((res) => res.data),
+  });
+
+  const { data: organizations } = useQuery<Organization[]>({
+    queryKey: ['organizations'],
+    queryFn: () => api.get('/organizations/all').then((res) => res.data),
   });
 
   const createMutation = useMutation({
@@ -83,6 +104,19 @@ const PlanManagement: React.FC = () => {
     onError: (error: any) => {
       console.error('Error deleting plan:', error);
       alert(error.response?.data?.message || 'Failed to delete plan.');
+    }
+  });
+
+  const assignPlanMutation = useMutation({
+    mutationFn: (data: any) => api.post('/organizations/assign-plan', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      closeAssignModal();
+      alert('Plan assigned successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error assigning plan:', error);
+      alert(error.response?.data?.message || 'Failed to assign plan.');
     }
   });
 
@@ -125,6 +159,24 @@ const PlanManagement: React.FC = () => {
     setEditingPlan(null);
   };
 
+  const openAssignModal = () => {
+    setAssignFormData({
+      organizationId: '',
+      planId: '',
+      planExpiryDays: ''
+    });
+    setIsAssignModalOpen(true);
+  };
+
+  const closeAssignModal = () => {
+    setIsAssignModalOpen(false);
+    setAssignFormData({
+      organizationId: '',
+      planId: '',
+      planExpiryDays: ''
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingPlan) {
@@ -132,6 +184,16 @@ const PlanManagement: React.FC = () => {
     } else {
       createMutation.mutate(formData);
     }
+  };
+
+  const handleAssignSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = {
+      organizationId: assignFormData.organizationId,
+      planId: assignFormData.planId,
+      planExpiryDays: assignFormData.planExpiryDays ? parseInt(assignFormData.planExpiryDays) : null
+    };
+    assignPlanMutation.mutate(data);
   };
 
   const filteredPlans = plans?.filter((plan) =>
@@ -145,13 +207,22 @@ const PlanManagement: React.FC = () => {
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Upgrade Plans</h1>
           <p className="text-sm text-slate-500 mt-1">Manage organization subscription plans and limits</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl flex items-center space-x-2 hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-600/20 text-sm font-bold"
-        >
-          <Plus size={18} />
-          <span>Create New Plan</span>
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={openAssignModal}
+            className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl flex items-center space-x-2 hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-600/20 text-sm font-bold"
+          >
+            <Send size={18} />
+            <span>Assign Plan</span>
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl flex items-center space-x-2 hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-600/20 text-sm font-bold"
+          >
+            <Plus size={18} />
+            <span>Create New Plan</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -263,7 +334,7 @@ const PlanManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Create/Edit Plan Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
@@ -310,7 +381,7 @@ const PlanManagement: React.FC = () => {
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Billing Cycle</label>
                   <select
-                  title="name"
+                    title="name"
                     value={formData.billing_cycle}
                     onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"
@@ -401,6 +472,96 @@ const PlanManagement: React.FC = () => {
                        <span>Saving...</span>
                     </div>
                   ) : editingPlan ? 'Update Plan' : 'Create Plan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Plan Modal */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Assign Plan to Organization</h3>
+                <p className="text-xs text-slate-500 mt-1">Select an organization and assign a subscription plan</p>
+              </div>
+              <button onClick={closeAssignModal} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAssignSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Organization</label>
+                  <select
+                    required
+                    value={assignFormData.organizationId}
+                    onChange={(e) => setAssignFormData({ ...assignFormData, organizationId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"
+                  >
+                    <option value="">Select an organization...</option>
+                    {organizations?.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name} {org.plan ? `(Current: ${org.plan.name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Plan</label>
+                  <select
+                    required
+                    value={assignFormData.planId}
+                    onChange={(e) => setAssignFormData({ ...assignFormData, planId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"
+                  >
+                    <option value="">Select a plan...</option>
+                    {plans?.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} - ${plan.price} ({plan.billing_cycle})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Custom Expiry Days (Optional)</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input
+                      type="number"
+                      min="1"
+                      value={assignFormData.planExpiryDays}
+                      onChange={(e) => setAssignFormData({ ...assignFormData, planExpiryDays: e.target.value })}
+                      placeholder="Leave empty to use plan's default"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-4">
+                <button
+                  type="button"
+                  onClick={closeAssignModal}
+                  className="flex-1 px-6 py-3.5 border border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assignPlanMutation.isPending}
+                  className="flex-1 px-6 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-600/20"
+                >
+                  {assignPlanMutation.isPending ? (
+                    <div className="flex items-center justify-center gap-2">
+                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                       <span>Assigning...</span>
+                    </div>
+                  ) : 'Assign Plan'}
                 </button>
               </div>
             </form>

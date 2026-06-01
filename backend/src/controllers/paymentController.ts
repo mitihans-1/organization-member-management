@@ -3,6 +3,13 @@ import { PrismaClient } from '@prisma/client';
 import { extractReceiptData } from '../services/ocrService';
 import { sendPaymentConfirmationEmail } from '../services/emailService';
 import { createInvoice } from '../services/invoiceService';
+import { predefinedMemberPlans, predefinedPlans } from '../data/predefinedData';
+import {
+  getPlatformEventById,
+  getPlatformServiceById,
+  registerUserForPlatformEvent,
+  subscribeUserToPlatformService,
+} from '../data/predefinedCatalogStore';
 
 const prisma = new PrismaClient();
 
@@ -33,8 +40,8 @@ export const createPayment = async (req: any, res: Response) => {
       },
     });
 
-    // Update user's plan and expiry date
-    const plan = await prisma.plan.findUnique({ where: { id: plan_id } });
+    // Update user's plan and expiry date using predefined plans
+    const plan = predefinedPlans.find(p => p.id === plan_id) || await prisma.plan.findUnique({ where: { id: plan_id } });
     if (plan) {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + plan.duration_days);
@@ -42,7 +49,7 @@ export const createPayment = async (req: any, res: Response) => {
       await prisma.user.update({
         where: { id: req.user.userId },
         data: {
-          plan_id: plan.id,
+          plan_id,
           plan_expiry: expiryDate,
         },
       });
@@ -114,7 +121,7 @@ export const uploadPaymentReceipt = async (req: any, res: Response) => {
       }
 
       // Validate amount fits the exact amount of the plan
-      const plan = await prisma.plan.findUnique({ where: { id: plan_id } });
+      const plan = predefinedPlans.find(p => p.id === plan_id) || await prisma.plan.findUnique({ where: { id: plan_id } });
       if (!plan) {
           return res.status(404).json({ message: 'Plan not found' });
       }
@@ -196,7 +203,6 @@ export const confirmPayment = async (req: any, res: Response) => {
     
     const payment = await prisma.payment.findUnique({
       where: { id: id },
-      include: { plan: true }
     });
 
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
@@ -208,15 +214,19 @@ export const confirmPayment = async (req: any, res: Response) => {
       data: { status: 'completed' }
     });
 
-    // Update user's plan and expiry date
-    if (payment.plan) {
+    // Update user's plan and expiry date using predefined plans if available
+    const plan = payment.plan_id 
+      ? predefinedPlans.find(p => p.id === payment.plan_id) || await prisma.plan.findUnique({ where: { id: payment.plan_id } })
+      : null;
+      
+    if (plan) {
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + payment.plan.duration_days);
+      expiryDate.setDate(expiryDate.getDate() + plan.duration_days);
 
       await prisma.user.update({
         where: { id: payment.user_id },
         data: {
-          plan_id: payment.plan.id,
+          plan_id: plan.id,
           plan_expiry: expiryDate,
         },
       });
@@ -225,7 +235,7 @@ export const confirmPayment = async (req: any, res: Response) => {
       await prisma.notification.create({
         data: {
             userId: payment.user_id,
-            title: `Your payment of ${payment.amount} ETB has been approved! You are now on the ${payment.plan.name} plan until ${expiryDate.toLocaleDateString()}.`
+            title: `Your payment of ${payment.amount} ETB has been approved! You are now on the ${plan.name} plan until ${expiryDate.toLocaleDateString()}.`
         }
       });
 
@@ -236,7 +246,7 @@ export const confirmPayment = async (req: any, res: Response) => {
           user.email,
           user.name,
           payment.amount,
-          payment.plan.name,
+          plan.name,
           payment.transaction_id || '',
           payment.id
         );
@@ -423,10 +433,13 @@ export const createEventPayment = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'Event ID is required.' });
     }
 
-    const event = await prisma.event.findUnique({
-      where: { id: event_id },
-      include: { organizations: true }
-    });
+    const platformEvent = getPlatformEventById(event_id);
+    const event =
+      platformEvent ??
+      (await prisma.event.findUnique({
+        where: { id: event_id },
+        include: { organizations: true },
+      }));
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found.' });
@@ -666,20 +679,29 @@ export const confirmEventPayment = async (req: any, res: Response) => {
     });
 
     if (payment.reference_type === 'event' && payment.reference_id) {
-      const event = await prisma.event.findUnique({ where: { id: payment.reference_id } });
+      const eventId = payment.reference_id;
+      const platformEvent = getPlatformEventById(eventId);
+      const event =
+        platformEvent ?? (await prisma.event.findUnique({ where: { id: eventId } }));
       if (event) {
-        await prisma.event.update({
-          where: { id: event.id },
-          data: {
-            attendees: {
-              connect: { id: payment.user_id }
-            }
-          }
-        }).catch(() => {});
+        if (platformEvent) {
+          await registerUserForPlatformEvent(payment.user_id, eventId).catch(() => {});
+        } else {
+          await prisma.event
+            .update({
+              where: { id: eventId },
+              data: {
+                attendees: { connect: { id: payment.user_id } },
+              },
+            })
+            .catch(() => {});
+        }
 
-        const eventOrgAdmins = await prisma.user.findMany({
-          where: { organizationId: event.organizationId, role: 'orgAdmin' }
-        });
+        const eventOrgAdmins = event.organizationId
+          ? await prisma.user.findMany({
+              where: { organizationId: event.organizationId, role: 'orgAdmin' },
+            })
+          : [];
         for (const admin of eventOrgAdmins) {
           await prisma.notification.create({
             data: {
@@ -745,10 +767,13 @@ export const createServicePayment = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'Service ID is required.' });
     }
 
-    const service = await prisma.service.findUnique({
-      where: { id: service_id },
-      include: { organizations: true }
-    });
+    const platformService = getPlatformServiceById(service_id);
+    const service =
+      platformService ??
+      (await prisma.service.findUnique({
+        where: { id: service_id },
+        include: { organizations: true },
+      }));
 
     if (!service) {
       return res.status(404).json({ message: 'Service not found.' });
@@ -833,20 +858,29 @@ export const confirmServicePayment = async (req: any, res: Response) => {
     });
 
     if (payment.reference_type === 'service' && payment.reference_id) {
-      const service = await prisma.service.findUnique({ where: { id: payment.reference_id } });
+      const serviceId = payment.reference_id;
+      const platformService = getPlatformServiceById(serviceId);
+      const service =
+        platformService ?? (await prisma.service.findUnique({ where: { id: serviceId } }));
       if (service) {
-        await prisma.service.update({
-          where: { id: service.id },
-          data: {
-            subscribers: {
-              connect: { id: payment.user_id }
-            }
-          }
-        }).catch(() => {});
+        if (platformService) {
+          await subscribeUserToPlatformService(payment.user_id, serviceId).catch(() => {});
+        } else {
+          await prisma.service
+            .update({
+              where: { id: serviceId },
+              data: {
+                subscribers: { connect: { id: payment.user_id } },
+              },
+            })
+            .catch(() => {});
+        }
 
-        const serviceOrgAdmins = await prisma.user.findMany({
-          where: { organizationId: service.organizationId, role: 'orgAdmin' }
-        });
+        const serviceOrgAdmins = service.organizationId
+          ? await prisma.user.findMany({
+              where: { organizationId: service.organizationId, role: 'orgAdmin' },
+            })
+          : [];
         for (const admin of serviceOrgAdmins) {
           await prisma.notification.create({
             data: {
@@ -956,12 +990,19 @@ export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
 
       let expectedAmount = parseFloat(reqAmount);
       let selectedPlan = null;
-      
+
       // If planId is provided, get plan price as expected amount
       if (planId) {
-        selectedPlan = await prisma.memberSubscriptionPlan.findUnique({
-          where: { id: planId }
-        });
+        // Check predefined plans first
+        selectedPlan = predefinedMemberPlans.find(p => p.id === planId);
+        
+        if (!selectedPlan) {
+          // Fallback to database
+          selectedPlan = await prisma.memberSubscriptionPlan.findUnique({
+            where: { id: planId }
+          });
+        }
+        
         if (!selectedPlan) {
           return res.status(404).json({ message: 'Member subscription plan not found' });
         }
@@ -1066,9 +1107,9 @@ export const uploadEventPaymentReceipt = async (req: any, res: Response) => {
           return res.status(400).json({ message: 'Event ID is required.' });
       }
 
-      const event = await prisma.event.findUnique({
-          where: { id: event_id }
-      });
+      const platformEvent = getPlatformEventById(event_id);
+      const event =
+        platformEvent ?? (await prisma.event.findUnique({ where: { id: event_id } }));
 
       if (!event) {
           return res.status(404).json({ message: 'Event not found.' });
@@ -1200,9 +1241,15 @@ export const confirmMemberPayment = async (req: any, res: Response) => {
       const memberId = payment.user_id;
       const organizationId = user.organizationId;
 
-      const plan = await prisma.memberSubscriptionPlan.findUnique({
-        where: { id: planId },
-      });
+      let plan;
+      plan = predefinedMemberPlans.find(p => p.id === planId);
+      
+      if (!plan) {
+        // Fallback to database
+        plan = await prisma.memberSubscriptionPlan.findUnique({
+          where: { id: planId },
+        });
+      }
 
       if (plan) {
         const actualStartDate = new Date();
