@@ -272,6 +272,105 @@ export const verifyTransaction = async (req: Request, res: Response) => {
 };
 
 /**
+ * Initialize a Chapa payment for a Member Subscription Plan
+ */
+export const initializeMemberSubscriptionPayment = async (req: any, res: Response) => {
+  try {
+    const { planId, phoneNumber, mode } = req.body;
+    const userId = req.user.userId;
+    const isInline = mode === 'inline';
+
+    if (!userId || !isValidId(userId)) {
+      return res.status(400).json({ message: 'Invalid User ID format' });
+    }
+
+    if (!planId || !isValidId(planId)) {
+      return res.status(400).json({ message: 'Invalid Plan ID format' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+    if (!plan) return res.status(404).json({ message: 'Member Subscription Plan not found' });
+
+    const tx_ref = `ms-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const callback_url = `${process.env.BACKEND_URL}/api/chapa/webhook`;
+    const return_url = `${process.env.FRONTEND_URL}/member/payments?tx_ref=${tx_ref}`;
+
+    const firstName = user.name.split(' ')[0] || 'User';
+    const lastName = user.name.split(' ').slice(1).join(' ') || 'Name';
+
+    const chapaData: any = {
+      amount: plan.price.toString(),
+      currency: plan.currency || 'ETB',
+      email: user.email,
+      first_name: firstName,
+      last_name: lastName,
+      tx_ref,
+      return_url,
+      customization: {
+        title: 'Member Subscription',
+      },
+    };
+
+    if (process.env.BACKEND_URL && !process.env.BACKEND_URL.includes('localhost')) {
+        chapaData.callback_url = callback_url;
+    }
+
+    const phoneToUse = phoneNumber || user.phone;
+    if (phoneToUse) {
+        const cleanPhone = phoneToUse.replace(/[^\d+]/g, '');
+        if (cleanPhone) chapaData.phone_number = cleanPhone;
+    }
+
+    console.log(`Initializing Chapa Member Subscription Payment (mode: ${mode || 'standard'}) with data:`, JSON.stringify(chapaData, null, 2));
+
+    let response: any = { status: 'success' };
+    if (!isInline) {
+        try {
+          response = await chapaService.initializePayment(chapaData);
+          console.log('Chapa Member Subscription Response:', JSON.stringify(response, null, 2));
+        } catch (chapaErr: any) {
+          console.error('Error calling Chapa Service for Member Subscription:', chapaErr.message);
+          return res.status(400).json({ 
+            message: 'Chapa initialization failed', 
+            error: chapaErr.message,
+            details: chapaErr.response?.data
+          });
+        }
+    } else {
+        console.log('Skipping Chapa API call for inline member subscription payment - frontend SDK will handle it');
+    }
+
+    try {
+      await prisma.payment.create({
+        data: {
+          user_id: userId,
+          amount: plan.price,
+          payment_method: 'chapa',
+          status: 'pending',
+          transaction_id: tx_ref,
+          reference_id: planId,
+          reference_type: 'member-subscription',
+        },
+      });
+      console.log('Pending member subscription payment record created in DB');
+    } catch (prismaErr: any) {
+      console.error('Error creating member subscription payment record in Prisma:', prismaErr);
+    }
+
+    res.status(200).json({
+      ...response,
+      tx_ref
+    });
+  } catch (error: any) {
+    console.error('Unexpected Chapa Initialization Error (Member Subscription):', error);
+    res.status(500).json({ message: error.message || 'Internal server error during Chapa initialization' });
+  }
+};
+
+/**
  * Initialize a Chapa payment for a Service Subscription
  */
 export const initializeServicePayment = async (req: any, res: Response) => {
@@ -435,7 +534,143 @@ async function processSuccessfulTransaction(tx_ref: string) {
       ]);
     }
   }
-  // 3. Check if it's a Service Payment
+  // 3. Check if it's a Member Subscription Payment
+  else if (tx_ref.startsWith('ms-')) {
+    const memberSubscriptionPayment = await prisma.payment.findFirst({
+      where: { transaction_id: tx_ref, status: 'pending' },
+    });
+
+    if (memberSubscriptionPayment && memberSubscriptionPayment.reference_id) {
+      const planId = memberSubscriptionPayment.reference_id;
+      const user = await prisma.user.findUnique({ 
+        where: { id: memberSubscriptionPayment.user_id },
+        include: { organization: true },
+      });
+      const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+
+      if (!user || !plan || !user.organizationId) {
+        console.error('Missing user, plan, or organization for member subscription payment');
+        return;
+      }
+
+      const actualStartDate = new Date();
+      const nextBillingDate = new Date(actualStartDate);
+      nextBillingDate.setDate(nextBillingDate.getDate() + plan.durationDays);
+
+      const trialEndsAt = plan.trialDays
+        ? new Date(actualStartDate.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      // Check for existing active subscription
+      const existingActiveSubscription = await prisma.memberSubscription.findFirst({
+        where: {
+          memberId: user.id,
+          organizationId: user.organizationId,
+          status: 'active',
+        },
+      });
+
+      let subscription;
+
+      if (existingActiveSubscription) {
+        // Upgrade
+        await prisma.memberSubscription.update({
+          where: { id: existingActiveSubscription.id },
+          data: {
+            status: 'cancelled',
+            cancellationDate: new Date(),
+            cancellationReason: 'Upgraded to new plan',
+            autoRenew: false,
+          },
+        });
+
+        subscription = await prisma.memberSubscription.create({
+          data: {
+            memberId: user.id,
+            organizationId: user.organizationId,
+            planId,
+            status: 'active',
+            startDate: actualStartDate,
+            nextBillingDate,
+            trialEndsAt,
+          },
+        });
+      } else {
+        // First subscription
+        subscription = await prisma.memberSubscription.create({
+          data: {
+            memberId: user.id,
+            organizationId: user.organizationId,
+            planId,
+            status: 'active',
+            startDate: actualStartDate,
+            nextBillingDate,
+            trialEndsAt,
+          },
+        });
+      }
+
+      // Create invoice
+      const dueDate = new Date(actualStartDate);
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      // Dynamically import createInvoice from invoiceService
+      const { createInvoice } = await import('../services/invoiceService.js');
+
+      await createInvoice({
+        organizationId: user.organizationId,
+        memberId: user.id,
+        subscriptionId: subscription.id,
+        planId,
+        planType: 'member',
+        subtotal: plan.price,
+        tax: 0,
+        discount: 0,
+        total: plan.price,
+        dueDate,
+        billingPeriodStart: actualStartDate,
+        billingPeriodEnd: nextBillingDate,
+        isRecurring: true,
+        notes: existingActiveSubscription 
+          ? `${plan.name} - ${plan.billingCycle} subscription (upgraded)` 
+          : `${plan.name} - ${plan.billingCycle} subscription (self-subscribed)`,
+        items: [
+          {
+            description: `${plan.name} Subscription`,
+            quantity: 1,
+            unitPrice: plan.price,
+            total: plan.price,
+          },
+        ],
+      });
+
+      // Create member subscription payment record
+      await prisma.memberSubscriptionPayment.create({
+        data: {
+          subscriptionId: subscription.id,
+          paymentId: memberSubscriptionPayment.id,
+          amount: plan.price,
+          periodStart: actualStartDate,
+          periodEnd: nextBillingDate,
+          status: 'completed',
+        },
+      });
+
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: memberSubscriptionPayment.id },
+          data: { status: 'completed' },
+        }),
+        prisma.notification.create({
+          data: {
+            userId: memberSubscriptionPayment.user_id,
+            title: `Your subscription to ${plan.name} was successful!`,
+          },
+        }),
+      ]);
+    }
+  }
+  // 4. Check if it's a Service Payment
   else if (tx_ref.startsWith('s-')) {
     const servicePayment = await prisma.payment.findFirst({
       where: { transaction_id: tx_ref, status: 'pending' },
@@ -474,3 +709,323 @@ async function processSuccessfulTransaction(tx_ref: string) {
     }
   }
 }
+
+/**
+ * Upload manual payment receipt for Member Subscription (with OCR)
+ */
+export const uploadMemberSubscriptionReceipt = async (req: any, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No receipt image uploaded.' });
+    }
+
+    const { planId, paymentMethod, manualTransactionId } = req.body;
+    const imagePath = req.file.path;
+
+    if (!planId || !isValidId(planId)) {
+      return res.status(400).json({ message: 'Invalid Member Subscription Plan ID format' });
+    }
+
+    const user = await prisma.user.findUnique({ 
+      where: { id: req.user.userId },
+      include: { organization: true },
+    });
+
+    if (!user?.organizationId) {
+      return res.status(400).json({ message: 'User does not belong to any organization.' });
+    }
+
+    const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+    if (!plan) return res.status(404).json({ message: 'Member Subscription Plan not found' });
+
+    // 1. Run OCR Processing
+    const { extractReceiptData } = await import('../services/ocrService.js');
+    const extracted = await extractReceiptData(imagePath);
+    let { transactionId, amount, isTelebirr, isCbeBirr } = extracted;
+
+    // Allow manual override
+    if (manualTransactionId) {
+      transactionId = manualTransactionId;
+    }
+
+    // Validate payment method matches receipt (if not manually overridden)
+    if (!manualTransactionId) {
+      if (paymentMethod === 'telebirr' && !isTelebirr) {
+        return res.status(400).json({
+          message: 'The uploaded receipt does not appear to be a valid Telebirr screenshot.',
+          rawText: extracted.rawText,
+          requiresManualEntry: true
+        });
+      }
+      if (paymentMethod === 'cbe-birr' && !isCbeBirr) {
+        return res.status(400).json({
+          message: 'The uploaded receipt does not appear to be a valid CBE Birr screenshot.',
+          rawText: extracted.rawText,
+          requiresManualEntry: true
+        });
+      }
+    }
+
+    if (!transactionId) {
+      return res.status(400).json({
+        message: 'Could not extract a Transaction ID from the image. Please enter it manually.',
+        rawText: extracted.rawText,
+        requiresManualEntry: true
+      });
+    }
+
+    // Validate amount matches plan price
+    if (amount !== null && !manualTransactionId) {
+      if (amount !== plan.price) {
+        return res.status(400).json({
+          message: `The receipt amount (${amount} ETB) does not match the plan price (${plan.price} ETB).`,
+          requiresManualEntry: true
+        });
+      }
+    }
+
+    const finalAmount = amount || plan.price;
+
+    // Check for existing transaction ID
+    const existingPayment = await prisma.payment.findFirst({
+      where: { transaction_id: transactionId }
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        message: `Transaction ID ${transactionId} has already been used.`
+      });
+    }
+
+    // Create pending payment
+    const payment = await prisma.payment.create({
+      data: {
+        user_id: req.user.userId,
+        amount: finalAmount,
+        payment_method: paymentMethod || 'telebirr',
+        status: 'pending',
+        transaction_id: transactionId,
+        receipt_url: imagePath,
+        payer_type: 'member',
+        payer_id: req.user.userId,
+        payee_type: 'organization',
+        payee_id: user.organizationId,
+        reference_type: 'member-subscription',
+        reference_id: planId,
+        organization_id: user.organizationId,
+      }
+    });
+
+    // Notify org admins
+    const orgAdmins = await prisma.user.findMany({
+      where: { role: 'orgAdmin', organizationId: user.organizationId }
+    });
+    if (orgAdmins.length > 0) {
+      const notificationsData = orgAdmins.map(admin => ({
+        userId: admin.id,
+        title: `New member subscription payment: ${user.name} paid ${finalAmount} ETB for ${plan.name} (Txn ID: ${transactionId})`
+      }));
+      await prisma.notification.createMany({ data: notificationsData });
+    }
+
+    res.status(201).json({
+      message: 'Payment receipt uploaded and is pending organization confirmation.',
+      extractedData: extracted,
+      payment
+    });
+  } catch (error) {
+    console.error('Member Subscription Receipt Error:', error);
+    res.status(500).json({ message: 'Internal server error processing receipt.', error });
+  }
+};
+
+/**
+ * Confirm member subscription payment (org admin)
+ */
+export const confirmMemberSubscriptionPayment = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const payment = await prisma.payment.findUnique({ where: { id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (user?.role !== 'orgAdmin' || user?.organizationId?.toString() !== payment.payee_id) {
+      return res.status(403).json({ message: 'Only the organization admin can confirm this payment.' });
+    }
+
+    const planId = payment.reference_id;
+    if (!planId) {
+      return res.status(400).json({ message: 'Missing plan reference in payment.' });
+    }
+    const member = await prisma.user.findUnique({ where: { id: payment.user_id } });
+    const plan = await prisma.memberSubscriptionPlan.findUnique({ where: { id: planId } });
+
+    if (!member || !plan) {
+      return res.status(404).json({ message: 'Member or Plan not found.' });
+    }
+
+    const actualStartDate = new Date();
+    const nextBillingDate = new Date(actualStartDate);
+    nextBillingDate.setDate(nextBillingDate.getDate() + plan.durationDays);
+
+    const trialEndsAt = plan.trialDays
+      ? new Date(actualStartDate.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
+      : null;
+
+    // Check for existing active subscription
+    const existingActiveSubscription = await prisma.memberSubscription.findFirst({
+      where: {
+        memberId: member.id,
+        organizationId: user.organizationId,
+        status: 'active',
+      },
+    });
+
+    let subscription;
+
+    if (existingActiveSubscription) {
+      // Upgrade - cancel old subscription and create new one
+      await prisma.memberSubscription.update({
+        where: { id: existingActiveSubscription.id },
+        data: {
+          status: 'cancelled',
+          cancellationDate: new Date(),
+          cancellationReason: 'Upgraded to new plan',
+          autoRenew: false,
+        },
+      });
+
+      subscription = await prisma.memberSubscription.create({
+        data: {
+          memberId: member.id,
+          organizationId: user.organizationId,
+          planId: planId,
+          status: 'active',
+          startDate: actualStartDate,
+          nextBillingDate: nextBillingDate,
+          trialEndsAt: trialEndsAt,
+        },
+      });
+    } else {
+      // First subscription
+      subscription = await prisma.memberSubscription.create({
+        data: {
+          memberId: member.id,
+          organizationId: user.organizationId,
+          planId: planId,
+          status: 'active',
+          startDate: actualStartDate,
+          nextBillingDate: nextBillingDate,
+          trialEndsAt: trialEndsAt,
+        },
+      });
+    }
+
+    // Create invoice
+    const dueDate = new Date(actualStartDate);
+    dueDate.setDate(dueDate.getDate() + 7);
+
+    const { createInvoice } = await import('../services/invoiceService.js');
+
+    await createInvoice({
+      organizationId: user.organizationId,
+      memberId: member.id,
+      subscriptionId: subscription.id,
+      planId: planId,
+      planType: 'member',
+      subtotal: plan.price,
+      tax: 0,
+      discount: 0,
+      total: plan.price,
+      dueDate: dueDate,
+      billingPeriodStart: actualStartDate,
+      billingPeriodEnd: nextBillingDate,
+      isRecurring: true,
+      notes: existingActiveSubscription 
+        ? `${plan.name} - ${plan.billingCycle} subscription (upgraded)` 
+        : `${plan.name} - ${plan.billingCycle} subscription (self-subscribed)`,
+      items: [
+        {
+          description: `${plan.name} Subscription`,
+          quantity: 1,
+          unitPrice: plan.price,
+          total: plan.price,
+        },
+      ],
+    });
+
+    // Create member subscription payment record
+    await prisma.memberSubscriptionPayment.create({
+      data: {
+        subscriptionId: subscription.id,
+        paymentId: payment.id,
+        amount: plan.price,
+        periodStart: actualStartDate,
+        periodEnd: nextBillingDate,
+        status: 'completed',
+      },
+    });
+
+    // Update payment status and notify member
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'completed' },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: member.id,
+          title: `Your subscription to ${plan.name} was successful!`,
+        },
+      }),
+    ]);
+
+    res.status(200).json({ message: 'Payment confirmed successfully' });
+  } catch (error) {
+    console.error('Confirm Member Subscription Payment Error:', error);
+    res.status(500).json({ message: 'Error confirming payment.', error });
+  }
+};
+
+/**
+ * Reject member subscription payment (org admin)
+ */
+export const rejectMemberSubscriptionPayment = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const payment = await prisma.payment.findUnique({ where: { id } });
+    if (!payment) return res.status(404).json({ message: 'Payment not found.' });
+    if (payment.status !== 'pending') return res.status(400).json({ message: 'Payment is already processed.' });
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    if (user?.role !== 'orgAdmin' || user?.organizationId?.toString() !== payment.payee_id) {
+      return res.status(403).json({ message: 'Only the organization admin can reject this payment.' });
+    }
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id },
+      data: {
+        status: 'rejected',
+        rejection_reason: reason || 'No reason provided.',
+      }
+    });
+
+    // Notify member
+    await prisma.notification.create({
+      data: {
+        userId: payment.user_id,
+        title: `Your subscription payment was rejected. Reason: ${reason || 'Invalid payment details.'}`
+      }
+    });
+
+    res.status(200).json({ message: 'Payment rejected successfully', payment: updatedPayment });
+  } catch (error) {
+    console.error('Reject Member Subscription Payment Error:', error);
+    res.status(500).json({ message: 'Error rejecting payment.', error });
+  }
+};
+

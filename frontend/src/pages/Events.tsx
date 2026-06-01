@@ -50,6 +50,7 @@ const Events: React.FC = () => {
     contactEmail: '',
     price: '',
     payment_required: false,
+    visibility: 'public',
   });
   const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
 
@@ -58,7 +59,7 @@ const Events: React.FC = () => {
 
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ['events'],
-    queryFn: () => api.get('/events').then((res) => res.data),
+    queryFn: () => api.get('/events?mode=dashboard').then((res) => res.data),
   });
 
   const createMutation = useMutation({

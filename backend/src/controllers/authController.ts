@@ -173,33 +173,53 @@ export const verifyOtp = async (req: Request, res: Response) => {
     }
 
     // If not existing user, proceed with normal registration flow
-    let user;
+  let user;
 
-    // Create User and Organization now that OTP is verified
-    if (pendingUser.role === 'orgAdmin') {
-      const org = await prisma.organization.create({
-        data: {
-          name: pendingUser.organization_name!,
-          type: pendingUser.organization_type!,
-        },
-      });
-      user = await prisma.user.create({
-        data: {
-          name: pendingUser.name,
-          email: pendingUser.email,
-          password: pendingUser.password,
-          role: 'orgAdmin',
-          organizationId: org.id,
-          organization_name: org.name,
-          organization_type: org.type,
-          is_verified: true,
-          phone: (pendingUser as any).phone,
-          address: (pendingUser as any).address,
-          sex: (pendingUser as any).sex,
-          join_date: (pendingUser as any).join_date,
-        },
-      });
-    } else {
+  // Get or create free plan
+  let freePlan = await prisma.plan.findFirst({ where: { name: 'Free' } });
+  if (!freePlan) {
+    const defaultFeatures = ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'];
+    // @ts-ignore: Prisma client needs regeneration
+    freePlan = await prisma.plan.create({
+      data: {
+        name: 'Free',
+        price: 0,
+        billing_cycle: 'monthly',
+        type: 'Standard',
+        max_members: 10,
+        duration_days: 30,
+        // @ts-ignore: Prisma client needs regeneration
+        allowed_features: defaultFeatures,
+      },
+    });
+  }
+
+  // Create User and Organization now that OTP is verified
+  if (pendingUser.role === 'orgAdmin') {
+    const org = await prisma.organization.create({
+      data: {
+        name: pendingUser.organization_name!,
+        type: pendingUser.organization_type!,
+        plan_id: freePlan.id, // Assign free plan
+      },
+    });
+    user = await prisma.user.create({
+      data: {
+        name: pendingUser.name,
+        email: pendingUser.email,
+        password: pendingUser.password,
+        role: 'orgAdmin',
+        organizationId: org.id,
+        organization_name: org.name,
+        organization_type: org.type,
+        is_verified: true,
+        phone: (pendingUser as any).phone,
+        address: (pendingUser as any).address,
+        sex: (pendingUser as any).sex,
+        join_date: (pendingUser as any).join_date,
+      },
+    });
+  } else {
       const org = await prisma.organization.findUnique({ where: { id: pendingUser.organization_id! } });
       if (!org) {
         console.error('OTP Verification Error: Target organization missing', pendingUser.organization_id);
@@ -410,16 +430,80 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+
+// Default features for different plan tiers (same as planController)
+const defaultFeatures = {
+  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'],
+  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'profile', 'tickets'],
+  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'reports', 'id-cards', 'licenses', 'profile', 'tickets']
+};
+
 export const getProfile = async (req: any, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
-      include: { plan: true },
+      include: { 
+        organization: {
+          include: { plan: true }
+        }
+      },
     });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    console.log("Backend getProfile: user.organization.plan:", JSON.stringify(user?.organization?.plan, null, 2));
+
+    // Apply default features to organization's plan if needed OR no plan at all (treat as Free)
+    if (user.organization) {
+      let features: string[] = [];
+      let planName = 'Free';
+      
+      if (user.organization.plan) {
+        features = (user.organization.plan as any).allowed_features || [];
+        planName = user.organization.plan.name;
+        console.log("Backend getProfile: initial features:", features);
+      }
+      
+      if (!features || features.length === 0) {
+        const nameLower = planName.toLowerCase();
+        console.log("Backend getProfile: nameLower:", nameLower);
+        if (nameLower.includes('free')) {
+          features = defaultFeatures.free;
+        } else if (nameLower.includes('pro')) {
+          features = defaultFeatures.pro;
+        } else if (nameLower.includes('enterprise')) {
+          features = defaultFeatures.enterprise;
+        } else {
+          features = defaultFeatures.free;
+        }
+        console.log("Backend getProfile: features after default:", features);
+      }
+      
+      // Attach the plan object even if it didn't exist in DB
+      const defaultPlan = {
+        id: 'default-free',
+        name: 'Free',
+        price: 0,
+        billing_cycle: 'monthly',
+        type: 'Standard',
+        max_members: 10,
+        duration_days: 30,
+        allowed_features: features,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      if (user.organization.plan) {
+        (user.organization.plan as any) = { ...user.organization.plan, allowed_features: features };
+      } else {
+        (user.organization as any).plan = defaultPlan;
+      }
+      
+      console.log("Backend getProfile: final plan object:", JSON.stringify(user.organization.plan, null, 2));
+    }
+
     const { password, ...userWithoutPassword } = user;
+    console.log("Backend getProfile: returning user:", JSON.stringify(userWithoutPassword, null, 2));
     res.status(200).json(userWithoutPassword);
   } catch (error: any) {
     console.error('Fetch Profile Error:', error);

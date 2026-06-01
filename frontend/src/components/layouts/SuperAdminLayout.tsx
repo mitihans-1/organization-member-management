@@ -46,9 +46,6 @@ const reportsSubmenu = [
 const otherNavItems = [
   { to: '/super-admin/tickets', label: 'Tickets', icon: FileText, color: 'text-indigo-500' },
   { to: '/super-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-slate-500' },
-  { to: '/super-admin/platform-services', label: 'Platform Services', icon: Settings, color: 'text-emerald-600' },
-  { to: '/super-admin/platform-events', label: 'Platform Events', icon: Settings, color: 'text-blue-600' },
-  { to: '/super-admin/platform-blogs', label: 'Platform Blogs', icon: Settings, color: 'text-orange-600' },
   { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-gray-500' },
 ];
 

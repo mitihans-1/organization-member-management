@@ -10,6 +10,16 @@ import useCountAnimation from '../../hooks/useCountAnimation';
 const MemberOverview: React.FC = () => {
   const { user } = useAuth();
 
+  // Get allowed features
+  const { data: subscriptions } = useQuery({
+    queryKey: ['member-subscriptions'],
+    queryFn: () => api.get('/member-subscriptions/member').then(res => res.data),
+    enabled: user?.role === 'member',
+  });
+
+  const activeSubscription = subscriptions?.find((s: any) => s.status === 'active');
+  const allowedFeatures = activeSubscription?.plan?.features ?? (user as any)?.organization?.plan?.allowed_features ?? ['overview', 'profile', 'subscriptions'];
+
   const { data: dash, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats').then((r) => r.data),
@@ -19,12 +29,12 @@ const MemberOverview: React.FC = () => {
   const { data: services } = useQuery<Service[]>({
     queryKey: ['services'],
     queryFn: () => api.get('/services').then((r) => r.data),
-    enabled: user?.role === 'member',
+    enabled: user?.role === 'member' && allowedFeatures.includes('services'),
   });
 
-  const upcoming = dash?.stats?.find((s: { label: string }) => s.label?.includes('Events'))?.value ?? '—';
-  const animatedUpcoming = useCountAnimation(upcoming);
-  const activeServices = services?.filter((s) => s.status === 'Active') ?? [];
+  const upcoming = allowedFeatures.includes('events') ? dash?.stats?.find((s: { label: string }) => s.label?.includes('Events'))?.value ?? '—' : null;
+  const animatedUpcoming = useCountAnimation(upcoming ?? '—');
+  const activeServices = allowedFeatures.includes('services') ? services?.filter((s) => s.status === 'Active') ?? [] : [];
 
   return (
     <div className="max-w-5xl space-y-8 font-poppins">
@@ -49,106 +59,116 @@ const MemberOverview: React.FC = () => {
               <p className="text-xs text-slate-400 mt-2">Renews {new Date(user.plan_expiry).toLocaleDateString()}</p>
             )}
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 uppercase">Upcoming events</p>
-            <p className="text-3xl font-black text-slate-900 mt-2">{animatedUpcoming}</p>
-            <Link to="/member/events" className="text-sm font-bold text-sky-600 mt-3 inline-block">
-              View all →
-            </Link>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 uppercase">Outstanding dues</p>
-            <p className="text-2xl font-black text-amber-600 mt-2">ETB 0.00</p>
-            <p className="text-xs text-slate-500 mt-1">All payments up to date</p>
-            <Link to="/member/payments" className="mt-3 inline-block text-sm font-bold text-sky-600 hover:text-sky-500">
-              Payments →
-            </Link>
-          </div>
+          {allowedFeatures.includes('events') && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+              <p className="text-xs font-bold text-slate-500 uppercase">Upcoming events</p>
+              <p className="text-3xl font-black text-slate-900 mt-2">{animatedUpcoming}</p>
+              <Link to="/member/events" className="text-sm font-bold text-sky-600 mt-3 inline-block">
+                View all →
+              </Link>
+            </div>
+          )}
+          {allowedFeatures.includes('payments') && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+              <p className="text-xs font-bold text-slate-500 uppercase">Outstanding dues</p>
+              <p className="text-2xl font-black text-amber-600 mt-2">ETB 0.00</p>
+              <p className="text-xs text-slate-500 mt-1">All payments up to date</p>
+              <Link to="/member/payments" className="mt-3 inline-block text-sm font-bold text-sky-600 hover:text-sky-500">
+                Payments →
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-black text-slate-900 flex items-center gap-2">
-              <Briefcase size={20} className="text-sky-600" />
-              Available Services
-            </h2>
-            <Link to="/member/services" className="text-sm font-bold text-sky-600">
-              View all
-            </Link>
+        {allowedFeatures.includes('services') && (
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-black text-slate-900 flex items-center gap-2">
+                <Briefcase size={20} className="text-sky-600" />
+                Available Services
+              </h2>
+              <Link to="/member/services" className="text-sm font-bold text-sky-600">
+                View all
+              </Link>
+            </div>
+            {activeServices.length > 0 ? (
+              <ul className="space-y-3 text-sm text-slate-700">
+                {activeServices.slice(0, 3).map((service) => (
+                  <li key={service.id} className="flex justify-between border-b border-slate-100 pb-2 last:border-0">
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 block">{service.title}</span>
+                      <span className="text-xs text-slate-500">{service.status || 'Active'}</span>
+                    </div>
+                    <Link to="/member/services" className="text-sky-600 font-bold flex items-center">
+                      View
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">No services available yet.</p>
+            )}
           </div>
-          {activeServices.length > 0 ? (
-            <ul className="space-y-3 text-sm text-slate-700">
-              {activeServices.slice(0, 3).map((service) => (
-                <li key={service.id} className="flex justify-between border-b border-slate-100 pb-2 last:border-0">
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 block">{service.title}</span>
-                    <span className="text-xs text-slate-500">{service.status || 'Active'}</span>
-                  </div>
-                  <Link to="/member/services" className="text-sky-600 font-bold flex items-center">
-                    View
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-500">No services available yet.</p>
-          )}
-        </div>
+        )}
 
+        {allowedFeatures.includes('events') && (
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-black text-slate-900 flex items-center gap-2">
+                <Calendar size={20} className="text-sky-600" />
+                Upcoming events
+              </h2>
+              <Link to="/member/events" className="text-sm font-bold text-sky-600">
+                View all
+              </Link>
+            </div>
+            <ul className="space-y-3 text-sm text-slate-700">
+              <li className="flex justify-between border-b border-slate-100 pb-2">
+                <span>Board meeting</span>
+                <Link to="/member/events" className="text-sky-600 font-bold">
+                  RSVP
+                </Link>
+              </li>
+              <li className="flex justify-between">
+                <span>Community outreach</span>
+                <Link to="/member/events" className="text-sky-600 font-bold">
+                  RSVP
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {allowedFeatures.includes('payments') && (
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-black text-slate-900 flex items-center gap-2">
-              <Calendar size={20} className="text-sky-600" />
-              Upcoming events
+              <CreditCard size={20} className="text-sky-600" />
+              Recent payments
             </h2>
-            <Link to="/member/events" className="text-sm font-bold text-sky-600">
+            <Link to="/member/payments" className="text-sm font-bold text-sky-600">
               View all
             </Link>
           </div>
-          <ul className="space-y-3 text-sm text-slate-700">
-            <li className="flex justify-between border-b border-slate-100 pb-2">
-              <span>Board meeting</span>
-              <Link to="/member/events" className="text-sky-600 font-bold">
-                RSVP
-              </Link>
+          <ul className="space-y-3 text-sm">
+            <li className="flex justify-between items-start border-b border-slate-100 pb-2">
+              <span className="text-slate-700">Annual membership</span>
+              <span className="text-emerald-600 font-bold flex items-center gap-1">
+                <CheckCircle size={14} /> Paid
+              </span>
             </li>
-            <li className="flex justify-between">
-              <span>Community outreach</span>
-              <Link to="/member/events" className="text-sky-600 font-bold">
-                RSVP
-              </Link>
+            <li className="flex justify-between items-start">
+              <span className="text-slate-700">Event registration</span>
+              <span className="text-emerald-600 font-bold flex items-center gap-1">
+                <CheckCircle size={14} /> Paid
+              </span>
             </li>
           </ul>
         </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-black text-slate-900 flex items-center gap-2">
-            <CreditCard size={20} className="text-sky-600" />
-            Recent payments
-          </h2>
-          <Link to="/member/payments" className="text-sm font-bold text-sky-600">
-            View all
-          </Link>
-        </div>
-        <ul className="space-y-3 text-sm">
-          <li className="flex justify-between items-start border-b border-slate-100 pb-2">
-            <span className="text-slate-700">Annual membership</span>
-            <span className="text-emerald-600 font-bold flex items-center gap-1">
-              <CheckCircle size={14} /> Paid
-            </span>
-          </li>
-          <li className="flex justify-between items-start">
-            <span className="text-slate-700">Event registration</span>
-            <span className="text-emerald-600 font-bold flex items-center gap-1">
-              <CheckCircle size={14} /> Paid
-            </span>
-          </li>
-        </ul>
-      </div>
+      )}
     </div>
   );
 };

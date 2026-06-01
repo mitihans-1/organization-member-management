@@ -18,6 +18,24 @@ import {
 } from 'lucide-react';
 import useBodyScrollLock from '../../hooks/useBodyScrollLock';
 
+// List of all possible features to allow or disallow
+const ALL_FEATURES = [
+  { id: 'overview', label: 'Dashboard Overview' },
+  { id: 'members', label: 'Member Management' },
+  { id: 'events', label: 'Events' },
+  { id: 'services', label: 'Services' },
+  { id: 'news', label: 'News' },
+  { id: 'contact', label: 'Contact' },
+  { id: 'subscriptions', label: 'Member Subscriptions' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'tickets', label: 'Tickets' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'id-cards', label: 'ID Cards' },
+  { id: 'licenses', label: 'Licenses' },
+  { id: 'profile', label: 'Profile' },
+];
+
 const PlanManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,6 +47,7 @@ const PlanManagement: React.FC = () => {
     type: 'business',
     max_members: 0,
     duration_days: 30,
+    allowed_features: [] as string[]
   });
 
   const queryClient = useQueryClient();
@@ -83,9 +102,11 @@ const PlanManagement: React.FC = () => {
         type: plan.type,
         max_members: plan.max_members,
         duration_days: plan.duration_days,
+        allowed_features: plan.allowed_features || []
       });
     } else {
       setEditingPlan(null);
+      // Set default features
       setFormData({
         name: '',
         price: 0,
@@ -93,6 +114,7 @@ const PlanManagement: React.FC = () => {
         type: 'business',
         max_members: 0,
         duration_days: 30,
+        allowed_features: ALL_FEATURES.map(f => f.id)
       });
     }
     setIsModalOpen(true);
@@ -327,6 +349,36 @@ const PlanManagement: React.FC = () => {
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                     />
                   </div>
+                </div>
+              </div>
+              
+              {/* Allowed Features Toggle */}
+              <div className="col-span-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Allowed Features</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {ALL_FEATURES.map(feature => (
+                    <label key={feature.id} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-indigo-300 transition-all">
+                      <input
+                        type="checkbox"
+                        checked={formData.allowed_features.includes(feature.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({
+                              ...formData,
+                              allowed_features: [...formData.allowed_features, feature.id]
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              allowed_features: formData.allowed_features.filter(id => id !== feature.id)
+                            });
+                          }
+                        }}
+                        className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm font-semibold text-slate-700">{feature.label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 

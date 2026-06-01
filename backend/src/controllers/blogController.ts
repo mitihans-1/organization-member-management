@@ -7,14 +7,13 @@ const prisma = new PrismaClient();
 export const getBlogs = async (req: any, res: Response) => {
   try {
     const ctx = await resolveRequestContext(req);
-    const where = await resolveCatalogWhere(req);
+    const mode = req.query.mode === 'dashboard' ? 'browse_dashboard' : 'browse_navbar';
+    const where = await resolveCatalogWhere(req, mode);
     const publishedOnly = ctx.role === 'guest' || ctx.role === 'member';
-    const isPublicOnly = ctx.role === 'guest';
     const blogs = await prisma.blog.findMany({
       where: {
         ...where,
         ...(publishedOnly && { status: 'published' }),
-        ...(isPublicOnly && { visibility: 'public' })
       },
       include: {
         author: { select: { id: true, name: true, email: true } },

@@ -11,18 +11,19 @@ import {
   createOrganizationPlanInvoice,
   getInvoicesForMember,
 } from '../controllers/invoiceController';
+import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-router.get('/organizations/:orgId/invoices', getInvoices);
-router.get('/member', getInvoicesForMember);
-router.get('/invoices/:id', getInvoiceById);
-router.post('/organizations/:orgId/invoices', createInvoiceHandler);
-router.post('/invoices/:id/send', sendInvoiceHandler);
-router.get('/invoices/:id/pdf', downloadInvoicePDF);
-router.post('/invoices/:id/mark-paid', markInvoicePaidHandler);
-router.post('/invoices/:id/void', voidInvoiceHandler);
-router.post('/organizations/:orgId/invoices/organization-plan', createOrganizationPlanInvoice);
+router.get('/organizations/:orgId/invoices', authenticateToken, getInvoices);
+router.get('/member', authenticateToken, getInvoicesForMember);
+router.get('/invoices/:id', authenticateToken, getInvoiceById);
+router.post('/organizations/:orgId/invoices', authenticateToken, createInvoiceHandler);
+router.post('/invoices/:id/send', authenticateToken, sendInvoiceHandler);
+router.get('/invoices/:id/pdf', authenticateToken, downloadInvoicePDF);
+router.post('/invoices/:id/mark-paid', authenticateToken, markInvoicePaidHandler);
+router.post('/invoices/:id/void', authenticateToken, voidInvoiceHandler);
+router.post('/organizations/:orgId/invoices/organization-plan', authenticateToken, createOrganizationPlanInvoice);
 
 export default router;
 

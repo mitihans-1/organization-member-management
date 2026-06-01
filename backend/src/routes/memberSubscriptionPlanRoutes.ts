@@ -7,14 +7,15 @@ import {
   updateSubscriptionPlan,
   deleteSubscriptionPlan,
 } from '../controllers/memberSubscriptionPlanController';
+import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-router.get('/organizations/:orgId/subscription-plans', getSubscriptionPlans);
-router.get('/subscription-plans/:id', getSubscriptionPlanById);
-router.post('/organizations/:orgId/subscription-plans', createSubscriptionPlan);
-router.put('/subscription-plans/:id', updateSubscriptionPlan);
-router.delete('/subscription-plans/:id', deleteSubscriptionPlan);
+router.get('/member-subscription-plans/organizations/:orgId', getSubscriptionPlans);
+router.get('/member-subscription-plans/:id', getSubscriptionPlanById);
+router.post('/member-subscription-plans/organizations/:orgId', authenticateToken, createSubscriptionPlan);
+router.put('/member-subscription-plans/:id', authenticateToken, updateSubscriptionPlan);
+router.delete('/member-subscription-plans/:id', authenticateToken, deleteSubscriptionPlan);
 
 export default router;
 

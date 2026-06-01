@@ -62,7 +62,7 @@ const MemberEvents: React.FC = () => {
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['events'],
-    queryFn: () => api.get('/events').then((r) => r.data),
+    queryFn: () => api.get('/events?mode=dashboard').then((r) => r.data),
   });
 
   const { data: userPayments, isLoading: paymentsLoading } = useQuery<any[]>({

@@ -13,7 +13,7 @@ const MemberBlog: React.FC = () => {
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
     queryKey: ['blogs'],
-    queryFn: () => api.get('/blogs').then((r) => r.data),
+    queryFn: () => api.get('/blogs?mode=dashboard').then((r) => r.data),
   });
 
   const filtered = useMemo(() => {
@@ -29,14 +29,14 @@ const MemberBlog: React.FC = () => {
     <div className="max-w-3xl space-y-6 font-poppins">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Blog</h1>
+          <h1 className="text-2xl font-black text-slate-900">News</h1>
           <p className="text-sm text-slate-500">Posts from your organization</p>
         </div>
         <Link
           to="/blogs"
           className="inline-flex items-center gap-2 text-sm font-bold text-sky-600 hover:underline"
         >
-          Public blog site
+          Public news site
           <ExternalLink size={16} />
         </Link>
       </div>

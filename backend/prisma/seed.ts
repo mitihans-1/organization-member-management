@@ -45,10 +45,17 @@ async function main() {
   }
   console.log('SuperAdmin ready:', superEmail, '(password from SEED_SUPERADMIN_PASSWORD)');
 
+  // Default features (same as in controllers)
+  const defaultFeatures = {
+    free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'],
+    pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'profile'],
+    enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'reports', 'id-cards', 'licenses', 'profile'],
+  };
+
   /** Default subscription plans for org upgrade / Payments UI (idempotent: creates any that are missing by name). */
   const defaultPlans = [
-    { name: 'Basic', price: 0, billing_cycle: 'monthly', type: 'Standard', max_members: 10, duration_days: 30 },
-    { name: 'Pro', price: 25, billing_cycle: 'monthly', type: 'Premium', max_members: 50, duration_days: 30 },
+    { name: 'Free', price: 0, billing_cycle: 'monthly', type: 'Standard', max_members: 10, duration_days: 30, allowed_features: defaultFeatures.free },
+    { name: 'Pro', price: 25, billing_cycle: 'monthly', type: 'Premium', max_members: 50, duration_days: 30, allowed_features: defaultFeatures.pro },
     {
       name: 'Enterprise',
       price: 100,
@@ -56,14 +63,29 @@ async function main() {
       type: 'Elite',
       max_members: 500,
       duration_days: 365,
+      allowed_features: defaultFeatures.enterprise,
     },
   ] as const;
 
+  let freePlan: any = null;
   for (const plan of defaultPlans) {
     const existing = await prisma.plan.findFirst({ where: { name: plan.name } });
     if (!existing) {
-      await prisma.plan.create({ data: { ...plan } });
+      const createdPlan = await prisma.plan.create({ data: plan as any });
       console.log('Plan created:', plan.name);
+      if (plan.name === 'Free') {
+        freePlan = createdPlan;
+      }
+    } else {
+      if (plan.name === 'Free') {
+        freePlan = existing;
+      }
+      // Update existing plan's features
+      await prisma.plan.update({
+        where: { id: existing.id },
+        // @ts-ignore: Prisma client needs regeneration in progress
+        data: { allowed_features: plan.allowed_features as any },
+      });
     }
   }
   const planTotal = await prisma.plan.count();
@@ -80,8 +102,16 @@ async function main() {
   let demoOrg = await prisma.organization.findFirst({ where: { name: orgName } });
   if (!demoOrg) {
     demoOrg = await prisma.organization.create({
-      data: { name: orgName, type: orgType },
+      data: { name: orgName, type: orgType, plan_id: freePlan.id },
     });
+    console.log('Demo org created with Free plan');
+  } else if (!demoOrg.plan_id) {
+    // Assign free plan to existing demo org if it doesn't have one
+    demoOrg = await prisma.organization.update({
+      where: { id: demoOrg.id },
+      data: { plan_id: freePlan.id },
+    });
+    console.log('Demo org updated to use Free plan');
   }
 
   let user = await prisma.user.findUnique({ where: { email: demoEmail } });

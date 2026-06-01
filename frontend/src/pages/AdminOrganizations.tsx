@@ -9,7 +9,13 @@ import useBodyScrollLock from '../hooks/useBodyScrollLock';
 const AdminOrganizations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAssignPlanModalOpen, setIsAssignPlanModalOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<User | null>(null);
+  const [assigningOrgId, setAssigningOrgId] = useState<string | null>(null);
+  const [assignFormData, setAssignFormData] = useState({
+    plan_id: '',
+    skipPayment: true,
+  });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,7 +24,7 @@ const AdminOrganizations: React.FC = () => {
     organization_type: 'business',
     plan_id: '',
   });
-  useBodyScrollLock(isModalOpen);
+  useBodyScrollLock(isModalOpen || isAssignPlanModalOpen);
 
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,6 +74,23 @@ interface OrganizationWithAdmin {
     }
   });
 
+  const assignPlanMutation = useMutation({
+    mutationFn: ({ organizationId, planId, skipPayment }: any) => 
+      api.post(`/organization-subscriptions/organizations/${organizationId}/assign-plan`, { 
+        planId, 
+        skipPayment 
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'organizations'] });
+      closeAssignPlanModal();
+      alert('Plan assigned successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Error assigning plan:', error);
+      alert(error.response?.data?.message || 'Failed to assign plan.');
+    }
+  });
+
   const handleDeleteOrganization = (id: string) => {
     if (window.confirm('Are you sure you want to delete this organization?')) {
       deleteMutation.mutate(id);
@@ -104,6 +127,31 @@ interface OrganizationWithAdmin {
     setEditingOrg(null);
     // If this modal was opened via query params, clear them so it doesn't reopen on refresh.
     setSearchParams({});
+  };
+
+  const openAssignPlanModal = (organizationId: string) => {
+    setAssigningOrgId(organizationId);
+    setAssignFormData({
+      plan_id: '',
+      skipPayment: true,
+    });
+    setIsAssignPlanModalOpen(true);
+  };
+
+  const closeAssignPlanModal = () => {
+    setIsAssignPlanModalOpen(false);
+    setAssigningOrgId(null);
+  };
+
+  const handleAssignPlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (assigningOrgId && assignFormData.plan_id) {
+      assignPlanMutation.mutate({
+        organizationId: assigningOrgId,
+        planId: assignFormData.plan_id,
+        skipPayment: assignFormData.skipPayment,
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -224,13 +272,20 @@ interface OrganizationWithAdmin {
                     </td>
                     <td className="px-8 py-5 text-right">
                       <div className="flex justify-end space-x-2">
+                        <button 
+                          title='Assign plan'
+                          onClick={() => openAssignPlanModal(org.id)}
+                          className="p-2 bg-brand-pale/50 text-brand-medium shadow-sm border border-gray-100 rounded-xl hover:bg-brand-pale transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Edit2 size={16} />
+                        </button>
                         {admin && (
                           <button 
                           title='Edit organization'
                             onClick={() => openModal(admin)}
                             className="p-2 bg-white shadow-sm border border-gray-100 rounded-xl hover:text-brand-medium transition-colors opacity-0 group-hover:opacity-100"
                           >
-                            <Edit2 size={16} />
+                            <UserIcon size={16} />
                           </button>
                         )}
                         <button
@@ -359,6 +414,61 @@ interface OrganizationWithAdmin {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {editingOrg ? 'Update Organization' : 'Create Organization'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Plan Modal */}
+      {isAssignPlanModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-bold">Assign Plan to Organization</h3>
+              <button onClick={closeAssignPlanModal} title="Close"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleAssignPlan} className="p-4 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Plan</label>
+                <select
+                  title="Select plan"
+                  value={assignFormData.plan_id}
+                  onChange={(e) => setAssignFormData({ ...assignFormData, plan_id: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2"
+                  required
+                >
+                  <option value="">Select a Plan</option>
+                  {plans?.map(plan => (
+                    <option key={plan.id} value={plan.id}>{plan.name} - ${plan.price}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="skipPayment"
+                  checked={assignFormData.skipPayment}
+                  onChange={(e) => setAssignFormData({ ...assignFormData, skipPayment: e.target.checked })}
+                  className="w-5 h-5 rounded"
+                />
+                <label htmlFor="skipPayment" className="text-sm font-medium text-gray-700">Skip Payment (Assign without charging)</label>
+              </div>
+              <div className="pt-6 flex space-x-3">
+                <button
+                  type="button"
+                  onClick={closeAssignPlanModal}
+                  className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assignPlanMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Assign Plan
                 </button>
               </div>
             </form>

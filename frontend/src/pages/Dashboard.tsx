@@ -46,6 +46,9 @@ const DashboardStatsCard: React.FC<DashboardStatsCardProps> = ({
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
 
+  // Get allowed features
+  const allowedFeatures = (user as any)?.organization?.plan?.allowed_features ?? ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'];
+
   const { data: dashboardData, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats').then((res) => res.data),
@@ -54,85 +57,100 @@ const Dashboard: React.FC = () => {
   const { data: members } = useQuery({
     queryKey: ['members'],
     queryFn: () => api.get('/members').then((res) => res.data),
-    enabled: user?.role === 'orgAdmin' || user?.role === 'SuperAdmin',
+    enabled: (user?.role === 'orgAdmin' || user?.role === 'SuperAdmin') && allowedFeatures.includes('members'),
   });
 
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: () => api.get('/events').then((res) => res.data),
-    enabled: user?.role === 'orgAdmin' || user?.role === 'member',
+    enabled: (user?.role === 'orgAdmin' || user?.role === 'member') && allowedFeatures.includes('events'),
   });
 
   const { data: services } = useQuery({
     queryKey: ['services'],
     queryFn: () => api.get('/services').then((res) => res.data),
-    enabled: user?.role === 'orgAdmin' || user?.role === 'member',
+    enabled: (user?.role === 'orgAdmin' || user?.role === 'member') && allowedFeatures.includes('services'),
   });
 
   const { data: blogs } = useQuery({
     queryKey: ['blogs'],
     queryFn: () => api.get('/blogs').then((res) => res.data),
-    enabled: user?.role === 'orgAdmin',
+    enabled: user?.role === 'orgAdmin' && allowedFeatures.includes('news'),
   });
 
   const { data: payments } = useQuery({
     queryKey: ['payments'],
     queryFn: () => api.get('/payments').then((res) => res.data),
-    enabled: user?.role === 'orgAdmin',
+    enabled: user?.role === 'orgAdmin' && allowedFeatures.includes('payments'),
   });
 
   const statsCards = useMemo(() => {
     const stats = dashboardData?.stats ?? [];
     const find = (needle: string) =>
       stats.find((s: { label: string }) => s.label?.toLowerCase().includes(needle.toLowerCase()));
-    const memberVal = find('member')?.value ?? members?.length ?? '—';
-    const eventVal = find('event')?.value ?? events?.length ?? '—';
-    const serviceVal = find('service')?.value ?? services?.length ?? '—';
-    const blogVal = find('blog')?.value ?? blogs?.length ?? '—';
-    const paidSum = dashboardData?.totalPaidPayments ?? 0;
+    const cards: any[] = [];
 
-    return [
-      {
+    if (allowedFeatures.includes('members')) {
+      const memberVal = find('member')?.value ?? members?.length ?? '—';
+      cards.push({
         label: 'Total Members',
         value: String(memberVal),
         sub: <span className="text-emerald-600 font-semibold">↑ +12 this month</span>,
         icon: Users,
-      },
-      {
+      });
+    }
+
+    if (allowedFeatures.includes('events')) {
+      const eventVal = find('event')?.value ?? events?.length ?? '—';
+      cards.push({
         label: 'Active Events',
         value: String(eventVal),
         sub: <span className="text-gray-500">upcoming this week</span>,
         icon: Calendar,
-      },
-      {
+      });
+    }
+
+    if (allowedFeatures.includes('services')) {
+      const serviceVal = find('service')?.value ?? services?.length ?? '—';
+      cards.push({
         label: 'Active Services',
         value: String(serviceVal),
         sub: <span className="text-blue-500 font-semibold">available for members</span>,
         icon: Briefcase,
-      },
-      {
-        label: 'Total blogs',
+      });
+    }
+
+    if (allowedFeatures.includes('news')) {
+      const blogVal = find('blog')?.value ?? blogs?.length ?? '—';
+      cards.push({
+        label: 'Total News',
         value: String(blogVal),
-        sub: <span className="text-rose-600 font-semibold">+12 Blogs</span>,
+        sub: <span className="text-rose-600 font-semibold">+12 News</span>,
         icon: FileText,
-      },
-      {
+      });
+    }
+
+    if (allowedFeatures.includes('payments')) {
+      const paidSum = dashboardData?.totalPaidPayments ?? 0;
+      cards.push({
         label: 'Total Paid Payments',
         value: `ETB ${paidSum.toLocaleString()}`,
         sub: <span className="text-rose-600 font-semibold">Total paid this week</span>,
         icon: CreditCard,
-      },
-    ];
-  }, [dashboardData, members, events, services, blogs, payments]);
+      });
+    }
 
-  const upcoming = events?.slice(0, 3) ?? [];
+    return cards;
+  }, [dashboardData, members, events, services, blogs, payments, allowedFeatures]);
+
+  const upcoming = allowedFeatures.includes('events') ? events?.slice(0, 3) ?? [] : [];
   const firstEvent = upcoming[0];
-  const activeServices = services?.filter((s: any) => s.status === 'Active' || s.status === 'published').slice(0, 3) ?? [];
+  const activeServices = allowedFeatures.includes('services') ? services?.filter((s: any) => s.status === 'Active' || s.status === 'published').slice(0, 3) ?? [] : [];
   const firstService = activeServices[0];
   const reminders = useMemo(() => {
     const items: { key: string; title: string; description: string; ctaLabel: string; to: string }[] = [];
 
-    if (blogs?.length) {
+    if (allowedFeatures.includes('news') && blogs?.length) {
       items.push({
         key: 'blogs',
         title: 'Blog Post Review',
@@ -142,7 +160,7 @@ const Dashboard: React.FC = () => {
       });
     }
 
-    if (events?.length) {
+    if (allowedFeatures.includes('events') && events?.length) {
       items.push({
         key: 'events',
         title: 'Event Venue Confirmation',
@@ -152,7 +170,7 @@ const Dashboard: React.FC = () => {
       });
     }
 
-    if (services?.length) {
+    if (allowedFeatures.includes('services') && services?.length) {
       items.push({
         key: 'services',
         title: 'Service Management',
@@ -173,7 +191,7 @@ const Dashboard: React.FC = () => {
     }
 
     return items.slice(0, 3);
-  }, [blogs, events, services, dashboardData]);
+  }, [blogs, events, services, dashboardData, allowedFeatures]);
 
   return (
     <div className="space-y-8 font-poppins">
@@ -223,73 +241,77 @@ const Dashboard: React.FC = () => {
 
       {/* Events and Services Separate Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Events Dashboard */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Calendar size={20} className="text-indigo-600" />
-              Events Dashboard
-            </h2>
-            <Link to="/org-admin/events" className="text-sm font-bold text-indigo-600 hover:underline">
-              View All Events
-            </Link>
-          </div>
-          <p className="text-sm text-gray-500 mb-6">
-            Calendar-based, activity-oriented event management
-          </p>
-          {firstEvent ? (
-            <div className="rounded-xl border border-gray-100 bg-blue-50/30 p-5">
-              <p className="text-sm text-gray-600">
-                {new Date(firstEvent.date).toLocaleDateString()} {new Date(firstEvent.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
-                — <span className="font-bold text-gray-900">{firstEvent.title}</span>
-              </p>
-              <div className="flex flex-wrap gap-3 mt-5">
-                <Link
-                  to="/org-admin/events"
-                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
-                >
-                  Manage Events
-                </Link>
-              </div>
+        {/* Events Dashboard - Only if allowed */}
+        {allowedFeatures.includes('events') && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Calendar size={20} className="text-indigo-600" />
+                Events Dashboard
+              </h2>
+              <Link to="/org-admin/events" className="text-sm font-bold text-indigo-600 hover:underline">
+                View All Events
+              </Link>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">No upcoming events.</p>
-          )}
-        </div>
+            <p className="text-sm text-gray-500 mb-6">
+              Calendar-based, activity-oriented event management
+            </p>
+            {firstEvent ? (
+              <div className="rounded-xl border border-gray-100 bg-blue-50/30 p-5">
+                <p className="text-sm text-gray-600">
+                  {new Date(firstEvent.date).toLocaleDateString()} {new Date(firstEvent.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
+                  — <span className="font-bold text-gray-900">{firstEvent.title}</span>
+                </p>
+                <div className="flex flex-wrap gap-3 mt-5">
+                  <Link
+                    to="/org-admin/events"
+                    className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
+                  >
+                    Manage Events
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No upcoming events.</p>
+            )}
+          </div>
+        )}
 
-        {/* Services Dashboard */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Briefcase size={20} className="text-green-600" />
-              Services Dashboard
-            </h2>
-            <Link to="/org-admin/services" className="text-sm font-bold text-green-600 hover:underline">
-              View All Services
-            </Link>
-          </div>
-          <p className="text-sm text-gray-500 mb-6">
-            Operational, administrative service management
-          </p>
-          {firstService ? (
-            <div className="rounded-xl border border-gray-100 bg-green-50/30 p-5">
-              <p className="text-sm text-gray-600">
-                <span className="font-bold text-gray-900">{firstService.title}</span>
-                {' '}— {firstService.status || 'Active'}
-              </p>
-              <div className="flex flex-wrap gap-3 mt-5">
-                <Link
-                  to="/org-admin/services"
-                  className="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-500"
-                >
-                  Manage Services
-                </Link>
-              </div>
+        {/* Services Dashboard - Only if allowed */}
+        {allowedFeatures.includes('services') && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Briefcase size={20} className="text-green-600" />
+                Services Dashboard
+              </h2>
+              <Link to="/org-admin/services" className="text-sm font-bold text-green-600 hover:underline">
+                View All Services
+              </Link>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">No active services.</p>
-          )}
-        </div>
+            <p className="text-sm text-gray-500 mb-6">
+              Operational, administrative service management
+            </p>
+            {firstService ? (
+              <div className="rounded-xl border border-gray-100 bg-green-50/30 p-5">
+                <p className="text-sm text-gray-600">
+                  <span className="font-bold text-gray-900">{firstService.title}</span>
+                  {' '}— {firstService.status || 'Active'}
+                </p>
+                <div className="flex flex-wrap gap-3 mt-5">
+                  <Link
+                    to="/org-admin/services"
+                    className="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-500"
+                  >
+                    Manage Services
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No active services.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Reminders Section */}

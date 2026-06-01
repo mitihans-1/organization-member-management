@@ -26,41 +26,50 @@ import {
   Shield,
   TrendingUp,
   Search,
+  Mail,
 } from 'lucide-react';
-
-/** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
-const navItems = [
-  { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-indigo-500' },
-  { to: '/org-admin/members', label: 'Member Management', icon: Users, color: 'text-blue-500' },
-  { to: '/org-admin/id-cards', label: 'ID Card Management', icon: Shield, color: 'text-cyan-500' },
-  { to: '/org-admin/licenses', label: 'License Management', icon: Shield, color: 'text-violet-500' },
-  { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500' },
-  { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500' },
-  { to: '/org-admin/blogs', label: 'Blog & Announcements', icon: FileText, narrow: true, color: 'text-orange-500' },
-  { to: '/org-admin/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
-  { to: '/org-admin/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
-  { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
-];
-
-const reportsSubmenu = [
-  
-  { to: '/org-admin/reports/members', label: 'Member Reports', color: 'text-indigo-500' },
-  { to: '/org-admin/reports/events', label: 'Event Reports', color: 'text-blue-500' },
-  { to: '/org-admin/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
-  { to: '/org-admin/reports/tickets', label: 'Ticket Reports', color: 'text-amber-500' },
-  { to: '/org-admin/reports/blogs', label: 'Blog & Announcement Reports', color: 'text-rose-500' },
-  { to: '/org-admin/reports/payments', label: 'Payment Reports', color: 'text-violet-500' },
-  { to: '/org-admin/reports/id-cards', label: 'ID Card Reports', color: 'text-indigo-500' },
-];
-
-const otherNavItems = [
-  { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
-  { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500' },
-  { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500' },
-];
 
 const OrgAdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
+  console.log("OrgAdminLayout: user object:", JSON.stringify(user, null, 2));
+  // Get allowed features from organization's plan
+  const allowedFeatures = (user as any)?.organization?.plan?.allowed_features || [];
+  console.log("OrgAdminLayout: allowedFeatures:", allowedFeatures);
+
+  /** Sidebar labels align with main content titles (see OMMS org-admin mocks). */
+  const navItems = [
+    { to: '/org-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, color: 'text-indigo-500', featureId: 'overview' },
+    { to: '/org-admin/members', label: 'Member Management', icon: Users, color: 'text-blue-500', featureId: 'members' },
+    { to: '/org-admin/contact', label: 'Contact', icon: Mail, color: 'text-pink-500', featureId: 'contact' },
+    { to: '/org-admin/id-cards', label: 'ID Card Management', icon: Shield, color: 'text-cyan-500', featureId: 'id-cards' },
+    { to: '/org-admin/licenses', label: 'License Management', icon: Shield, color: 'text-violet-500', featureId: 'licenses' },
+    { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500', featureId: 'events' },
+    { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500', featureId: 'services' },
+    { to: '/org-admin/blogs', label: 'News & Announcements', icon: FileText, narrow: true, color: 'text-orange-500', featureId: 'news' },
+    { to: '/org-admin/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600', featureId: 'subscriptions' },
+    { to: '/org-admin/member-subscriptions', label: 'Member Subscriptions', icon: Users, color: 'text-emerald-600', featureId: 'subscriptions' },
+    { to: '/org-admin/member-payments', label: 'Member Payments', icon: CreditCard, color: 'text-rose-600', featureId: 'payments' },
+    { to: '/org-admin/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600', featureId: 'tickets' },
+    { to: '/org-admin/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500', featureId: 'chat' },
+  ].filter((item) => item.featureId === null || allowedFeatures.includes(item.featureId));
+
+  const reportsSubmenu = [
+  
+    { to: '/org-admin/reports/members', label: 'Member Reports', color: 'text-indigo-500' },
+    { to: '/org-admin/reports/events', label: 'Event Reports', color: 'text-blue-500' },
+    { to: '/org-admin/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
+    { to: '/org-admin/reports/tickets', label: 'Ticket Reports', color: 'text-amber-500' },
+    { to: '/org-admin/reports/blogs', label: 'News & Announcement Reports', color: 'text-rose-500' },
+    { to: '/org-admin/reports/payments', label: 'Payment Reports', color: 'text-violet-500' },
+    { to: '/org-admin/reports/id-cards', label: 'ID Card Reports', color: 'text-indigo-500' },
+  ];
+
+  const otherNavItems = [
+    { to: '/org-admin/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500', featureId: 'payments' },
+    { to: '/org-admin/profile', label: 'Profile', icon: UserIcon, color: 'text-indigo-500', featureId: 'profile' },
+    { to: '/org-admin/upgrade', label: 'Upgrade Plan', icon: ArrowUpCircle, color: 'text-purple-500', featureId: null }, // Always show upgrade
+    { to: '/org-admin/settings', label: 'Settings', icon: Settings, color: 'text-slate-500', featureId: null }, // Always show settings
+  ].filter((item) => item.featureId === null || allowedFeatures.includes(item.featureId));
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -206,60 +215,62 @@ const OrgAdminLayout: React.FC = () => {
           })}
 
           {/* Reports Collapsible Menu */}
-          <div>
-            <button
-              onClick={() => setIsReportsOpen(!isReportsOpen)}
-              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                location.pathname.startsWith('/org-admin/reports')
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
-                  : 'hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <FileText
-                  size={18}
-                  className={
-                    location.pathname.startsWith('/org-admin/reports') ? '' : 'text-rose-500'
-                  }
+          {allowedFeatures.includes('reports') && (
+            <div>
+              <button
+                onClick={() => setIsReportsOpen(!isReportsOpen)}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  location.pathname.startsWith('/org-admin/reports')
+                    ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText
+                    size={18}
+                    className={
+                      location.pathname.startsWith('/org-admin/reports') ? '' : 'text-rose-500'
+                    }
+                  />
+                  <span
+                    className={
+                      location.pathname.startsWith('/org-admin/reports')
+                        ? 'text-white'
+                        : 'text-gray-600'
+                    }
+                  >
+                    Reports
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
                 />
-                <span
-                  className={
-                    location.pathname.startsWith('/org-admin/reports')
-                      ? 'text-white'
-                      : 'text-gray-600'
-                  }
-                >
-                  Reports
-                </span>
-              </div>
-              <ChevronDown
-                size={16}
-                className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {isReportsOpen && (
-              <div className="ml-4 mt-1 space-y-1">
-                {reportsSubmenu.map((item) => {
-                  const active = location.pathname === item.to;
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      onClick={closeSidebar}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className={active ? 'text-indigo-700' : item.color}>•</span>
-                      <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
-                        {item.label}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+              </button>
+              {isReportsOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {reportsSubmenu.map((item) => {
+                    const active = location.pathname === item.to;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        onClick={closeSidebar}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className={active ? 'text-indigo-700' : item.color}>•</span>
+                        <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
+                          {item.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {otherNavItems.map((item) => {
             const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/');

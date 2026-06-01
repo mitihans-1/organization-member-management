@@ -31,20 +31,32 @@ export async function resolveRequestContext(req: any): Promise<{
   return { role: 'guest' };
 }
 
-/** Platform catalog only (guest / first visit). */
-export function platformCatalogWhere() {
-  return { isPredefined: true };
-}
-
-/** Member: only their organization's items. */
-export function memberCatalogWhere(organizationId: string) {
-  return { organizationId, isPredefined: false };
-}
-
-/** Org admin navbar pages: platform predefined + own org content. */
-export function orgAdminCatalogWhere(organizationId: string) {
+/** Guest: only public items from any org + platform predefined. */
+export function guestBrowseWhere() {
   return {
-    OR: [{ isPredefined: true }, { organizationId, isPredefined: false }],
+    OR: [
+      { isPredefined: true },
+      { visibility: 'public' },
+    ],
+  };
+}
+
+/** Member/OrgAdmin navbar: own org (public + private) + other orgs public + platform predefined. */
+export function navbarBrowseWhere(organizationId: string) {
+  return {
+    OR: [
+      { isPredefined: true },
+      { organizationId, isPredefined: false },
+      { visibility: 'public', organizationId: { not: organizationId }, isPredefined: false },
+    ],
+  };
+}
+
+/** Member/OrgAdmin dashboard sidebar: only own org (public + private). */
+export function dashboardBrowseWhere(organizationId: string) {
+  return {
+    organizationId,
+    isPredefined: false,
   };
 }
 
@@ -54,7 +66,7 @@ export function orgAdminManageWhere(organizationId: string) {
 
 export async function resolveCatalogWhere(
   req: any,
-  mode: 'browse' | 'manage' = 'browse'
+  mode: 'browse_navbar' | 'browse_dashboard' | 'manage' = 'browse_navbar'
 ) {
   const ctx = await resolveRequestContext(req);
 
@@ -67,13 +79,16 @@ export async function resolveCatalogWhere(
     }
   }
 
-  if (ctx.role === 'member' && ctx.organizationId) {
-    return memberCatalogWhere(ctx.organizationId);
+  if (ctx.role === 'guest') {
+    return guestBrowseWhere();
   }
 
-  if (ctx.role === 'orgAdmin' && ctx.organizationId) {
-    return orgAdminCatalogWhere(ctx.organizationId);
+  if (ctx.organizationId) {
+    if (mode === 'browse_dashboard') {
+      return dashboardBrowseWhere(ctx.organizationId);
+    }
+    return navbarBrowseWhere(ctx.organizationId);
   }
 
-  return platformCatalogWhere();
+  return guestBrowseWhere();
 }

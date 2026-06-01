@@ -19,13 +19,10 @@ import SuperReport from './pages/super-admin/SuperReport';
 import MemberTickets from './pages/member/MemberTickets';
 import MembersReport from './pages/member/MembersReport';
 import OrgTickets from './pages/OrgTickets';
-import OrganiReport from './pages/OrganiReport';
+import OrgAnalytics from './pages/OrgAnalytics';
 import ChatPage from './pages/ChatPage';
 // System configuration
 import SystemConfig from './pages/super-admin/SystemConfig';
-import PlatformServices from './pages/super-admin/PlatformServices';
-import PlatformEvents from './pages/super-admin/PlatformEvents';
-import PlatformBlogs from './pages/super-admin/PlatformBlogs';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -50,6 +47,7 @@ import MemberEvents from './pages/member/MemberEvents';
 import MemberServices from './pages/member/MemberServices';
 import MemberBlog from './pages/member/MemberBlog';
 import MemberPayments from './pages/member/MemberPayments';
+import MemberContact from './pages/member/MemberContact';
 
 import Home from './pages/Home';
 import About from './pages/About';
@@ -65,6 +63,8 @@ import { OrgLegacyRedirect, OrganAdminLegacyRedirect } from './components/OrgPat
 
 import OrgSubscriptions from './pages/org/OrgSubscriptions';
 import MemberSubscriptions from './pages/member/MemberSubscriptions';
+import OrgMemberPayments from './pages/org/OrgMemberPayments';
+import OrgMemberSubscriptions from './pages/org/OrgMemberSubscriptions';
 
 const queryClient = new QueryClient();
 
@@ -116,9 +116,6 @@ const App: React.FC = () => {
               <Route path="tickets" element={<SuperAdminTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="system-config" element={<SystemConfig />} />
-              <Route path="platform-services" element={<PlatformServices />} />
-              <Route path="platform-events" element={<PlatformEvents />} />
-              <Route path="platform-blogs" element={<PlatformBlogs />} />
             </Route>
 
             <Route path="/organadmin/*" element={<OrganAdminLegacyRedirect />} />
@@ -134,6 +131,7 @@ const App: React.FC = () => {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="members" element={<Members />} />
+              <Route path="contact" element={<MemberContact />} />
               <Route path="events" element={<Events />} />
               <Route path="services" element={<OrgServices />} />
               <Route path="blogs" element={<Blogs />} />
@@ -141,13 +139,15 @@ const App: React.FC = () => {
               <Route path="profile" element={<Profile />} />
               <Route path="upgrade" element={<UpgradePlan />} />
               <Route path="settings" element={<OrgSettings />} />
-              <Route path="reports" element={<OrganiReport />} />
-              <Route path="reports/:section" element={<OrganiReport />} />
+              <Route path="reports" element={<OrgAnalytics />} />
+              <Route path="reports/:section" element={<OrgAnalytics />} />
               <Route path="tickets" element={<OrgTickets />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="id-cards" element={<OrgIdCards />} />
               <Route path="licenses" element={<OrgLicenses />} />
               <Route path="subscriptions" element={<OrgSubscriptions />} />
+              <Route path="member-subscriptions" element={<OrgMemberSubscriptions />} />
+              <Route path="member-payments" element={<OrgMemberPayments />} />
             </Route>
 
             <Route path="/org/*" element={<OrgLegacyRedirect />} />
@@ -166,6 +166,7 @@ const App: React.FC = () => {
               <Route path="events" element={<MemberEvents />} />
               <Route path="services" element={<MemberServices />} />
               <Route path="blog" element={<MemberBlog />} />
+              <Route path="contact" element={<MemberContact />} />
               <Route path="id-card" element={<MyIdCard />} />
               <Route path="license" element={<MyLicense />} />
               <Route path="payments" element={<MemberPayments />} />

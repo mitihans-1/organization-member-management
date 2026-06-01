@@ -13,20 +13,21 @@ import {
   getAvailablePlansForMember,
   memberSelfSubscribe,
 } from '../controllers/memberSubscriptionController';
+import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-router.get('/organizations/:orgId/subscriptions', getMemberSubscriptions);
-router.get('/member', getMemberSubscriptionsForMember);
-router.get('/member/available-plans', getAvailablePlansForMember);
-router.post('/member/subscribe', memberSelfSubscribe);
-router.get('/subscriptions/:id', getMemberSubscriptionById);
-router.get('/subscriptions/:id/recurring-payments', getRecurringPayments);
-router.post('/organizations/:orgId/members/:memberId/subscriptions', createMemberSubscription);
-router.put('/subscriptions/:id', updateMemberSubscription);
-router.post('/subscriptions/:id/cancel', cancelMemberSubscription);
-router.post('/subscriptions/:id/pause', pauseMemberSubscription);
-router.post('/subscriptions/:id/resume', resumeMemberSubscription);
+router.get('/member-subscriptions/organizations/:orgId', authenticateToken, getMemberSubscriptions);
+router.get('/member-subscriptions/member', authenticateToken, getMemberSubscriptionsForMember);
+router.get('/member-subscriptions/member/available-plans', authenticateToken, getAvailablePlansForMember);
+router.post('/member-subscriptions/member/subscribe', authenticateToken, memberSelfSubscribe);
+router.get('/member-subscriptions/:id', authenticateToken, getMemberSubscriptionById);
+router.get('/member-subscriptions/:id/recurring-payments', authenticateToken, getRecurringPayments);
+router.post('/member-subscriptions/organizations/:orgId/members/:memberId', authenticateToken, createMemberSubscription);
+router.put('/member-subscriptions/:id', authenticateToken, updateMemberSubscription);
+router.post('/member-subscriptions/:id/cancel', authenticateToken, cancelMemberSubscription);
+router.post('/member-subscriptions/:id/pause', authenticateToken, pauseMemberSubscription);
+router.post('/member-subscriptions/:id/resume', authenticateToken, resumeMemberSubscription);
 
 export default router;
 

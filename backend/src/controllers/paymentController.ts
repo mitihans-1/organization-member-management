@@ -910,7 +910,7 @@ export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
           return res.status(400).json({ message: 'No receipt image uploaded.' });
       }
 
-      const { reason, amount: reqAmount, payment_method, manual_transaction_id } = req.body;
+      const { reason, amount: reqAmount, payment_method, manual_transaction_id, planId } = req.body;
       const imagePath = req.file.path;
 
       const user = await prisma.user.findUnique({
@@ -954,11 +954,24 @@ export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
           });
       }
 
-      const expectedAmount = parseFloat(reqAmount);
+      let expectedAmount = parseFloat(reqAmount);
+      let selectedPlan = null;
+      
+      // If planId is provided, get plan price as expected amount
+      if (planId) {
+        selectedPlan = await prisma.memberSubscriptionPlan.findUnique({
+          where: { id: planId }
+        });
+        if (!selectedPlan) {
+          return res.status(404).json({ message: 'Member subscription plan not found' });
+        }
+        expectedAmount = selectedPlan.price;
+      }
+
       if (amount !== null && !manual_transaction_id && expectedAmount) {
           if (amount !== expectedAmount) {
               return res.status(400).json({
-                  message: `The receipt amount (${amount} ETB) does not match the entered amount (${expectedAmount} ETB).`,
+                  message: `The receipt amount (${amount} ETB) does not match the expected amount (${expectedAmount} ETB).`,
                   requiresManualEntry: true
               });
           }
@@ -988,8 +1001,8 @@ export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
               payer_id: req.user.userId.toString(),
               payee_type: 'organization',
               payee_id: user.organizationId.toString(),
-              reference_type: 'member_to_org',
-              reference_id: reason || 'Other',
+              reference_type: planId ? 'member_subscription' : 'member_to_org',
+              reference_id: planId || reason || 'Other',
               organization_id: user.organizationId,
           }
       });
@@ -1019,9 +1032,12 @@ export const uploadMemberPaymentReceipt = async (req: any, res: Response) => {
         where: { role: 'orgAdmin', organizationId: user.organizationId } 
       });
       if (orgAdmins.length > 0) {
+          const title = planId 
+            ? `New member subscription payment: ${user.name} paid ${finalAmount} ETB via ${payment_method === 'telebirr' ? 'Telebirr' : payment_method === 'cbe_birr' ? 'CBE Birr' : payment_method} (Txn ID: ${transactionId})`
+            : `New member payment: ${user.name} paid ${finalAmount} ETB for "${reason || 'Other'}" via ${payment_method === 'telebirr' ? 'Telebirr' : payment_method === 'cbe_birr' ? 'CBE Birr' : payment_method} (Txn ID: ${transactionId})`;
           const notificationsData = orgAdmins.map(admin => ({
               userId: admin.id,
-              title: `New member payment: ${user.name} paid ${finalAmount} ETB for "${reason || 'Other'}" via ${payment_method === 'telebirr' ? 'Telebirr' : 'CBE Birr'} (Txn ID: ${transactionId})`
+              title
           }));
           await prisma.notification.createMany({ data: notificationsData });
       }
@@ -1173,6 +1189,103 @@ export const confirmMemberPayment = async (req: any, res: Response) => {
       data: { status: 'completed' }
     });
 
+    let subscription = null;
+
+    // Handle Member Subscription
+    if (payment.reference_type === 'member_subscription') {
+      const planId = payment.reference_id;
+      if (!planId) {
+        return res.status(400).json({ message: 'Missing plan ID in payment.' });
+      }
+      const memberId = payment.user_id;
+      const organizationId = user.organizationId;
+
+      const plan = await prisma.memberSubscriptionPlan.findUnique({
+        where: { id: planId },
+      });
+
+      if (plan) {
+        const actualStartDate = new Date();
+        const nextBillingDate = new Date(actualStartDate);
+        nextBillingDate.setDate(nextBillingDate.getDate() + plan.durationDays);
+
+        const trialEndsAt = plan.trialDays
+          ? new Date(actualStartDate.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
+          : null;
+
+        // Check if user already has active subscription
+        const existingActiveSubscription = await prisma.memberSubscription.findFirst({
+          where: {
+            memberId,
+            organizationId,
+            status: 'active',
+          },
+        });
+
+        if (existingActiveSubscription) {
+          // Upgrade - cancel old subscription and create new one
+          await prisma.memberSubscription.update({
+            where: { id: existingActiveSubscription.id },
+            data: {
+              status: 'cancelled',
+              cancellationDate: new Date(),
+              cancellationReason: 'Upgraded to new plan',
+              autoRenew: false,
+            },
+          });
+        }
+
+        // Create new subscription
+        subscription = await prisma.memberSubscription.create({
+          data: {
+            memberId,
+            organizationId,
+            planId,
+            status: 'active',
+            startDate: actualStartDate,
+            nextBillingDate,
+            trialEndsAt,
+          },
+          include: {
+            member: true,
+            plan: true,
+            organization: true,
+          },
+        });
+
+        // Create invoice
+        const dueDate = new Date(actualStartDate);
+        dueDate.setDate(dueDate.getDate() + 7);
+
+        await createInvoice({
+          organizationId,
+          memberId,
+          subscriptionId: subscription.id,
+          planId,
+          planType: 'member',
+          subtotal: plan.price,
+          tax: 0,
+          discount: 0,
+          total: plan.price,
+          dueDate,
+          billingPeriodStart: actualStartDate,
+          billingPeriodEnd: nextBillingDate,
+          isRecurring: true,
+          notes: existingActiveSubscription
+            ? `${plan.name} - ${plan.billingCycle} subscription (upgraded)`
+            : `${plan.name} - ${plan.billingCycle} subscription`,
+          items: [
+            {
+              description: `${plan.name} Subscription`,
+              quantity: 1,
+              unitPrice: plan.price,
+              total: plan.price,
+            },
+          ],
+        });
+      }
+    }
+
     // Handle ID Card Replacement
     if (payment.reference_id === 'ID_CARD_REPLACEMENT') {
       await prisma.idCardRequest.updateMany({
@@ -1209,12 +1322,14 @@ export const confirmMemberPayment = async (req: any, res: Response) => {
       await prisma.notification.create({
         data: {
           userId: member.id,
-          title: `Your payment of ${payment.amount} ETB for "${payment.reference_id}" has been confirmed by the organization!`
+          title: payment.reference_type === 'member_subscription' 
+            ? `Your subscription payment of ${payment.amount} ETB has been confirmed by the organization!`
+            : `Your payment of ${payment.amount} ETB for "${payment.reference_id}" has been confirmed by the organization!`
         }
       });
     }
 
-    res.status(200).json({ message: 'Member payment confirmed', payment: updatedPayment });
+    res.status(200).json({ message: 'Member payment confirmed', payment: updatedPayment, subscription });
   } catch (error) {
     res.status(500).json({ message: 'Error confirming member payment', error });
   }

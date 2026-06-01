@@ -6,13 +6,13 @@ import { Report } from '../types';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 
-const AccordionReportCard: React.FC<{
-  report: any;
+const AccordionTicketCard: React.FC<{
+  ticket: any;
   activeTab: 'member' | 'org';
   onManage: () => void;
   onAccept: () => void;
   onReply: () => void;
-}> = ({ report, activeTab, onManage, onAccept, onReply }) => {
+}> = ({ ticket, activeTab, onManage, onAccept, onReply }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getStatusIcon = (status: string, accepted: boolean) => {
@@ -58,26 +58,26 @@ const AccordionReportCard: React.FC<{
         className="w-full p-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-4 flex-1">
-          {getStatusIcon(report.status, report.accepted)}
+          {getStatusIcon(ticket.status, ticket.accepted)}
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h3 className="font-bold text-gray-900">
                 {activeTab === 'member' 
-                  ? report.member?.name || 'Unknown Sender'
-                  : 'Report to Super Admin'}
+                  ? ticket.member?.name || 'Unknown Sender'
+                  : 'Ticket to Super Admin'}
               </h3>
               <span className="text-sm text-gray-600 truncate max-w-xs">
-                - {report.title}
+                - {ticket.title}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getStatusClass(report.status)}`}>
-                {report.status.replace('_', ' ')}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getStatusClass(ticket.status)}`}>
+                {ticket.status.replace('_', ' ')}
               </span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getPriorityClass(report.priority)}`}>
-                {report.priority}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getPriorityClass(ticket.priority)}`}>
+                {ticket.priority}
               </span>
-              {report.accepted && (
+              {ticket.accepted && (
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                 Accepted
               </span>
@@ -91,10 +91,10 @@ const AccordionReportCard: React.FC<{
       </button>
       {isExpanded && (
         <div className="border-t border-gray-200 p-5">
-          <p className="text-sm text-gray-600 mb-3">{report.description}</p>
-          {report.attachment && (
+          <p className="text-sm text-gray-600 mb-3">{ticket.description}</p>
+          {ticket.attachment && (
             <a
-              href={`http://localhost:5000/${report.attachment}`}
+              href={`http://localhost:5000/${ticket.attachment}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-indigo-600 hover:text-indigo-500 underline mb-3 block"
@@ -102,21 +102,21 @@ const AccordionReportCard: React.FC<{
               View Attachment
             </a>
           )}
-          {report.response && (
+          {ticket.response && (
             <div className="mt-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100 mb-3">
               <p className="text-xs font-bold text-emerald-800 uppercase mb-2">Response</p>
-              <p className="text-sm text-emerald-900">{report.response}</p>
+              <p className="text-sm text-emerald-900">{ticket.response}</p>
             </div>
           )}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4 text-xs text-gray-400">
               {activeTab === 'member' && (
                 <>
-                  <span>From: {report.member?.name || 'Unknown'}</span>
+                  <span>From: {ticket.member?.name || 'Unknown'}</span>
                   <span>•</span>
                 </>
               )}
-              <span>Created: {new Date(report.createdAt).toLocaleString()}</span>
+              <span>Created: {new Date(ticket.createdAt).toLocaleString()}</span>
             </div>
             {activeTab === 'member' && (
               <div className="flex gap-2">
@@ -127,7 +127,7 @@ const AccordionReportCard: React.FC<{
                 <Edit2 size={16} />
                 Manage
               </button>
-              {!report.accepted && (
+              {!ticket.accepted && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onAccept(); }}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500"
@@ -152,15 +152,15 @@ const AccordionReportCard: React.FC<{
   );
 };
 
-const OrgReports: React.FC = () => {
+const OrgTickets: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
-  const [editingMemberReport, setEditingMemberReport] = useState<Report | null>(null);
-  const [replyingReport, setReplyingReport] = useState<Report | null>(null);
+  const [editingMemberTicket, setEditingMemberReport] = useState<Report | null>(null);
+  const [replyingTicket, setReplyingReport] = useState<Report | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [replyText, setReplyText] = useState('');
   const [formData, setFormData] = useState<{
@@ -186,55 +186,55 @@ const OrgReports: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'member' | 'org'>('member');
 
-  const { data: reportsData, isLoading } = useQuery({
-    queryKey: ['org-reports'],
+  const { data: ticketsData, isLoading } = useQuery({
+    queryKey: ['org-tickets'],
     queryFn: reportService.getOrgReports,
     enabled: !!user,
   });
 
-  const memberReports = reportsData?.memberReports || [];
-  const orgReports = reportsData?.orgReports || [];
-  const currentReports = activeTab === 'member' ? memberReports : orgReports;
+  const memberTickets = ticketsData?.memberReports || [];
+  const orgTickets = ticketsData?.orgReports || [];
+  const currentTickets = activeTab === 'member' ? memberTickets : orgTickets;
 
-  const filteredReports = React.useMemo(() => {
-    if (!currentReports) return [];
-    if (filterStatus === 'all') return currentReports;
-    return currentReports.filter((r) => r.status === filterStatus);
-  }, [currentReports, filterStatus]);
+  const filteredTickets = React.useMemo(() => {
+    if (!currentTickets) return [];
+    if (filterStatus === 'all') return currentTickets;
+    return currentTickets.filter((ticket: Report) => ticket.status === filterStatus);
+  }, [currentTickets, filterStatus]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; report: any }) =>
-      reportService.updateReport(data.id, data.report),
+    mutationFn: (data: { id: string; ticket: any }) =>
+      reportService.updateReport(data.id, data.ticket),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['org-tickets'] });
       closeAllModals();
-      alert('Report updated successfully!');
+      alert('Ticket updated successfully!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to update report.');
+      alert(error.response?.data?.message || 'Failed to update ticket.');
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => reportService.createReport(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['org-tickets'] });
       closeAllModals();
-      alert('Report sent to Super Admin successfully!');
+      alert('Ticket sent to Super Admin successfully!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to send report.');
+      alert(error.response?.data?.message || 'Failed to send ticket.');
     },
   });
 
   const acceptMutation = useMutation({
     mutationFn: (id: string) => reportService.acceptReport(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
-      alert('Report accepted!');
+      queryClient.invalidateQueries({ queryKey: ['org-tickets'] });
+      alert('Ticket accepted!');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to accept report.');
+      alert(error.response?.data?.message || 'Failed to accept ticket.');
     },
   });
 
@@ -242,7 +242,7 @@ const OrgReports: React.FC = () => {
     mutationFn: (data: { id: string; response: string }) =>
       reportService.replyToReport(data.id, data.response),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['org-tickets'] });
       closeAllModals();
       alert('Reply sent!');
     },
@@ -251,13 +251,13 @@ const OrgReports: React.FC = () => {
     },
   });
 
-  const openMemberModal = (report: Report) => {
-    setEditingMemberReport(report);
+  const openMemberModal = (ticket: Report) => {
+    setEditingMemberReport(ticket);
     setFormData({
-      title: report.title,
-      description: report.description,
-      status: report.status as any,
-      priority: report.priority,
+      title: ticket.title,
+      description: ticket.description,
+      status: ticket.status as any,
+      priority: ticket.priority,
     });
     setIsMemberModalOpen(true);
   };
@@ -268,9 +268,9 @@ const OrgReports: React.FC = () => {
     setIsOrgModalOpen(true);
   };
 
-  const openReplyModal = (report: Report) => {
-    setReplyingReport(report);
-    setReplyText(report.response || '');
+  const openReplyModal = (ticket: Report) => {
+    setReplyingReport(ticket);
+    setReplyText(ticket.response || '');
     setIsReplyModalOpen(true);
   };
 
@@ -288,8 +288,8 @@ const OrgReports: React.FC = () => {
 
   const handleMemberSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingMemberReport) {
-      updateMutation.mutate({ id: editingMemberReport.id, report: formData });
+    if (editingMemberTicket) {
+      updateMutation.mutate({ id: editingMemberTicket.id, ticket: formData });
     }
   };
 
@@ -300,8 +300,8 @@ const OrgReports: React.FC = () => {
 
   const handleReplySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (replyingReport) {
-      replyMutation.mutate({ id: replyingReport.id, response: replyText });
+    if (replyingTicket) {
+      replyMutation.mutate({ id: replyingTicket.id, response: replyText });
     }
   };
 
@@ -342,25 +342,25 @@ const OrgReports: React.FC = () => {
   };
 
   const stats = React.useMemo(() => {
-    const allReports = [...memberReports, ...orgReports];
+    const allTickets = [...memberTickets, ...orgTickets];
     return {
-      total: allReports.length,
-      open: allReports.filter((r) => r.status === 'open').length,
-      inProgress: allReports.filter((r) => r.status === 'in_progress').length,
-      resolved: allReports.filter((r) => r.status === 'resolved').length,
+      total: allTickets.length,
+      open: allTickets.filter((r) => r.status === 'open').length,
+      inProgress: allTickets.filter((r) => r.status === 'in_progress').length,
+      resolved: allTickets.filter((r) => r.status === 'resolved').length,
     };
-  }, [memberReports, orgReports]);
+  }, [memberTickets, orgTickets]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <OrgAdminPageHeader
-        title="Report Management"
-        subtitle="Manage member reports and send reports to Super Admin"
+        title="Tickets Management"
+        subtitle="Manage member Tickets and send Tickets to Super Admin"
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase">Total Reports</p>
+          <p className="text-xs font-bold text-gray-500 uppercase">Total Tickets</p>
           <p className="text-3xl font-black text-gray-900 mt-2">{stats.total}</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
@@ -386,7 +386,7 @@ const OrgReports: React.FC = () => {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Member Reports ({memberReports.length})
+          Member Tickets({memberTickets.length})
         </button>
         <button
           onClick={() => { setActiveTab('org'); setFilterStatus('all'); }}
@@ -396,7 +396,7 @@ const OrgReports: React.FC = () => {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Reports to Super Admin ({orgReports.length})
+          Tickets to Super Admin ({orgTickets.length})
         </button>
         {activeTab === 'org' && (
           <button
@@ -440,32 +440,32 @@ const OrgReports: React.FC = () => {
             </div>
           ))}
         </div>
-      ) : filteredReports.length === 0 ? (
+      ) : filteredTickets.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
           <p className="text-gray-500">
-            {activeTab === 'member' ? 'No member reports found.' : 'No reports sent to Super Admin yet.'}
+            {activeTab === 'member' ? 'No member tickets found.' : 'No tickets sent to Super Admin yet.'}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredReports.map((report) => (
-            <AccordionReportCard 
-              key={report.id} 
-              report={report} 
+          {filteredTickets.map((ticket: Report) => (
+            <AccordionTicketCard 
+              key={ticket.id} 
+              ticket={ticket} 
               activeTab={activeTab}
-              onManage={() => openMemberModal(report)}
-              onAccept={() => acceptMutation.mutate(report.id)}
-              onReply={() => openReplyModal(report)}
+              onManage={() => openMemberModal(ticket)}
+              onAccept={() => acceptMutation.mutate(ticket.id)}
+              onReply={() => openReplyModal(ticket)}
             />
           ))}
         </div>
       )}
 
-      {isMemberModalOpen && editingMemberReport && (
+      {isMemberModalOpen && editingMemberTicket && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-gray-900">Manage Report</h3>
+              <h3 className="text-lg font-black text-gray-900">Manage Ticket</h3>
               <button onClick={closeAllModals} className="p-2 rounded-lg hover:bg-gray-100">
                 <div className="h-5 w-5 flex items-center justify-center">×</div>
               </button>
@@ -473,7 +473,7 @@ const OrgReports: React.FC = () => {
             <form onSubmit={handleMemberSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Member</label>
-                <p className="text-sm text-gray-700 py-2">{editingMemberReport.member?.name || 'Unknown'}</p>
+                <p className="text-sm text-gray-700 py-2">{editingMemberTicket.member?.name || 'Unknown'}</p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Title</label>
@@ -549,11 +549,11 @@ const OrgReports: React.FC = () => {
         </div>
       )}
 
-      {isReplyModalOpen && replyingReport && (
+      {isReplyModalOpen && replyingTicket && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-gray-900">Reply to Report</h3>
+              <h3 className="text-lg font-black text-gray-900">Reply to Ticket</h3>
               <button onClick={closeAllModals} className="p-2 rounded-lg hover:bg-gray-100">
                 <div className="h-5 w-5 flex items-center justify-center">×</div>
               </button>
@@ -561,7 +561,7 @@ const OrgReports: React.FC = () => {
             <form onSubmit={handleReplySubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Report</label>
-                <p className="text-sm font-bold text-gray-900 mb-2">{replyingReport.title}</p>
+                <p className="text-sm font-bold text-gray-900 mb-2">{replyingTicket.title}</p>
               </div>
               <div>
                 <label htmlFor="reply" className="block text-xs font-bold text-gray-500 uppercase mb-1">
@@ -601,7 +601,7 @@ const OrgReports: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-gray-900">Send Report to Super Admin</h3>
+              <h3 className="text-lg font-black text-gray-900">Send Ticket to Super Admin</h3>
               <button onClick={closeAllModals} className="p-2 rounded-lg hover:bg-gray-100">
                 <div className="h-5 w-5 flex items-center justify-center">×</div>
               </button>
@@ -615,7 +615,7 @@ const OrgReports: React.FC = () => {
                   value={orgFormData.title}
                   onChange={(e) => setOrgFormData({ ...orgFormData, title: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
-                  placeholder="Report title..."
+                  placeholder="Ticket title..."
                 />
               </div>
               <div>
@@ -626,7 +626,7 @@ const OrgReports: React.FC = () => {
                   value={orgFormData.description}
                   onChange={(e) => setOrgFormData({ ...orgFormData, description: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none resize-y"
-                  placeholder="Describe your report in detail..."
+                  placeholder="Describe your ticket in detail..."
                 />
               </div>
               <div>
@@ -688,4 +688,4 @@ const OrgReports: React.FC = () => {
   );
 };
 
-export default OrgReports;
+export default OrgTickets;

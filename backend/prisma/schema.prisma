@@ -283,6 +283,7 @@ model Plan {
   type          String
   max_members   Int
   duration_days Int
+  allowed_features String[] @default([]) // List of allowed features like "overview", "members", "events", etc.
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   payments      Payment[]

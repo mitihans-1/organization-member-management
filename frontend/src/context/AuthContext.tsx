@@ -23,6 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         try {
           const response = await api.get('/auth/profile');
+          console.log("AuthContext: /auth/profile response:", JSON.stringify(response.data, null, 2));
           setUser(response.data);
         } catch (error) {
           console.error('Failed to fetch profile', error);

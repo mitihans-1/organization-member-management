@@ -56,7 +56,7 @@ const Blogs: React.FC = () => {
 
   const { data: blogs, isLoading } = useQuery<Blog[]>({
     queryKey: ['blogs'],
-    queryFn: () => api.get('/blogs').then((res) => res.data),
+    queryFn: () => api.get('/blogs?mode=dashboard').then((res) => res.data),
   });
 
   const createMutation = useMutation({

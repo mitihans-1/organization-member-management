@@ -9,6 +9,22 @@ import { useNavigate } from 'react-router-dom';
 const PAYMENTS_UPGRADE_FLAG = 'omms_payments_open_upgrade';
 const PAYMENTS_UPGRADE_PLAN = 'omms_payments_upgrade_plan_id';
 
+// Map from feature IDs to user-friendly labels
+const FEATURE_LABELS: Record<string, string> = {
+  'overview': 'Dashboard Overview',
+  'members': 'Member Management',
+  'events': 'Events',
+  'services': 'Services',
+  'news': 'News',
+  'contact': 'Contact',
+  'subscriptions': 'Member Subscriptions',
+  'payments': 'Payments',
+  'chat': 'Chat',
+  'reports': 'Reports',
+  'id-cards': 'ID Cards',
+  'licenses': 'Licenses'
+};
+
 type Tab = 'plans' | 'invoices' | 'payments';
 
 const UpgradePlan: React.FC = () => {
@@ -102,6 +118,11 @@ const UpgradePlan: React.FC = () => {
               ) : (
                 list.map((plan: any) => {
                   const isCurrent = plan.name === currentName;
+                  // Get allowed features as user-friendly labels
+                  const allowedFeatures = Array.isArray(plan.allowed_features)
+                    ? plan.allowed_features.map((id: string) => FEATURE_LABELS[id] || id)
+                    : [];
+
                   return (
                     <div
                       key={plan.id ?? plan.name}
@@ -110,9 +131,9 @@ const UpgradePlan: React.FC = () => {
                       }`}
                     >
                       {plan.name === 'Pro' && (
-                        <div className="text-center -mt-2 mb-2">
+                        <div className="text-center -mt-3 mb-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-                            Most popular
+                            Most Popular
                           </span>
                         </div>
                       )}
@@ -126,21 +147,19 @@ const UpgradePlan: React.FC = () => {
                       </p>
                       <p className="text-3xl font-black text-gray-900 mt-4">
                         ${Number(plan.price).toFixed(2)}
-                        <span className="text-base font-semibold text-gray-500"> /month</span>
+                        <span className="text-lg font-semibold text-gray-500"> /month</span>
                       </p>
                       <ul className="mt-6 space-y-3 text-sm text-gray-600 flex-1">
                         <li className="flex items-center gap-2">
                           <Users size={16} className="text-violet-500 shrink-0" />
                           Up to {plan.max_members ?? '—'} members
                         </li>
-                        <li className="flex items-center gap-2">
-                          <Zap size={16} className="text-amber-500 shrink-0" />
-                          Priority support
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Lock size={16} className="text-amber-600 shrink-0" />
-                          Secure system access
-                        </li>
+                        {allowedFeatures.map((feature: string) => (
+                          <li key={feature} className="flex items-center gap-2">
+                            <span className="text-indigo-600 font-bold">✓</span>
+                            {feature}
+                          </li>
+                        ))}
                       </ul>
                       {isCurrent ? (
                         <p className="mt-8 text-center text-sm font-bold text-gray-500">Your current plan</p>

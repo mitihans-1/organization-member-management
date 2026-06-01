@@ -72,32 +72,6 @@ const Payments: React.FC = () => {
     setIsUpgradeModalOpen(true);
   }, [clearUpgradeDeepLink, resetUpgradeWizardFields]);
 
-  useEffect(() => {
-    const state = location.state as { autoOpenUpgrade?: boolean; selectedPlanId?: string } | null;
-    if (state?.autoOpenUpgrade) {
-      try {
-        sessionStorage.setItem(PAYMENTS_UPGRADE_FLAG, '1');
-        if (state.selectedPlanId != null && state.selectedPlanId !== '') {
-          sessionStorage.setItem(PAYMENTS_UPGRADE_PLAN, String(state.selectedPlanId));
-        }
-      } catch {
-        /* ignore */
-      }
-      navigate(location.pathname, { replace: true });
-      return;
-    }
-
-    try {
-      if (sessionStorage.getItem(PAYMENTS_UPGRADE_FLAG) === '1') {
-        setIsUpgradeModalOpen(true);
-        const pid = sessionStorage.getItem(PAYMENTS_UPGRADE_PLAN);
-        if (pid) setSelectedPlanId(pid);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [location.pathname, location.state, navigate]);
-
   const { data: payments, isLoading: paymentsLoading } = useQuery<any[]>({
     queryKey: ['payments'],
     queryFn: () => api.get('/payments/org/all').then((res) => res.data),
@@ -123,6 +97,32 @@ const Payments: React.FC = () => {
     queryFn: () => api.get('/organizations/me').then(r => r.data),
     enabled: user?.role === 'orgAdmin'
   });
+
+  useEffect(() => {
+    const state = location.state as { autoOpenUpgrade?: boolean; selectedPlanId?: string } | null;
+    if (state?.autoOpenUpgrade) {
+      try {
+        sessionStorage.setItem(PAYMENTS_UPGRADE_FLAG, '1');
+        if (state.selectedPlanId != null && state.selectedPlanId !== '') {
+          sessionStorage.setItem(PAYMENTS_UPGRADE_PLAN, String(state.selectedPlanId));
+        }
+      } catch {
+        /* ignore */
+      }
+      navigate(location.pathname, { replace: true });
+      return;
+    }
+
+    try {
+      if (sessionStorage.getItem(PAYMENTS_UPGRADE_FLAG) === '1') {
+        setIsUpgradeModalOpen(true);
+        const pid = sessionStorage.getItem(PAYMENTS_UPGRADE_PLAN);
+        if (pid) setSelectedPlanId(pid);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const updatePhoneMutation = useMutation({
     mutationFn: (phone: string) => api.put('/organizations/me', { payment_phone: phone }),
@@ -400,6 +400,31 @@ const Payments: React.FC = () => {
       }
     }
   });
+
+  // Pre-select last used payment method when opening upgrade modal
+  useEffect(() => {
+    if (isUpgradeModalOpen && !paymentMethod && payments && selectedPlanId) {
+      // Get last completed payment from subscription tab
+      const lastSubscriptionPayment = [...payments]
+        .filter(p => (p.payer_type === 'organization' || !p.payer_type) && p.status === 'completed')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+      if (lastSubscriptionPayment) {
+        const method = lastSubscriptionPayment.payment_method?.toLowerCase();
+        if (method === 'chapa') {
+          setPaymentMode('direct');
+          setPaymentMethod('chapa');
+          // Auto-trigger chapa mutation if not already in progress
+          if (!chapaMutation.isPending && !chapaMutation.isSuccess) {
+            chapaMutation.mutate({ planId: selectedPlanId });
+          }
+        } else if (method === 'telebirr' || method === 'cbe_birr' || method === 'ebirr') {
+          setPaymentMode('manual');
+          setPaymentMethod(method as any);
+        }
+      }
+    }
+  }, [isUpgradeModalOpen, payments, paymentMethod, selectedPlanId, chapaMutation]);
 
   const selectedPlan = useMemo(
     () => plans?.find((p) => String(p.id) === String(selectedPlanId)),

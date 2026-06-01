@@ -64,6 +64,7 @@ export interface Plan {
   type: string;
   max_members: number;
   duration_days: number;
+  allowed_features: string[];
 }
 
 export interface Payment {
@@ -90,6 +91,7 @@ export interface Blog {
   readTime?: number;
   author_id: string;
   author?: { id: string; name: string; email: string };
+  visibility?: string;
   createdAt: string;
 }
 
@@ -106,7 +108,7 @@ export interface Event {
   capacity?: number;
   virtualLink?: string;
   contactEmail?: string;
-  organizer?: string;
+  
   registrationDeadline?: string;
   organizationId?: string;
   _count?: { attendees: number };
@@ -123,7 +125,6 @@ export interface Service {
   status?: string;
   category?: string;
   code?: string;
-  owner?: string;
   department?: string;
   duration?: string;
   requiredDocuments?: string[];
@@ -137,6 +138,7 @@ export interface Service {
   payment_required?: boolean;
   subscribersIds?: string[];
   isPredefined?: boolean;
+  visibility?: string;
   createdAt: string;
   updatedAt: string;
 }

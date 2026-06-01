@@ -17,6 +17,25 @@ export const listPublicOrganizations = async (_req: Request, res: Response) => {
       },
     });
 
+    // Get or create free plan
+    let freePlan = await prisma.plan.findFirst({ where: { name: 'Free' } });
+    if (!freePlan) {
+      const defaultFeatures = ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'];
+      // @ts-ignore: Prisma client needs regeneration
+      freePlan = await prisma.plan.create({
+        data: {
+          name: 'Free',
+          price: 0,
+          billing_cycle: 'monthly',
+          type: 'Standard',
+          max_members: 10,
+          duration_days: 30,
+          // @ts-ignore: Prisma client needs regeneration
+          allowed_features: defaultFeatures,
+        },
+      });
+    }
+
     for (const admin of orgAdmins) {
       const name = admin.organization_name?.trim();
       if (!name) continue;
@@ -25,7 +44,7 @@ export const listPublicOrganizations = async (_req: Request, res: Response) => {
       const linkedOrg = admin.organizationId
         ? await prisma.organization.findUnique({
             where: { id: admin.organizationId },
-            select: { id: true, name: true, type: true },
+            select: { id: true, name: true, type: true, plan_id: true },
           })
         : null;
 
@@ -37,6 +56,7 @@ export const listPublicOrganizations = async (_req: Request, res: Response) => {
           data: {
             name,
             type: expectedType,
+            plan_id: freePlan.id, // Assign free plan
           },
           select: { id: true },
         });
@@ -44,6 +64,12 @@ export const listPublicOrganizations = async (_req: Request, res: Response) => {
         await prisma.user.update({
           where: { id: admin.id },
           data: { organizationId: created.id },
+        });
+      } else if (linkedOrg && !linkedOrg.plan_id) {
+        // Assign free plan to existing org if it doesn't have one
+        await prisma.organization.update({
+          where: { id: linkedOrg.id },
+          data: { plan_id: freePlan.id },
         });
       }
     }

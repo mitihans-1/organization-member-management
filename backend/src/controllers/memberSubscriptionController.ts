@@ -316,60 +316,114 @@ export const memberSelfSubscribe = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'Plan is not active' });
     }
 
-    const actualStartDate = new Date();
-    const nextBillingDate = new Date(actualStartDate);
-    nextBillingDate.setDate(nextBillingDate.getDate() + plan.durationDays);
-
-    const trialEndsAt = plan.trialDays
-      ? new Date(actualStartDate.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
-      : null;
-
-    const subscription = await prisma.memberSubscription.create({
-      data: {
-        memberId: req.user.userId,
-        organizationId: user.organizationId,
-        planId,
-        status: 'active',
-        startDate: actualStartDate,
-        nextBillingDate,
-        trialEndsAt,
-      },
-      include: {
-        member: true,
-        plan: true,
-        organization: true,
-      },
-    });
-
-    const dueDate = new Date(actualStartDate);
-    dueDate.setDate(dueDate.getDate() + 7);
-
-    await createInvoice({
-      organizationId: user.organizationId,
-      memberId: req.user.userId,
-      subscriptionId: subscription.id,
-      planId,
-      planType: 'member',
-      subtotal: plan.price,
-      tax: 0,
-      discount: 0,
-      total: plan.price,
-      dueDate,
-      billingPeriodStart: actualStartDate,
-      billingPeriodEnd: nextBillingDate,
-      isRecurring: true,
-      notes: `${plan.name} - ${plan.billingCycle} subscription (self-subscribed)`,
-      items: [
-        {
-          description: `${plan.name} Subscription`,
-          quantity: 1,
-          unitPrice: plan.price,
-          total: plan.price,
+    // If plan is free, activate subscription immediately without payment
+    if (plan.price === 0) {
+      // Check if user already has active subscription
+      const existingActiveSubscription = await prisma.memberSubscription.findFirst({
+        where: {
+          memberId: req.user.userId,
+          organizationId: user.organizationId,
+          status: 'active',
         },
-      ],
-    });
+      });
 
-    res.status(201).json(subscription);
+      const actualStartDate = new Date();
+      const nextBillingDate = new Date(actualStartDate);
+      nextBillingDate.setDate(nextBillingDate.getDate() + plan.durationDays);
+
+      const trialEndsAt = plan.trialDays
+        ? new Date(actualStartDate.getTime() + plan.trialDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      let subscription;
+
+      if (existingActiveSubscription) {
+        // Upgrade - cancel old subscription and create new one
+        await prisma.memberSubscription.update({
+          where: { id: existingActiveSubscription.id },
+          data: {
+            status: 'cancelled',
+            cancellationDate: new Date(),
+            cancellationReason: 'Upgraded to new plan',
+            autoRenew: false,
+          },
+        });
+
+        subscription = await prisma.memberSubscription.create({
+          data: {
+            memberId: req.user.userId,
+            organizationId: user.organizationId,
+            planId,
+            status: 'active',
+            startDate: actualStartDate,
+            nextBillingDate,
+            trialEndsAt,
+          },
+          include: {
+            member: true,
+            plan: true,
+            organization: true,
+          },
+        });
+      } else {
+        // First subscription
+        subscription = await prisma.memberSubscription.create({
+          data: {
+            memberId: req.user.userId,
+            organizationId: user.organizationId,
+            planId,
+            status: 'active',
+            startDate: actualStartDate,
+            nextBillingDate,
+            trialEndsAt,
+          },
+          include: {
+            member: true,
+            plan: true,
+            organization: true,
+          },
+        });
+      }
+
+      const dueDate = new Date(actualStartDate);
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      await createInvoice({
+        organizationId: user.organizationId,
+        memberId: req.user.userId,
+        subscriptionId: subscription.id,
+        planId,
+        planType: 'member',
+        subtotal: plan.price,
+        tax: 0,
+        discount: 0,
+        total: plan.price,
+        dueDate,
+        billingPeriodStart: actualStartDate,
+        billingPeriodEnd: nextBillingDate,
+        isRecurring: true,
+        notes: existingActiveSubscription
+          ? `${plan.name} - ${plan.billingCycle} subscription (upgraded)`
+          : `${plan.name} - ${plan.billingCycle} subscription (self-subscribed)`,
+        items: [
+          {
+            description: `${plan.name} Subscription`,
+            quantity: 1,
+            unitPrice: plan.price,
+            total: plan.price,
+          },
+        ],
+      });
+
+      return res.status(201).json(subscription);
+    }
+
+    // If plan is paid, return message that payment is required
+    return res.status(200).json({
+      message: 'Payment required for this plan',
+      requiresPayment: true,
+      plan: plan
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error creating subscription', error });
   }

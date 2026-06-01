@@ -76,7 +76,7 @@ export const organizationSelfSubscribe = async (req: any, res: Response) => {
 export const assignOrganizationPlan = async (req: any, res: Response) => {
   try {
     const { organizationId } = req.params;
-    const { planId } = req.body;
+    const { planId, skipPayment = false } = req.body;
 
     if (req.user.role !== 'superAdmin') {
       return res.status(403).json({ message: 'Only super admins can assign organization plans' });
@@ -96,33 +96,36 @@ export const assignOrganizationPlan = async (req: any, res: Response) => {
       },
     });
 
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 7);
+    // Only create invoice if skipPayment is false
+    if (!skipPayment) {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
 
-    const billingEndDate = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000);
+      const billingEndDate = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000);
 
-    await createInvoice({
-      organizationId,
-      planId,
-      planType: 'organization',
-      subtotal: plan.price,
-      tax: 0,
-      discount: 0,
-      total: plan.price,
-      dueDate,
-      billingPeriodStart: new Date(),
-      billingPeriodEnd: billingEndDate,
-      isRecurring: true,
-      notes: `${plan.name} - Organization plan (assigned by super admin)`,
-      items: [
-        {
-          description: `${plan.name} Organization Plan`,
-          quantity: 1,
-          unitPrice: plan.price,
-          total: plan.price,
-        },
-      ],
-    });
+      await createInvoice({
+        organizationId,
+        planId,
+        planType: 'organization',
+        subtotal: plan.price,
+        tax: 0,
+        discount: 0,
+        total: plan.price,
+        dueDate,
+        billingPeriodStart: new Date(),
+        billingPeriodEnd: billingEndDate,
+        isRecurring: true,
+        notes: `${plan.name} - Organization plan (assigned by super admin)`,
+        items: [
+          {
+            description: `${plan.name} Organization Plan`,
+            quantity: 1,
+            unitPrice: plan.price,
+            total: plan.price,
+          },
+        ],
+      });
+    }
 
     res.status(200).json(updatedOrganization);
   } catch (error) {

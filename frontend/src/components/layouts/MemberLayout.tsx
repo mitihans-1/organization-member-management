@@ -22,36 +22,52 @@ import {
   ChevronDown,
   User as UserIcon,
   Search,
+  Mail,
 } from 'lucide-react';
-
-const navItems = [
-  { to: '/member/dashboard', label: 'Overview', icon: LayoutGrid, end: true, color: 'text-sky-500' },
-  { to: '/member/profile', label: 'Profile', icon: User, color: 'text-indigo-500' },
-  { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500' },
-  { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500' },
-  { to: '/member/blog', label: 'Blog', icon: FileText, color: 'text-orange-500' },
-  { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600' },
-  { to: '/member/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600' },
-  { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500' },
-];
-
-const reportsSubmenu = [
-  { to: '/member/reports', label: 'Overview', color: 'text-sky-500' },
-  { to: '/member/reports/membership', label: 'Membership Report', color: 'text-indigo-500' },
-  { to: '/member/reports/events', label: 'Event Reports', color: 'text-blue-500' },
-  { to: '/member/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
-  { to: '/member/reports/tickets', label: 'Ticket Reports', color: 'text-amber-500' },
-  { to: '/member/reports/payments', label: 'Payment Reports', color: 'text-rose-500' },
-];
-
-const otherNavItems = [
-  { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },
-  { to: '/member/license', label: 'My License', icon: CreditCard, color: 'text-violet-500' },
-  { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
-];
 
 const MemberLayout: React.FC = () => {
   const { user, logout } = useAuth();
+  
+  // Get member's active subscription
+  const { data: subscriptions } = useQuery({
+    queryKey: ['member-subscriptions'],
+    queryFn: () => api.get('/member-subscriptions/member').then(res => res.data),
+    enabled: !!user,
+  });
+
+  // Get allowed features from active member subscription plan first,
+  // fall back to organization's plan if no active subscription
+  const activeSubscription = subscriptions?.find((s: any) => s.status === 'active');
+  const allowedFeatures = activeSubscription?.plan?.features 
+    || (user as any)?.organization?.plan?.allowed_features 
+    || ['overview', 'profile', 'subscriptions'];
+
+  const navItems = [
+    { to: '/member/dashboard', label: 'Overview', icon: LayoutGrid, end: true, color: 'text-sky-500', featureId: 'overview' },
+    { to: '/member/profile', label: 'Profile', icon: User, color: 'text-indigo-500', featureId: null }, // Always show profile
+    { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500', featureId: 'events' },
+    { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500', featureId: 'services' },
+    { to: '/member/blog', label: 'News', icon: FileText, color: 'text-orange-500', featureId: 'news' },
+    { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600', featureId: 'subscriptions' },
+    { to: '/member/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600', featureId: 'tickets' },
+    { to: '/member/chat', label: 'Chat', icon: MessageSquare, color: 'text-violet-500', featureId: 'chat' },
+    { to: '/member/contact', label: 'Contact Org', icon: Mail, color: 'text-pink-500', featureId: 'contact' },
+  ].filter((item) => item.featureId === null || allowedFeatures.includes(item.featureId));
+
+  const reportsSubmenu = [
+    { to: '/member/reports', label: 'Overview', color: 'text-sky-500' },
+    { to: '/member/reports/membership', label: 'Membership Report', color: 'text-indigo-500' },
+    { to: '/member/reports/events', label: 'Event Reports', color: 'text-blue-500' },
+    { to: '/member/reports/services', label: 'Service Reports', color: 'text-emerald-500' },
+    { to: '/member/reports/tickets', label: 'Ticket Reports', color: 'text-amber-500' },
+    { to: '/member/reports/payments', label: 'Payment Reports', color: 'text-rose-500' },
+  ];
+
+  const otherNavItems = [
+    { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500', featureId: 'id-cards' },
+    { to: '/member/license', label: 'My License', icon: CreditCard, color: 'text-violet-500', featureId: 'licenses' },
+    { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500', featureId: 'payments' },
+  ].filter((item) => item.featureId === null || allowedFeatures.includes(item.featureId));
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -191,60 +207,62 @@ const MemberLayout: React.FC = () => {
           })}
 
           {/* Reports Collapsible Menu */}
-          <div>
-            <button
-              onClick={() => setIsReportsOpen(!isReportsOpen)}
-              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                location.pathname.startsWith('/member/reports')
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
-                  : 'hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <FileText
-                  size={18}
-                  className={
-                    location.pathname.startsWith('/member/reports') ? '' : 'text-rose-500'
-                  }
+          {allowedFeatures.includes('reports') && (
+            <div>
+              <button
+                onClick={() => setIsReportsOpen(!isReportsOpen)}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                  location.pathname.startsWith('/member/reports')
+                    ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText
+                    size={18}
+                    className={
+                      location.pathname.startsWith('/member/reports') ? '' : 'text-rose-500'
+                    }
+                  />
+                  <span
+                    className={
+                      location.pathname.startsWith('/member/reports')
+                        ? 'text-white'
+                        : 'text-gray-600'
+                    }
+                  >
+                    Reports
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
                 />
-                <span
-                  className={
-                    location.pathname.startsWith('/member/reports')
-                      ? 'text-white'
-                      : 'text-gray-600'
-                  }
-                >
-                  Reports
-                </span>
-              </div>
-              <ChevronDown
-                size={16}
-                className={`transition-transform ${isReportsOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {isReportsOpen && (
-              <div className="ml-4 mt-1 space-y-1">
-                {reportsSubmenu.map((item) => {
-                  const active = location.pathname === item.to;
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      onClick={closeSidebar}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className={active ? 'text-indigo-700' : item.color}>•</span>
-                      <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
-                        {item.label}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+              </button>
+              {isReportsOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {reportsSubmenu.map((item) => {
+                    const active = location.pathname === item.to;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        onClick={closeSidebar}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className={active ? 'text-indigo-700' : item.color}>•</span>
+                        <span className={active ? 'text-indigo-700' : 'text-gray-600'}>
+                          {item.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {otherNavItems.map((item) => {
             const active = location.pathname.startsWith(item.to);
@@ -316,7 +334,7 @@ const MemberLayout: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search events, services, blogs..."
+                placeholder="Search events, services, news..."
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm"
               />
             </div>

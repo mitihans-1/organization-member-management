@@ -23,6 +23,24 @@ import CardPagination from '../components/filters/CardPagination';
 const forest = '#3d5a2b';
 const forestHover = '#4f772d';
 
+// Map from feature IDs to user-friendly labels
+const FEATURE_LABELS: Record<string, string> = {
+  'overview': 'Dashboard Overview',
+  'members': 'Member Management',
+  'events': 'Events',
+  'services': 'Services',
+  'news': 'News',
+  'contact': 'Contact',
+  'subscriptions': 'Member Subscriptions',
+  'payments': 'Payments',
+  'tickets': 'Tickets',
+  'chat': 'Chat',
+  'reports': 'Reports',
+  'id-cards': 'ID Cards',
+  'licenses': 'Licenses',
+  'profile': 'Profile'
+};
+
 const StatCard: React.FC<{ stat: { value: string; label: string } }> = ({ stat }) => {
   const animatedValue = useCountAnimation(stat.value);
   return (
@@ -100,19 +118,17 @@ const Home: React.FC = () => {
       }
 
       try {
-        if (user?.role === 'member') {
-          const available = await api.get('/member-subscriptions/member/available-plans');
-          setPlans(available.data || []);
-        } else {
-          const p = await api.get('/plans');
-          setPlans(p.data || []);
-        }
-      } catch {
+        // Always load super-admin-level plans (not org-level plans)
+        const p = await api.get('/plans');
+        console.log("Fetched plans:", p.data);
+        setPlans(p.data || []);
+      } catch (err) {
+        console.error("Error fetching plans:", err);
         setPlans([]);
       }
     };
     load();
-  }, [user?.role]);
+  }, []);
 
   const features = [
     {
@@ -156,6 +172,7 @@ const Home: React.FC = () => {
 
   const pricingCards = useMemo(() => {
     const list = Array.isArray(plans) ? plans : [];
+    console.log("useMemo: plans list", list);
 
     const normalize = (p: any) => {
       const name = p.name || 'Plan';
@@ -164,14 +181,17 @@ const Home: React.FC = () => {
       const durationDays = p.duration_days || p.durationDays;
       const maxMembers = p.max_members || p.maxMembers;
 
-      const features = Array.isArray(p.features)
-        ? p.features
-        : typeof p.features === 'string'
+      // Map allowed_features to user-friendly labels, or fallback to existing features
+      const features = Array.isArray(p.allowed_features)
+        ? p.allowed_features.map((id: string) => FEATURE_LABELS[id] || id)
+        : Array.isArray(p.features)
           ? p.features
-              .split(',')
-              .map((x: string) => x.trim())
-              .filter(Boolean)
-          : [];
+          : typeof p.features === 'string'
+            ? p.features
+                .split(',')
+                .map((x: string) => x.trim())
+                .filter(Boolean)
+            : [];
 
       const sub =
         p.description ||
@@ -202,6 +222,7 @@ const Home: React.FC = () => {
       const mid = Math.floor(cards.length / 2);
       cards[mid] = { ...cards[mid], highlight: true };
     }
+    console.log("useMemo: normalized pricing cards", cards);
     return cards;
   }, [plans, user]);
 
@@ -214,6 +235,9 @@ const Home: React.FC = () => {
     totalItems: pricingTotalItems,
     pageSize: pricingPageSize,
   } = useCardPagination(pricingCards, 3, pricingResetKey);
+  
+  console.log("Home.tsx: pricingCards.length", pricingCards.length);
+  console.log("Home.tsx: pagedPricingCards", pagedPricingCards);
 
   const endorsementResetKey = String(endorsements.length);
   const {

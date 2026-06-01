@@ -24,7 +24,7 @@ const sectionToReport: Record<string, string> = {
   'id-cards': 'idcards',
 };
 
-const OrganiReport: React.FC = () => {
+const OrgAnalytics: React.FC = () => {
   const { section } = useParams<{ section: string }>();
   const activeReport = section ? (sectionToReport[section] ?? 'overview') : 'overview';
 
@@ -190,8 +190,8 @@ const OrganiReport: React.FC = () => {
     { label: 'Export PDF', icon: FileText },
     { label: 'Export Excel', icon: FileSpreadsheet },
     { label: 'Export CSV', icon: Download },
-    { label: 'Print Report', icon: Printer },
-    { label: 'Email Report', icon: Mail },
+    { label: 'Print Analytics', icon: Printer },
+    { label: 'Email Analytics', icon: Mail },
   ];
 
   const selectClass = 'rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white';
@@ -200,7 +200,7 @@ const OrganiReport: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-900">Organization Reports</h1>
+          <h1 className="text-2xl font-black text-gray-900">Organization Analytics</h1>
           <p className="text-sm text-gray-500 mt-1">Analytics and insights for your organization</p>
         </div>
         <div className="relative" ref={exportDropdownRef}>
@@ -464,7 +464,7 @@ const OrganiReport: React.FC = () => {
 
       {isLoading ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-500 animate-pulse font-medium">
-          Loading report metrics...
+          Loading analytics metrics...
         </div>
       ) : (
         <>
@@ -548,7 +548,7 @@ const OrganiReport: React.FC = () => {
           {activeReport === 'members' && reportData && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-black text-gray-900">Member Reports</h3>
+                <h3 className="text-xl font-black text-gray-900">Member Analytics</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px]">
@@ -597,7 +597,7 @@ const OrganiReport: React.FC = () => {
           {activeReport === 'events' && reportData && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-black text-gray-900">Event Reports</h3>
+                <h3 className="text-xl font-black text-gray-900">Event Analytics</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1000px]">
@@ -642,7 +642,7 @@ const OrganiReport: React.FC = () => {
           {activeReport === 'services' && reportData && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-black text-gray-900">Service Reports</h3>
+                <h3 className="text-xl font-black text-gray-900">Service Analytics</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px]">
@@ -685,7 +685,7 @@ const OrganiReport: React.FC = () => {
           {activeReport === 'tickets' && reportData && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-black text-gray-900">Ticket Reports</h3>
+                <h3 className="text-xl font-black text-gray-900">Ticket Analytics</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px]">
@@ -866,5 +866,5 @@ const OrganiReport: React.FC = () => {
   );
 };
 
-export default OrganiReport;
+export default OrgAnalytics;
 

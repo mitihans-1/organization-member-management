@@ -1,16 +1,59 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { MemberSubscriptionPlan } from '../../types';
 
+const MEMBER_SPECIFIC_FEATURES = [
+  { id: 'overview', label: 'Dashboard Overview' },
+  { id: 'events', label: 'Events' },
+  { id: 'services', label: 'Services' },
+  { id: 'news', label: 'News' },
+  { id: 'contact', label: 'Contact' },
+  { id: 'subscriptions', label: 'Member Subscriptions' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'tickets', label: 'Tickets' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'id-cards', label: 'ID Cards' },
+  { id: 'licenses', label: 'Licenses' },
+  { id: 'profile', label: 'Profile' },
+];
+
+const FEATURE_LABELS: Record<string, string> = {
+  overview: 'Dashboard Overview',
+  members: 'Member Management',
+  events: 'Events',
+  services: 'Services',
+  news: 'News',
+  contact: 'Contact',
+  subscriptions: 'Member Subscriptions',
+  payments: 'Payments',
+  tickets: 'Tickets',
+  chat: 'Chat',
+  reports: 'Reports',
+  'id-cards': 'ID Cards',
+  licenses: 'Licenses',
+  profile: 'Profile',
+};
+
 const OrgSubscriptionPlans: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<MemberSubscriptionPlan | null>(null);
+
+  // Get the organization's allowed features
+  const orgAllowedFeatures = useMemo(() => {
+    return (user as any)?.organization?.plan?.allowed_features || ['overview', 'profile', 'subscriptions'];
+  }, [user]);
+
+  // Filter MEMBER_SPECIFIC_FEATURES to only include those allowed by the organization
+  const availableFeatures = useMemo(() => {
+    return MEMBER_SPECIFIC_FEATURES.filter(f => orgAllowedFeatures.includes(f.id));
+  }, [orgAllowedFeatures]);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -19,7 +62,7 @@ const OrgSubscriptionPlans: React.FC = () => {
     billingCycle: 'monthly' as const,
     durationDays: 30,
     trialDays: '',
-    features: [''],
+    features: [] as string[],
     maxMembers: '',
     isActive: true,
     sortOrder: 0,
@@ -68,7 +111,7 @@ const OrgSubscriptionPlans: React.FC = () => {
       billingCycle: 'monthly',
       durationDays: 30,
       trialDays: '',
-      features: [''],
+      features: availableFeatures.map(f => f.id), // Default to all allowed features
       maxMembers: '',
       isActive: true,
       sortOrder: 0,
@@ -83,7 +126,6 @@ const OrgSubscriptionPlans: React.FC = () => {
       price: parseFloat(formData.price),
       maxMembers: formData.maxMembers ? parseInt(formData.maxMembers) : undefined,
       trialDays: formData.trialDays ? parseInt(formData.trialDays) : undefined,
-      features: formData.features.filter((f) => f.trim() !== ''),
     };
 
     if (editingPlan) {
@@ -103,29 +145,12 @@ const OrgSubscriptionPlans: React.FC = () => {
       billingCycle: plan.billingCycle as any,
       durationDays: plan.durationDays || 30,
       trialDays: plan.trialDays ? String(plan.trialDays) : '',
-      features: plan.features.length > 0 ? plan.features : [''],
+      features: plan.features.length > 0 ? plan.features : availableFeatures.map(f => f.id),
       maxMembers: plan.maxMembers ? String(plan.maxMembers) : '',
       isActive: plan.isActive,
       sortOrder: plan.sortOrder,
     });
     setIsModalOpen(true);
-  };
-
-  const addFeature = () => {
-    setFormData({ ...formData, features: [...formData.features, ''] });
-  };
-
-  const updateFeature = (index: number, value: string) => {
-    const newFeatures = [...formData.features];
-    newFeatures[index] = value;
-    setFormData({ ...formData, features: newFeatures });
-  };
-
-  const removeFeature = (index: number) => {
-    setFormData({
-      ...formData,
-      features: formData.features.filter((_, i) => i !== index),
-    });
   };
 
   return (
@@ -221,7 +246,7 @@ const OrgSubscriptionPlans: React.FC = () => {
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-sm text-slate-700">
                       <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
-                      {feature}
+                      {FEATURE_LABELS[feature] || feature}
                     </li>
                   ))}
                 </ul>
@@ -349,33 +374,37 @@ const OrgSubscriptionPlans: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Features</label>
-                {formData.features.map((feature, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={feature}
-                      onChange={(e) => updateFeature(index, e.target.value)}
-                      className="flex-1 rounded-xl border border-slate-300 px-4 py-2 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
-                      placeholder="Feature description"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeFeature(index)}
-                      className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Allowed Features (based on your organization's plan)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {availableFeatures.map((feature) => (
+                    <label
+                      key={feature.id}
+                      className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-sky-300 transition-all"
                     >
-                      <XCircle size={20} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addFeature}
-                  className="flex items-center gap-2 text-sky-600 font-bold text-sm hover:text-sky-500"
-                >
-                  <Plus size={16} />
-                  Add Feature
-                </button>
+                      <input
+                        type="checkbox"
+                        checked={formData.features.includes(feature.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({
+                              ...formData,
+                              features: [...formData.features, feature.id],
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              features: formData.features.filter((f) => f !== feature.id),
+                            });
+                          }
+                        }}
+                        className="w-5 h-5 text-sky-600 rounded border-slate-300 focus:ring-sky-500"
+                      />
+                      <span className="text-sm font-semibold text-slate-700">{feature.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">

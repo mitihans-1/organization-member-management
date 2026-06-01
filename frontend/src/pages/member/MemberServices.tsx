@@ -50,7 +50,7 @@ const MemberServices: React.FC = () => {
 
   const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
     queryKey: ['services'],
-    queryFn: () => api.get('/services').then((r) => r.data),
+    queryFn: () => api.get('/services?mode=dashboard').then((r) => r.data),
   });
 
   const { data: userPayments, isLoading: paymentsLoading } = useQuery<any[]>({

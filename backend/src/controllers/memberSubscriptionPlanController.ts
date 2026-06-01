@@ -4,6 +4,22 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Define member-specific features that are allowed in member subscription plans
+const MEMBER_SPECIFIC_FEATURES = [
+  'overview',
+  'events',
+  'services',
+  'news',
+  'contact',
+  'subscriptions',
+  'payments',
+  'tickets',
+  'chat',
+  'id-cards',
+  'licenses',
+  'profile',
+];
+
 export const getSubscriptionPlans = async (req: any, res: Response) => {
   try {
     const { orgId } = req.params;
@@ -33,43 +49,63 @@ export const getSubscriptionPlanById = async (req: any, res: Response) => {
 
 export const createSubscriptionPlan = async (req: any, res: Response) => {
   try {
+    console.log('Creating subscription plan - req.body:', req.body);
+    console.log('req.params:', req.params);
+    console.log('req.user:', req.user);
+
     const { orgId } = req.params;
-    const { name, description, price, currency, billingCycle, durationDays, features, maxMembers, sortOrder } = req.body;
+    const { name, description, price, currency, billingCycle, durationDays, features, maxMembers, sortOrder, trialDays, isActive } = req.body;
 
     if (req.user.role !== 'orgAdmin') {
       return res.status(403).json({ message: 'Only organization admins can create plans' });
     }
 
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    console.log('Found user:', user);
     if (user?.organizationId !== orgId) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
+    // Validate that all features are member-specific
+    if (features) {
+      const invalidFeatures = features.filter((f: string) => !MEMBER_SPECIFIC_FEATURES.includes(f));
+      if (invalidFeatures.length > 0) {
+        return res.status(400).json({ message: `Invalid features: ${invalidFeatures.join(', ')}` });
+      }
+    }
+
+    const planData = {
+      organizationId: orgId,
+      name,
+      description,
+      price: typeof price === 'string' ? parseFloat(price) : price,
+      currency: currency || 'ETB',
+      billingCycle,
+      durationDays: typeof durationDays === 'string' ? parseInt(durationDays) : durationDays,
+      features: features || [],
+      maxMembers: maxMembers ? (typeof maxMembers === 'string' ? parseInt(maxMembers) : maxMembers) : null,
+      sortOrder: sortOrder !== undefined ? (typeof sortOrder === 'string' ? parseInt(sortOrder) : sortOrder) : 0,
+      trialDays: trialDays ? (typeof trialDays === 'string' ? parseInt(trialDays) : trialDays) : null,
+      isActive: isActive !== undefined ? isActive : true,
+    };
+    console.log('Plan data to create:', planData);
+
     const plan = await prisma.memberSubscriptionPlan.create({
-      data: {
-        organizationId: orgId,
-        name,
-        description,
-        price,
-        currency: currency || 'ETB',
-        billingCycle,
-        durationDays,
-        features: features || [],
-        maxMembers,
-        sortOrder: sortOrder || 0,
-      },
+      data: planData,
     });
 
+    console.log('Created plan:', plan);
     res.status(201).json(plan);
   } catch (error) {
-    res.status(500).json({ message: 'Error creating subscription plan', error });
+    console.error('Error creating subscription plan:', error);
+    res.status(500).json({ message: 'Error creating subscription plan', error: (error as Error).message });
   }
 };
 
 export const updateSubscriptionPlan = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, price, currency, billingCycle, durationDays, features, isActive, maxMembers, sortOrder } = req.body;
+    const { name, description, price, currency, billingCycle, durationDays, features, isActive, maxMembers, sortOrder, trialDays } = req.body;
 
     if (req.user.role !== 'orgAdmin') {
       return res.status(403).json({ message: 'Only organization admins can update plans' });
@@ -83,25 +119,35 @@ export const updateSubscriptionPlan = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
+    // Validate that all features are member-specific if features are provided
+    if (features) {
+      const invalidFeatures = features.filter((f: string) => !MEMBER_SPECIFIC_FEATURES.includes(f));
+      if (invalidFeatures.length > 0) {
+        return res.status(400).json({ message: `Invalid features: ${invalidFeatures.join(', ')}` });
+      }
+    }
+
     const updatedPlan = await prisma.memberSubscriptionPlan.update({
       where: { id },
       data: {
         name,
         description,
-        price,
+        price: price !== undefined ? (typeof price === 'string' ? parseFloat(price) : price) : undefined,
         currency,
         billingCycle,
-        durationDays,
+        durationDays: durationDays !== undefined ? (typeof durationDays === 'string' ? parseInt(durationDays) : durationDays) : undefined,
         features,
         isActive,
-        maxMembers,
-        sortOrder,
+        maxMembers: maxMembers !== undefined ? (maxMembers ? (typeof maxMembers === 'string' ? parseInt(maxMembers) : maxMembers) : null) : undefined,
+        sortOrder: sortOrder !== undefined ? (typeof sortOrder === 'string' ? parseInt(sortOrder) : sortOrder) : undefined,
+        trialDays: trialDays !== undefined ? (trialDays ? (typeof trialDays === 'string' ? parseInt(trialDays) : trialDays) : null) : undefined,
       },
     });
 
     res.status(200).json(updatedPlan);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating subscription plan', error });
+    console.error('Error updating subscription plan:', error);
+    res.status(500).json({ message: 'Error updating subscription plan', error: (error as Error).message });
   }
 };
 

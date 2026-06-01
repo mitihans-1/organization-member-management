@@ -1,11 +1,15 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { resolveCatalogWhere, resolveRequestContext } from '../utils/catalogScope';
 
 const prisma = new PrismaClient();
 
-export const getServices = async (req: Request, res: Response) => {
+export const getServices = async (req: any, res: Response) => {
   try {
+    const mode = req.query.mode === 'dashboard' ? 'browse_dashboard' : 'browse_navbar';
+    const where = await resolveCatalogWhere(req, mode);
     const services = await prisma.service.findMany({
+      where,
       include: {
         _count: {
           select: { subscribers: true },

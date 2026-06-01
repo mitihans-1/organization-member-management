@@ -53,7 +53,7 @@ const OrgServices: React.FC = () => {
 
   const { data: services, isLoading } = useQuery<Service[]>({
     queryKey: ['services'],
-    queryFn: () => api.get('/services').then((res) => res.data),
+    queryFn: () => api.get('/services?mode=dashboard').then((res) => res.data),
   });
 
   const createMutation = useMutation({
