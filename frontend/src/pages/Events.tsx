@@ -142,10 +142,11 @@ const Events: React.FC = () => {
         contactEmail: event.contactEmail || '',
         price: event.price !== undefined && event.price !== null ? String(event.price) : '',
         payment_required: (event as any).payment_required || false,
+        visibility: (event as any).visibility || 'public',
       });
     } else {
       setEditingEvent(null);
-      setFormData({ title: '', description: '', date: '', end_date: '', location: '', organizer: '', registrationDeadline: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false });
+      setFormData({ title: '', description: '', date: '', end_date: '', location: '', organizer: '', registrationDeadline: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false, visibility: 'public' });
     }
     setIsModalOpen(true);
   };
@@ -153,7 +154,7 @@ const Events: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingEvent(null);
-    setFormData({ title: '', description: '', date: '', end_date: '', location: '', organizer: '', registrationDeadline: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false });
+    setFormData({ title: '', description: '', date: '', end_date: '', location: '', organizer: '', registrationDeadline: '', image: '', status: 'draft', category: 'general', capacity: '', virtualLink: '', contactEmail: '', price: '', payment_required: false, visibility: 'public' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -596,6 +597,18 @@ const Events: React.FC = () => {
                   <option value="ongoing">Ongoing</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Visibility</label>
+                <select
+                  title='visibility'
+                  value={formData.visibility}
+                  onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+                >
+                  <option value="public">Public (Visible to everyone)</option>
+                  <option value="private">Private (Only members)</option>
                 </select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

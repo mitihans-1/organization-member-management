@@ -9,8 +9,13 @@ export const getBlogs = async (req: any, res: Response) => {
     const ctx = await resolveRequestContext(req);
     const where = await resolveCatalogWhere(req);
     const publishedOnly = ctx.role === 'guest' || ctx.role === 'member';
+    const isPublicOnly = ctx.role === 'guest';
     const blogs = await prisma.blog.findMany({
-      where: publishedOnly ? { ...where, status: 'published' } : where,
+      where: {
+        ...where,
+        ...(publishedOnly && { status: 'published' }),
+        ...(isPublicOnly && { visibility: 'public' })
+      },
       include: {
         author: { select: { id: true, name: true, email: true } },
       },
@@ -24,7 +29,7 @@ export const getBlogs = async (req: any, res: Response) => {
 
 export const createBlog = async (req: any, res: Response) => {
   try {
-    const { title, content, image, status, category, tags, readTime, isPredefined } = req.body;
+    const { title, content, image, status, category, tags, readTime, isPredefined, visibility } = req.body;
     const finalImage = req.file ? req.file.path : image;
 
     let orgId = req.user?.organizationId;
@@ -43,6 +48,7 @@ export const createBlog = async (req: any, res: Response) => {
         content,
         image: finalImage,
         status: status || 'draft',
+        visibility: visibility || 'public',
         category: category || 'general',
         tags: tags || null,
         readTime: readTime ? parseInt(readTime) : null,
@@ -63,7 +69,7 @@ export const createBlog = async (req: any, res: Response) => {
 export const updateBlog = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, content, status, category, tags, readTime } = req.body;
+    const { title, content, status, category, tags, readTime, visibility } = req.body;
     const image = req.file ? req.file.path : req.body.image;
 
     const existingBlog = await prisma.blog.findUnique({
@@ -90,6 +96,7 @@ export const updateBlog = async (req: any, res: Response) => {
         content,
         image,
         status: status ?? 'draft',
+        visibility: visibility !== undefined ? visibility : undefined,
         category: category ?? 'general',
         tags: tags !== undefined ? tags : null,
         readTime: readTime !== undefined ? parseInt(readTime) : null,

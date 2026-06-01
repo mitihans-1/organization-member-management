@@ -1,15 +1,17 @@
 import React, { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { useReactToPrint } from 'react-to-print';
-import { Printer, Download, CreditCard, UploadCloud } from 'lucide-react';
+import { Printer, Download, CreditCard, UploadCloud, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PrintPage1Back, PrintPage2Front } from '../../components/id-card/IdCardTemplates';
 
 export const MyIdCard = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [reason, setReason] = useState('Lost');
   const [paymentMethod, setPaymentMethod] = useState('Will Pay In Office');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -74,6 +76,13 @@ export const MyIdCard = () => {
   if (activeRequest && activeRequest.requestStatus === 'PENDING_PAYMENT_VERIFICATION') {
     return (
       <div className="max-w-xl mx-auto mt-12 p-8 bg-white rounded-2xl shadow-sm border border-orange-100 text-center">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ArrowLeft size={20} />
+          <span className="text-sm font-bold">Back</span>
+        </button>
         <UploadCloud size={48} className="mx-auto text-orange-400 mb-4" />
         <h2 className="text-xl font-bold text-gray-900">Payment Required</h2>
         <p className="text-gray-500 mt-2">Your replacement ID card request requires payment verification.</p>

@@ -42,6 +42,7 @@ const Blogs: React.FC = () => {
     category: 'general',
     tags: '',
     readTime: '',
+    visibility: 'public',
   });
   const [viewingBlog, setViewingBlog] = useState<Blog | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -154,6 +155,7 @@ const Blogs: React.FC = () => {
         category: blog.category || 'general',
         tags: blog.tags || '',
         readTime: blog.readTime ? String(blog.readTime) : '',
+        visibility: (blog as any).visibility || 'public',
       });
     } else {
       setEditingBlog(null);
@@ -165,6 +167,7 @@ const Blogs: React.FC = () => {
         category: 'general',
         tags: '',
         readTime: '',
+        visibility: 'public',
       });
     }
     setIsModalOpen(true);
@@ -181,6 +184,7 @@ const Blogs: React.FC = () => {
       category: 'general',
       tags: '',
       readTime: '',
+      visibility: 'public',
     });
   };
 
@@ -431,6 +435,18 @@ const Blogs: React.FC = () => {
                         {s}
                       </option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Visibility</label>
+                  <select
+                    title='visibility'
+                    value={formData.visibility}
+                    onChange={(e) => setFormData({ ...formData, visibility: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm capitalize"
+                  >
+                    <option value="public">Public (Visible to everyone)</option>
+                    <option value="private">Private (Only members)</option>
                   </select>
                 </div>
                 <div>

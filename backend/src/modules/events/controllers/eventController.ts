@@ -1,15 +1,20 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { resolveCatalogWhere } from '../../../utils/catalogScope';
+import { resolveCatalogWhere, resolveRequestContext } from '../../../utils/catalogScope';
 import { sendNewEventNotification } from '../../../services/emailService';
 
 const prisma = new PrismaClient();
 
 export const getEvents = async (req: any, res: Response) => {
   try {
+    const ctx = await resolveRequestContext(req);
     const where = await resolveCatalogWhere(req);
+    const isPublicOnly = ctx.role === 'guest';
     const events = await prisma.event.findMany({
-      where,
+      where: {
+        ...where,
+        ...(isPublicOnly && { visibility: 'public' })
+      },
       include: {
         _count: {
           select: { attendees: true },
@@ -27,7 +32,7 @@ export const createEvent = async (req: any, res: Response) => {
   try {
     const { 
       title, description, date, end_date, location, image, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline
+      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline, visibility
     } = req.body;
     const finalImage = req.file ? req.file.path : image;
     
@@ -57,6 +62,7 @@ export const createEvent = async (req: any, res: Response) => {
         organizationId: predefined ? null : orgId || null,
         isPredefined: predefined,
         status: status || 'draft',
+        visibility: visibility || 'public',
         price: price ? parseFloat(price) : null,
         payment_required: payment_required === true || payment_required === 'true',
         organizer: organizer || null,
@@ -117,7 +123,7 @@ export const updateEvent = async (req: any, res: Response) => {
     const { id } = req.params;
     const { 
       title, description, date, end_date, location, status, category, 
-      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline
+      capacity, virtualLink, contactEmail, price, payment_required, organizer, registrationDeadline, visibility
     } = req.body;
     const image = req.file ? req.file.path : req.body.image;
 
@@ -141,6 +147,7 @@ export const updateEvent = async (req: any, res: Response) => {
         virtualLink: virtualLink !== undefined ? virtualLink : null,
         contactEmail: contactEmail !== undefined ? contactEmail : null,
         status: status || 'draft',
+        visibility: visibility !== undefined ? visibility : undefined,
         price: price !== undefined ? parseFloat(price) : null,
         payment_required: payment_required !== undefined ? (payment_required === true || payment_required === 'true') : undefined,
         organizer: organizer !== undefined ? organizer : null,

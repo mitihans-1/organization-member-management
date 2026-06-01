@@ -15,6 +15,7 @@ const PlatformEvents: React.FC = () => {
     status: 'upcoming',
     category: 'general',
     organizer: 'OMMS Team',
+    visibility: 'public',
   });
 
   const { data: events, isLoading } = useQuery<Event[]>({
@@ -73,6 +74,7 @@ const PlatformEvents: React.FC = () => {
       status: 'upcoming',
       category: 'general',
       organizer: 'OMMS Team',
+      visibility: 'public',
     });
     setOpen(true);
   };
@@ -87,6 +89,7 @@ const PlatformEvents: React.FC = () => {
       status: e.status || 'upcoming',
       category: e.category || 'general',
       organizer: (e as any).organizer || 'OMMS Team',
+      visibility: (e as any).visibility || 'public',
     });
     setOpen(true);
   };
@@ -229,6 +232,17 @@ const PlatformEvents: React.FC = () => {
                 value={form.organizer}
                 onChange={(ev) => setForm({ ...form, organizer: ev.target.value })}
               />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Visibility</label>
+              <select
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm"
+                value={form.visibility}
+                onChange={(ev) => setForm({ ...form, visibility: ev.target.value })}
+              >
+                <option value="public">Public (Visible to everyone)</option>
+                <option value="private">Private (Only members)</option>
+              </select>
             </div>
             <div className="flex gap-3 pt-2">
               <button

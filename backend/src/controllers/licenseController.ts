@@ -4,13 +4,13 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// ----------------------------------------------------------------------
+// ==========================================
 // MEMBER ENDPOINTS
-// ----------------------------------------------------------------------
+// ==========================================
 
-export const requestIdCard = async (req: any, res: Response) => {
+export const requestLicense = async (req: any, res: Response) => {
   try {
-    const { requestType, reason, phone, sex, address } = req.body;
+    const { requestType, reason, phone, sex, address, licensePlanId } = req.body;
     const userId = req.user.userId;
 
     const user = await prisma.user.findUnique({
@@ -23,7 +23,7 @@ export const requestIdCard = async (req: any, res: Response) => {
     }
 
     // Check if there is already a pending request
-    const existingRequest = await prisma.idCardRequest.findFirst({
+    const existingRequest = await prisma.licenseRequest.findFirst({
       where: {
         userId,
         requestStatus: { in: ['PENDING', 'PENDING_PAYMENT_VERIFICATION'] }
@@ -50,12 +50,13 @@ export const requestIdCard = async (req: any, res: Response) => {
     const requestStatus = requestType === 'REPLACEMENT' ? 'PENDING_PAYMENT_VERIFICATION' : 'PENDING';
     const paymentStatus = requestType === 'REPLACEMENT' ? 'PENDING' : 'NOT_REQUIRED';
 
-    const newRequest = await prisma.idCardRequest.create({
+    const newRequest = await prisma.licenseRequest.create({
       data: {
         userId,
         organizationId: user.organizationId,
         requestType: requestType || 'FIRST_TIME',
         reason: reason || null,
+        licensePlanId,
         paymentStatus,
         requestStatus,
       }
@@ -70,7 +71,7 @@ export const requestIdCard = async (req: any, res: Response) => {
       await prisma.notification.createMany({
         data: orgAdmins.map(admin => ({
           userId: admin.id,
-          title: `New ID Card request from ${user.name}`
+          title: `New License request from ${user.name}`
         }))
       });
     }
@@ -82,11 +83,11 @@ export const requestIdCard = async (req: any, res: Response) => {
   }
 };
 
-export const getMyIdCard = async (req: any, res: Response) => {
+export const getMyLicense = async (req: any, res: Response) => {
   try {
     const userId = req.user.userId;
 
-    const card = await prisma.idCard.findFirst({
+    const license = await prisma.license.findFirst({
       where: { userId, status: 'ACTIVE' },
       include: {
         user: {
@@ -105,7 +106,7 @@ export const getMyIdCard = async (req: any, res: Response) => {
       }
     });
 
-    const activeRequest = await prisma.idCardRequest.findFirst({
+    const activeRequest = await prisma.licenseRequest.findFirst({
       where: {
         userId,
         requestStatus: { in: ['PENDING', 'PENDING_PAYMENT_VERIFICATION'] }
@@ -113,37 +114,37 @@ export const getMyIdCard = async (req: any, res: Response) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.status(200).json({ card, activeRequest });
+    res.status(200).json({ license, activeRequest });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Error fetching ID card details.', error });
+    res.status(500).json({ message: 'Error fetching license details.', error });
   }
 };
 
 export const logPrint = async (req: any, res: Response) => {
   try {
-    const { idCardId } = req.body;
+    const { licenseId } = req.body;
     const userId = req.user.userId;
     const role = req.user.role;
 
-    const card = await prisma.idCard.findUnique({ where: { id: idCardId } });
-    if (!card) return res.status(404).json({ message: 'Card not found' });
+    const license = await prisma.license.findUnique({ where: { id: licenseId } });
+    if (!license) return res.status(404).json({ message: 'License not found' });
 
-    // Ensure member only logs their own card
-    if (role === 'member' && card.userId !== userId) {
+    // Ensure member only logs their own license
+    if (role === 'member' && license.userId !== userId) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    await prisma.idCardPrintLog.create({
+    await prisma.licensePrintLog.create({
       data: {
-        idCardId,
+        licenseId,
         printedById: userId,
         printedByRole: role,
       }
     });
 
-    await prisma.idCard.update({
-      where: { id: idCardId },
+    await prisma.license.update({
+      where: { id: licenseId },
       data: { printCount: { increment: 1 } }
     });
 
@@ -153,9 +154,9 @@ export const logPrint = async (req: any, res: Response) => {
   }
 };
 
-// ----------------------------------------------------------------------
+// ==========================================
 // ORG ADMIN ENDPOINTS
-// ----------------------------------------------------------------------
+// ==========================================
 
 export const getRequests = async (req: any, res: Response) => {
   try {
@@ -163,7 +164,7 @@ export const getRequests = async (req: any, res: Response) => {
     const admin = await prisma.user.findUnique({ where: { id: userId } });
     if (!admin?.organizationId) return res.status(403).json({ message: 'No organization access' });
 
-    const requestsRaw = await prisma.idCardRequest.findMany({
+    const requestsRaw = await prisma.licenseRequest.findMany({
       where: { organizationId: admin.organizationId },
       include: { payment: true },
       orderBy: { createdAt: 'desc' }
@@ -198,27 +199,30 @@ export const approveRequest = async (req: any, res: Response) => {
     const { id } = req.params;
     const adminId = req.user.userId;
 
-    const request = await prisma.idCardRequest.findUnique({ where: { id } });
+    const request = await prisma.licenseRequest.findUnique({ 
+      where: { id }, 
+      include: { licensePlan: true } 
+    });
     if (!request) return res.status(404).json({ message: 'Request not found' });
 
     if (request.requestType === 'REPLACEMENT' && request.paymentStatus !== 'COMPLETED') {
       return res.status(400).json({ message: 'Cannot approve replacement before payment is verified.' });
     }
 
-    // Invalidate existing active cards
-    await prisma.idCard.updateMany({
+    // Invalidate existing active licenses
+    await prisma.license.updateMany({
       where: { userId: request.userId, status: 'ACTIVE' },
       data: { status: 'REVOKED' }
     });
 
     // Find previous version to increment
-    const previousCard = await prisma.idCard.findFirst({
+    const previousLicense = await prisma.license.findFirst({
       where: { userId: request.userId },
       orderBy: { version: 'desc' }
     });
-    const newVersion = previousCard ? previousCard.version + 1 : 1;
+    const newVersion = previousLicense ? previousLicense.version + 1 : 1;
     const { formatConfig } = req.body;
-    let cardNumber = '';
+    let licenseNumber = '';
     
     if (formatConfig) {
       const { prefix = '', length = 6, includeNumbers = true, includeLetters = true, includeHyphens = false, suffix = '' } = formatConfig;
@@ -237,27 +241,28 @@ export const approveRequest = async (req: any, res: Response) => {
         randomPart = randomPart.match(new RegExp('.{1,4}', 'g'))?.join('-') || randomPart;
       }
 
-      cardNumber = `${prefix}${randomPart}${suffix}`;
+      licenseNumber = `${prefix}${randomPart}${suffix}`;
     } else {
-      cardNumber = `ID-${Date.now().toString().slice(-6)}-${request.userId.slice(-4)}`;
+      licenseNumber = `LIC-${Date.now().toString().slice(-6)}-${request.userId.slice(-4)}`;
     }
     
     const qrToken = crypto.randomUUID();
+    const durationDays = request.licensePlan?.durationDays || 365 * 2; // default 2 years
 
-    const newCard = await prisma.idCard.create({
+    const newLicense = await prisma.license.create({
       data: {
         userId: request.userId,
         organizationId: request.organizationId,
-        cardNumber,
+        licenseNumber,
         qrToken,
         version: newVersion,
         status: 'ACTIVE',
         generatedByOrgAdminId: adminId,
-        expiresAt: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000), // 2 years from now
+        expiresAt: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000),
       }
     });
 
-    await prisma.idCardRequest.update({
+    await prisma.licenseRequest.update({
       where: { id },
       data: {
         requestStatus: 'GENERATED',
@@ -269,11 +274,11 @@ export const approveRequest = async (req: any, res: Response) => {
     await prisma.notification.create({
       data: {
         userId: request.userId,
-        title: 'Your ID Card has been approved and generated.'
+        title: 'Your License has been approved and generated.'
       }
     });
 
-    res.status(200).json({ message: 'Request approved and card generated.', data: newCard });
+    res.status(200).json({ message: 'Request approved and license generated.', data: newLicense });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error approving request', error });
@@ -285,7 +290,7 @@ export const rejectRequest = async (req: any, res: Response) => {
     const { id } = req.params;
     const adminId = req.user.userId;
 
-    const request = await prisma.idCardRequest.update({
+    const request = await prisma.licenseRequest.update({
       where: { id },
       data: {
         requestStatus: 'REJECTED',
@@ -303,7 +308,7 @@ export const verifyPayment = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     
-    const request = await prisma.idCardRequest.update({
+    const request = await prisma.licenseRequest.update({
       where: { id },
       data: {
         paymentStatus: 'COMPLETED',
@@ -317,13 +322,13 @@ export const verifyPayment = async (req: any, res: Response) => {
   }
 };
 
-export const getGeneratedCards = async (req: any, res: Response) => {
+export const getGeneratedLicenses = async (req: any, res: Response) => {
   try {
     const userId = req.user.userId;
     const admin = await prisma.user.findUnique({ where: { id: userId } });
     if (!admin?.organizationId) return res.status(403).json({ message: 'No organization access' });
 
-    const cardsRaw = await prisma.idCard.findMany({
+    const licensesRaw = await prisma.license.findMany({
       where: { organizationId: admin.organizationId },
       include: {
         organization: {
@@ -341,7 +346,7 @@ export const getGeneratedCards = async (req: any, res: Response) => {
     });
 
     // Manually fetch users to avoid Prisma "Inconsistent query result" error
-    const userIds = [...new Set(cardsRaw.map(c => c.userId))];
+    const userIds = [...new Set(licensesRaw.map(c => c.userId))];
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, name: true, email: true, phone: true, sex: true, address: true, profile_photo_path: true, role: true }
@@ -349,76 +354,76 @@ export const getGeneratedCards = async (req: any, res: Response) => {
 
     const userMap = new Map(users.map(u => [u.id, u]));
 
-    const cards = cardsRaw
+    const licenses = licensesRaw
       .map(c => ({
         ...c,
         user: userMap.get(c.userId) || null
       }))
       .filter(c => c.user !== null);
 
-    res.status(200).json(cards);
+    res.status(200).json(licenses);
   } catch (error) {
-    console.error('getGeneratedCards error:', error);
-    res.status(500).json({ message: 'Error fetching generated cards', error });
+    console.error('getGeneratedLicenses error:', error);
+    res.status(500).json({ message: 'Error fetching generated licenses', error });
   }
 };
 
-export const revokeCard = async (req: any, res: Response) => {
+export const revokeLicense = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const admin = await prisma.user.findUnique({ where: { id: req.user.userId } });
 
-    const card = await prisma.idCard.findUnique({ where: { id } });
-    if (!card || card.organizationId !== admin?.organizationId) {
-      return res.status(404).json({ message: 'Card not found' });
+    const license = await prisma.license.findUnique({ where: { id } });
+    if (!license || license.organizationId !== admin?.organizationId) {
+      return res.status(404).json({ message: 'License not found' });
     }
 
-    const updatedCard = await prisma.idCard.update({
+    const updatedLicense = await prisma.license.update({
       where: { id },
       data: { status: 'REVOKED' }
     });
 
-    res.status(200).json({ message: 'Card revoked.', data: updatedCard });
+    res.status(200).json({ message: 'License revoked.', data: updatedLicense });
   } catch (error) {
-    res.status(500).json({ message: 'Error revoking card', error });
+    res.status(500).json({ message: 'Error revoking license', error });
   }
 };
 
-export const regenerateCard = async (req: any, res: Response) => {
+export const regenerateLicense = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const adminId = req.user.userId;
     const admin = await prisma.user.findUnique({ where: { id: adminId } });
 
-    const oldCard = await prisma.idCard.findUnique({ where: { id } });
-    if (!oldCard || oldCard.organizationId !== admin?.organizationId) {
-      return res.status(404).json({ message: 'Card not found' });
+    const oldLicense = await prisma.license.findUnique({ where: { id } });
+    if (!oldLicense || oldLicense.organizationId !== admin?.organizationId) {
+      return res.status(404).json({ message: 'License not found' });
     }
 
-    // Invalidate all active cards for this user
-    await prisma.idCard.updateMany({
-      where: { userId: oldCard.userId, status: 'ACTIVE' },
+    // Invalidate all active licenses for this user
+    await prisma.license.updateMany({
+      where: { userId: oldLicense.userId, status: 'ACTIVE' },
       data: { status: 'REVOKED' }
     });
 
-    const cardNumber = `ID-${Date.now().toString().slice(-6)}-${oldCard.userId.slice(-4)}`;
+    const licenseNumber = `LIC-${Date.now().toString().slice(-6)}-${oldLicense.userId.slice(-4)}`;
     const qrToken = crypto.randomUUID();
 
-    const newCard = await prisma.idCard.create({
+    const newLicense = await prisma.license.create({
       data: {
-        userId: oldCard.userId,
-        organizationId: oldCard.organizationId,
-        cardNumber,
+        userId: oldLicense.userId,
+        organizationId: oldLicense.organizationId,
+        licenseNumber,
         qrToken,
-        version: oldCard.version + 1,
+        version: oldLicense.version + 1,
         status: 'ACTIVE',
         generatedByOrgAdminId: adminId,
       }
     });
 
-    res.status(200).json({ message: 'Card regenerated.', data: newCard });
+    res.status(200).json({ message: 'License regenerated.', data: newLicense });
   } catch (error) {
-    res.status(500).json({ message: 'Error regenerating card', error });
+    res.status(500).json({ message: 'Error regenerating license', error });
   }
 };
 
@@ -428,7 +433,7 @@ export const getVerificationLogs = async (req: any, res: Response) => {
     const admin = await prisma.user.findUnique({ where: { id: userId } });
     if (!admin?.organizationId) return res.status(403).json({ message: 'No organization access' });
 
-    const logs = await prisma.idCardVerificationLog.findMany({
+    const logs = await prisma.licenseVerificationLog.findMany({
       where: { organizationId: admin.organizationId },
       include: {
         member: { select: { name: true, email: true } }
@@ -443,15 +448,15 @@ export const getVerificationLogs = async (req: any, res: Response) => {
   }
 };
 
-// ----------------------------------------------------------------------
+// ==========================================
 // PUBLIC VERIFICATION ENDPOINT
-// ----------------------------------------------------------------------
+// ==========================================
 
 export const verifyPublicQR = async (req: any, res: Response) => {
   try {
     const { qrToken } = req.params;
 
-    const card = await prisma.idCard.findUnique({
+    const license = await prisma.license.findUnique({
       where: { qrToken },
       include: {
         user: { select: { id: true, name: true, role: true, profile_photo_path: true, phone: true, sex: true, address: true } },
@@ -459,32 +464,32 @@ export const verifyPublicQR = async (req: any, res: Response) => {
       }
     });
 
-    if (!card) {
+    if (!license) {
       return res.status(404).json({ message: 'Invalid QR Token' });
     }
 
     // Log the scan asynchronously
-    prisma.idCardVerificationLog.create({
+    prisma.licenseVerificationLog.create({
       data: {
-        idCardId: card.id,
+        licenseId: license.id,
         qrTokenScanned: qrToken,
-        memberId: card.user.id,
-        organizationId: card.organization.id,
-        verificationResult: card.status,
+        memberId: license.user.id,
+        organizationId: license.organization.id,
+        verificationResult: license.status,
         ipAddress: req.ip || req.headers['x-forwarded-for']?.toString(),
         deviceInfo: req.headers['user-agent']?.toString()
       }
     }).catch(e => console.error("Error logging verification:", e));
 
     const responseData = {
-      name: card.user.name,
-      photo: card.user.profile_photo_path,
-      organization: card.organization.name,
-      role: card.user.role,
-      status: card.status,
-      expiresAt: card.expiresAt,
-      version: card.version,
-      cardNumber: card.cardNumber,
+      name: license.user.name,
+      photo: license.user.profile_photo_path,
+      organization: license.organization.name,
+      role: license.user.role,
+      status: license.status,
+      expiresAt: license.expiresAt,
+      version: license.version,
+      licenseNumber: license.licenseNumber,
     };
 
     res.status(200).json(responseData);
@@ -494,34 +499,34 @@ export const verifyPublicQR = async (req: any, res: Response) => {
   }
 };
 
-export const updateCardDetails = async (req: any, res: Response) => {
+export const updateLicenseDetails = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { expiresAt, name, role, sex, phone, address, cardNumber, generatedAt } = req.body;
+    const { expiresAt, name, role, sex, phone, address, licenseNumber, generatedAt } = req.body;
     const admin = await prisma.user.findUnique({ where: { id: req.user.userId } });
 
     if (!admin || !admin.organizationId || admin.role !== 'orgAdmin') {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    const card = await prisma.idCard.findUnique({ where: { id } });
-    if (!card || card.organizationId !== admin.organizationId) {
-      return res.status(404).json({ message: 'ID Card not found' });
+    const license = await prisma.license.findUnique({ where: { id } });
+    if (!license || license.organizationId !== admin.organizationId) {
+      return res.status(404).json({ message: 'License not found' });
     }
 
-    // Update the ID Card expiration date, card number, and generation date
-    const updatedCard = await prisma.idCard.update({
+    // Update the License expiration date, license number, and generation date
+    const updatedLicense = await prisma.license.update({
       where: { id },
       data: { 
         expiresAt: expiresAt ? new Date(expiresAt) : null,
-        ...(cardNumber ? { cardNumber } : {}),
+        ...(licenseNumber ? { licenseNumber } : {}),
         ...(generatedAt ? { generatedAt: new Date(generatedAt) } : {})
       }
     });
 
     // Update the User profile
     await prisma.user.update({
-      where: { id: card.userId },
+      where: { id: license.userId },
       data: {
         name,
         role,
@@ -531,9 +536,9 @@ export const updateCardDetails = async (req: any, res: Response) => {
       }
     });
 
-    res.json(updatedCard);
+    res.json(updatedLicense);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error updating card details' });
+    res.status(500).json({ message: 'Server error updating license details' });
   }
 };

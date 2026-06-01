@@ -46,6 +46,7 @@ const reportsSubmenu = [
 
 const otherNavItems = [
   { to: '/member/id-card', label: 'My ID Card', icon: CreditCard, color: 'text-purple-500' },
+  { to: '/member/license', label: 'My License', icon: CreditCard, color: 'text-violet-500' },
   { to: '/member/payments', label: 'Payments', icon: CreditCard, color: 'text-emerald-500' },
 ];
 
