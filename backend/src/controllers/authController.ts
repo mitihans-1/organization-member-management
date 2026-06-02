@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { sendOtpEmail, sendResetPasswordEmail, sendWelcomeEmail, sendNewMemberNotificationToOrgAdmin } from '../services/emailService';
+import { sendOtpEmail, sendResetPasswordEmail, sendWelcomeEmail, sendNewMemberNotificationToOrgAdmin, sendNewOrgAdminNotificationToSuperAdmin } from '../services/emailService';
 import { JWT_SECRET } from '../config/jwtConfig';
 import fs from 'fs';
 import path from 'path';
@@ -178,7 +178,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
   // Get or create free plan
   let freePlan = await prisma.plan.findFirst({ where: { name: 'Free' } });
   if (!freePlan) {
-    const defaultFeatures = ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'];
+    const defaultFeatures = ['overview', 'members', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile'];
     // @ts-ignore: Prisma client needs regeneration
     freePlan = await prisma.plan.create({
       data: {
@@ -219,6 +219,21 @@ export const verifyOtp = async (req: Request, res: Response) => {
         join_date: (pendingUser as any).join_date,
       },
     });
+
+    const superAdmins = await prisma.user.findMany({ where: { role: 'SuperAdmin' } });
+    for (const superAdmin of superAdmins) {
+      try {
+        await sendNewOrgAdminNotificationToSuperAdmin(
+          superAdmin.email,
+          superAdmin.name,
+          user.name,
+          user.email,
+          org.name
+        );
+      } catch (emailError) {
+        console.error('Failed to send new organization admin notification to super admin:', emailError);
+      }
+    }
   } else {
       const org = await prisma.organization.findUnique({ where: { id: pendingUser.organization_id! } });
       if (!org) {
@@ -433,9 +448,9 @@ export const login = async (req: Request, res: Response) => {
 
 // Default features for different plan tiers (same as planController)
 const defaultFeatures = {
-  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'],
-  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'profile', 'tickets'],
-  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'reports', 'id-cards', 'licenses', 'profile', 'tickets']
+  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile'],
+  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile', 'tickets'],
+  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'reports', 'id-cards', 'licenses', 'profile', 'tickets']
 };
 
 export const getProfile = async (req: any, res: Response) => {

@@ -26,6 +26,7 @@ import {
   Shield,
   TrendingUp,
   Search,
+  FolderOpen,
 } from 'lucide-react';
 
 const OrgAdminLayout: React.FC = () => {
@@ -42,6 +43,7 @@ const OrgAdminLayout: React.FC = () => {
     { to: '/org-admin/id-cards', label: 'ID Card Management', icon: Shield, color: 'text-cyan-500', featureId: 'id-cards' },
     { to: '/org-admin/licenses', label: 'License Management', icon: Shield, color: 'text-violet-500', featureId: 'licenses' },
     { to: '/org-admin/events', label: 'Event Management', icon: Calendar, color: 'text-green-500', featureId: 'events' },
+    { to: '/org-admin/resources', label: 'Resources & Files', icon: FolderOpen, color: 'text-emerald-500', featureId: null },
     { to: '/org-admin/services', label: 'Service Management', icon: Briefcase, color: 'text-amber-500', featureId: 'services' },
     { to: '/org-admin/blogs', label: 'News & Announcements', icon: FileText, narrow: true, color: 'text-orange-500', featureId: 'news' },
     { to: '/org-admin/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600', featureId: 'subscriptions' },

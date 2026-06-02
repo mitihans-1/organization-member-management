@@ -19,6 +19,7 @@ const FEATURE_LABELS: Record<string, string> = {
   'contact': 'Contact',
   'subscriptions': 'Member Subscriptions',
   'payments': 'Payments',
+  'file-sharing': 'File Sharing',
   'chat': 'Chat',
   'reports': 'Reports',
   'id-cards': 'ID Cards',

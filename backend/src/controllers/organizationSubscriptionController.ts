@@ -12,6 +12,7 @@ export const getAvailablePlansForOrganization = async (req: any, res: Response) 
     });
     res.status(200).json(plans);
   } catch (error) {
+    console.error('Error fetching plans:', error);
     res.status(500).json({ message: 'Error fetching plans', error });
   }
 };
@@ -34,7 +35,7 @@ export const organizationSelfSubscribe = async (req: any, res: Response) => {
     const updatedOrganization = await prisma.organization.update({
       where: { id: user.organizationId },
       data: {
-        plan_id: planId,
+        plan_id: plan.id,
         plan_expiry: new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000),
       },
     });
@@ -44,9 +45,9 @@ export const organizationSelfSubscribe = async (req: any, res: Response) => {
 
     const billingEndDate = new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000);
 
-    await createInvoice({
-      organizationId: user.organizationId,
-      planId,
+      await createInvoice({
+        organizationId: user.organizationId,
+        planId: plan.id,
       planType: 'organization',
       subtotal: plan.price,
       tax: 0,
@@ -69,6 +70,7 @@ export const organizationSelfSubscribe = async (req: any, res: Response) => {
 
     res.status(200).json(updatedOrganization);
   } catch (error) {
+    console.error('Error subscribing to plan:', error);
     res.status(500).json({ message: 'Error subscribing to plan', error });
   }
 };
@@ -78,20 +80,34 @@ export const assignOrganizationPlan = async (req: any, res: Response) => {
     const { organizationId } = req.params;
     const { planId, skipPayment = false } = req.body;
 
-    if (req.user.role !== 'superAdmin') {
+    if (String(req.user.role).toLowerCase() !== 'superadmin') {
       return res.status(403).json({ message: 'Only super admins can assign organization plans' });
     }
 
     const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
     if (!organization) return res.status(404).json({ message: 'Organization not found' });
 
-    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    // planId may be a Mongo ObjectId or a friendly identifier (e.g., 'enterprise').
+    let plan: any = null;
+    const isObjectId = typeof planId === 'string' && /^[0-9a-fA-F]{24}$/.test(planId);
+    try {
+      if (isObjectId) {
+        plan = await prisma.plan.findUnique({ where: { id: planId } });
+      } else if (typeof planId === 'string') {
+        // try matching by name case-insensitively
+        plan = await prisma.plan.findFirst({ where: { name: { equals: planId, mode: 'insensitive' } } });
+      }
+    } catch (err) {
+      console.error('Error finding plan with planId:', planId, err);
+      // fallthrough to not-found handling
+    }
+
     if (!plan) return res.status(404).json({ message: 'Plan not found' });
 
     const updatedOrganization = await prisma.organization.update({
       where: { id: organizationId },
       data: {
-        plan_id: planId,
+        plan_id: plan.id,
         plan_expiry: new Date(Date.now() + plan.duration_days * 24 * 60 * 60 * 1000),
       },
     });
@@ -105,7 +121,7 @@ export const assignOrganizationPlan = async (req: any, res: Response) => {
 
       await createInvoice({
         organizationId,
-        planId,
+        planId: plan.id,
         planType: 'organization',
         subtotal: plan.price,
         tax: 0,
@@ -129,6 +145,7 @@ export const assignOrganizationPlan = async (req: any, res: Response) => {
 
     res.status(200).json(updatedOrganization);
   } catch (error) {
+    console.error('Error assigning organization plan:', error);
     res.status(500).json({ message: 'Error assigning organization plan', error });
   }
 };
@@ -137,7 +154,7 @@ export const getOrganizationInvoices = async (req: any, res: Response) => {
   try {
     const { organizationId } = req.params;
 
-    if (req.user.role !== 'superAdmin') {
+    if (String(req.user.role).toLowerCase() !== 'superadmin') {
       return res.status(403).json({ message: 'Only super admins can view organization invoices' });
     }
 
@@ -155,6 +172,7 @@ export const getOrganizationInvoices = async (req: any, res: Response) => {
 
     res.status(200).json(invoices);
   } catch (error) {
+    console.error('Error fetching organization invoices:', error);
     res.status(500).json({ message: 'Error fetching organization invoices', error });
   }
 };

@@ -74,6 +74,7 @@ model Organization {
   licenseRequests         LicenseRequest[]
   licenseVerificationLogs LicenseVerificationLog[]
   licensePlans            LicensePlan[]
+  resources               OrganizationResource[]
 
   @@map("organizations")
 }
@@ -130,8 +131,29 @@ model User {
   sentMessages           Message[]
   emailNotificationLogs  EmailNotificationLog[]
   eventMessages          EventMessage[]
+  organizationResources  OrganizationResource[]
 
   @@map("users")
+}
+
+model OrganizationResource {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  name           String
+  description    String?
+  fileName       String
+  filePath       String
+  mimeType       String
+  size           Int
+  category       String?
+  uploadedById   String?   @db.ObjectId
+  uploadedByName String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User?        @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@map("organization_resources")
 }
 
 model SystemConfig {

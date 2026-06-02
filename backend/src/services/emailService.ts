@@ -236,9 +236,9 @@ export const sendResetPasswordEmail = async (to: string, token: string, name: st
 
 // Default features for different plan tiers (same as authController)
 const defaultFeatures = {
-  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'],
-  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'profile', 'tickets'],
-  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'reports', 'id-cards', 'licenses', 'profile', 'tickets']
+  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile'],
+  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile', 'tickets'],
+  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'reports', 'id-cards', 'licenses', 'profile', 'tickets']
 };
 
 export const sendWelcomeEmail = async (to: string, name: string, userId: string, role: string) => {
@@ -652,6 +652,53 @@ export const sendNewMemberNotificationToOrgAdmin = async (
   } catch (error: any) {
     await updateEmailLog(log.id, 'failed', error.message);
     console.error('❌ Failed to send new member notification email:', error);
+  }
+};
+
+export const sendNewOrgAdminNotificationToSuperAdmin = async (
+  to: string,
+  superAdminName: string,
+  orgAdminName: string,
+  orgAdminEmail: string,
+  organizationName: string
+) => {
+  const log = await logEmail({
+    to,
+    subject: `New Organization Admin Registered for ${organizationName}`,
+    type: 'new_org_admin',
+  });
+
+  try {
+    const transporter = await getTransporter();
+    const platformLink = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #0ea5e9;">New Organization Admin Registered 📌</h2>
+        <p style="color: #475569; font-size: 16px;">Hi ${superAdminName}, a new organization administrator has joined ${organizationName}.</p>
+        <div style="background-color: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="color: #1d4ed8; margin: 0 0 8px;"><strong>Admin Name:</strong> ${orgAdminName}</p>
+          <p style="color: #1d4ed8; margin: 0 0 8px;"><strong>Email:</strong> ${orgAdminEmail}</p>
+          <p style="color: #1d4ed8; margin: 0;"><strong>Organization:</strong> ${organizationName}</p>
+        </div>
+        <div style="text-align: center; margin: 20px 0;">
+          <a href="${platformLink}/login" style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">Open Super Admin Portal</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px;">Log in to your Super Admin account to review and manage organization administrators.</p>
+      </div>
+    `;
+
+    const mailOptions = buildMailOptions(to, `New Organization Admin Registered for ${organizationName}`, htmlContent);
+    const info = await transporter.sendMail(mailOptions) as any;
+    await updateEmailLog(log.id, 'sent');
+
+    console.log('✅ New org admin notification sent to super admin %s', to);
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('📧 Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+    return info;
+  } catch (error: any) {
+    await updateEmailLog(log.id, 'failed', error.message);
+    console.error('❌ Failed to send new org admin notification email:', error);
   }
 };
 

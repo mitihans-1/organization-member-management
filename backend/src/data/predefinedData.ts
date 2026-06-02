@@ -15,6 +15,7 @@ export const predefinedPlans = [
       'contact',
       'subscriptions',
       'payments',
+      'file-sharing',
       'profile'
     ],
   },
@@ -36,6 +37,7 @@ export const predefinedPlans = [
       'contact',
       'subscriptions',
       'payments',
+      'file-sharing',
       'profile',
       'tickets'
     ],
@@ -58,6 +60,7 @@ export const predefinedPlans = [
       'contact',
       'subscriptions',
       'payments',
+      'file-sharing',
       'reports',
       'id-cards',
       'licenses',
@@ -138,6 +141,7 @@ export const ALL_FEATURES = [
   { id: 'contact', label: 'Contact' },
   { id: 'subscriptions', label: 'Member Subscriptions' },
   { id: 'payments', label: 'Payments' },
+  { id: 'file-sharing', label: 'File Sharing' },
   { id: 'tickets', label: 'Tickets' },
   { id: 'chat', label: 'Chat' },
   { id: 'reports', label: 'Reports' },
@@ -147,7 +151,7 @@ export const ALL_FEATURES = [
 ];
 
 export const defaultFeatures = {
-  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'],
-  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'profile', 'tickets'],
-  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'reports', 'id-cards', 'licenses', 'profile', 'tickets'],
+  free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile'],
+  pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile', 'tickets'],
+  enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'reports', 'id-cards', 'licenses', 'profile', 'tickets'],
 };

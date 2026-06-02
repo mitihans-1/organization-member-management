@@ -23,6 +23,7 @@ import {
   User as UserIcon,
   Search,
   Mail,
+  FolderOpen,
 } from 'lucide-react';
 
 const MemberLayout: React.FC = () => {
@@ -45,8 +46,8 @@ const MemberLayout: React.FC = () => {
   const navItems = [
     { to: '/member/dashboard', label: 'Overview', icon: LayoutGrid, end: true, color: 'text-sky-500', featureId: 'overview' },
     { to: '/member/profile', label: 'Profile', icon: User, color: 'text-indigo-500', featureId: null }, // Always show profile
+    { to: '/member/resources', label: 'Resources', icon: FolderOpen, color: 'text-emerald-500', featureId: null },
     { to: '/member/events', label: 'Events', icon: Calendar, color: 'text-green-500', featureId: 'events' },
-    { to: '/member/services', label: 'Services', icon: Briefcase, color: 'text-amber-500', featureId: 'services' },
     { to: '/member/blog', label: 'News', icon: FileText, color: 'text-orange-500', featureId: 'news' },
     { to: '/member/subscriptions', label: 'Subscriptions', icon: CreditCard, color: 'text-sky-600', featureId: 'subscriptions' },
     { to: '/member/tickets', label: 'Tickets', icon: Inbox, color: 'text-slate-600', featureId: 'tickets' },

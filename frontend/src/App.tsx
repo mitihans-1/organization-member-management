@@ -38,10 +38,12 @@ import Profile from './pages/Profile';
 import AdminOrganizations from './pages/AdminOrganizations';
 import UpgradePlan from './pages/org/UpgradePlan';
 import OrgSettings from './pages/org/OrgSettings';
+import OrgResources from './pages/org/OrgResources';
 import OrgIdCards from './pages/org/OrgIdCards';
 import OrgLicenses from './pages/org/OrgLicenses';
 
 import MemberOverview from './pages/member/MemberOverview';
+import MemberResources from './pages/member/MemberResources';
 import { MyLicense } from './pages/member/MyLicense';
 import MemberEvents from './pages/member/MemberEvents';
 import MemberServices from './pages/member/MemberServices';
@@ -134,6 +136,7 @@ const App: React.FC = () => {
               <Route path="blogs" element={<Blogs />} />
               <Route path="payments" element={<Payments />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="resources" element={<OrgResources />} />
               <Route path="upgrade" element={<UpgradePlan />} />
               <Route path="settings" element={<OrgSettings />} />
               <Route path="reports" element={<OrgAnalytics />} />
@@ -158,6 +161,7 @@ const App: React.FC = () => {
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<MemberOverview />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="resources" element={<MemberResources />} />
               <Route path="events" element={<MemberEvents />} />
               <Route path="services" element={<MemberServices />} />
               <Route path="blog" element={<MemberBlog />} />

@@ -1,10 +1,18 @@
+import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
+
+const ensureUploadDir = (dir: string) => {
+    const uploadPath = path.join(__dirname, '../../', dir);
+    if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+    }
+};
 
 // Set up storage logic
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Ensure this directory exists in your backend root
+        ensureUploadDir('uploads/receipts/');
         cb(null, 'uploads/receipts/');
     },
     filename: (req, file, cb) => {
@@ -27,6 +35,7 @@ export const uploadReceipt = multer({
 
 const generalStorage = multer.diskStorage({
     destination: (req, file, cb) => {
+        ensureUploadDir('uploads/images/');
         cb(null, 'uploads/images/');
     },
     filename: (req, file, cb) => {
@@ -48,6 +57,7 @@ export const uploadImage = multer({
 
 const reportAttachmentStorage = multer.diskStorage({
     destination: (req, file, cb) => {
+        ensureUploadDir('uploads/reports/');
         cb(null, 'uploads/reports/');
     },
     filename: (req, file, cb) => {
@@ -68,6 +78,7 @@ export const uploadReportAttachment = multer({
 
 const attachmentStorage = multer.diskStorage({
     destination: (req, file, cb) => {
+        ensureUploadDir('uploads/attachments/');
         cb(null, 'uploads/attachments/');
     },
     filename: (req, file, cb) => {

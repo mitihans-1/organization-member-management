@@ -29,6 +29,7 @@ const ALL_FEATURES = [
   { id: 'contact', label: 'Contact' },
   { id: 'subscriptions', label: 'Member Subscriptions' },
   { id: 'payments', label: 'Payments' },
+  { id: 'file-sharing', label: 'File Sharing' },
   { id: 'tickets', label: 'Tickets' },
   { id: 'chat', label: 'Chat' },
   { id: 'reports', label: 'Reports' },
@@ -108,7 +109,13 @@ const PlanManagement: React.FC = () => {
   });
 
   const assignPlanMutation = useMutation({
-    mutationFn: (data: any) => api.post('/organizations/assign-plan', data),
+    mutationFn: (data: any) =>
+      api.post(
+        `/organization-subscriptions/organizations/${data.organizationId}/assign-plan`,
+        {
+          planId: data.planId,
+        }
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
       closeAssignModal();

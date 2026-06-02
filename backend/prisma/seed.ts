@@ -47,9 +47,9 @@ async function main() {
 
   // Default features (same as in controllers)
   const defaultFeatures = {
-    free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'profile'],
-    pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'profile'],
-    enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'reports', 'id-cards', 'licenses', 'profile'],
+    free: ['overview', 'members', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile'],
+    pro: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'profile'],
+    enterprise: ['overview', 'members', 'events', 'services', 'news', 'chat', 'contact', 'subscriptions', 'payments', 'file-sharing', 'reports', 'id-cards', 'licenses', 'profile'],
   };
 
   /** Default subscription plans for org upgrade / Payments UI (idempotent: creates any that are missing by name). */
