@@ -107,7 +107,7 @@ const SuperAdminDashboard: React.FC = () => {
   return (
     <div className="max-w-5xl space-y-8 font-poppins">
       <div className="rounded-2xl bg-sky-600 text-white px-8 py-10 shadow-lg">
-        <h1 className="text-2xl font-black">Welcome back, {user?.name}!</h1>
+        <h1 className="text-2xl font-black">Welcome back!</h1>
         <p className="mt-2 text-sky-100 text-sm">Here&apos;s your platform overview for today.</p>
       </div>
 

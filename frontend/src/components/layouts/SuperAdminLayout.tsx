@@ -49,6 +49,11 @@ const otherNavItems = [
   { to: '/super-admin/system-config', label: 'System Config', icon: Settings, color: 'text-gray-500' },
 ];
 
+const displayName = (name?: string) => {
+  if (!name) return 'Super Admin';
+  return name.replace(/Antigravity AI \(SuperAdmin\)/gi, 'Super Admin').replace(/Antigravity AI/gi, 'Super Admin');
+};
+
 const SuperAdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -278,7 +283,7 @@ const SuperAdminLayout: React.FC = () => {
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-gray-900 truncate">{user?.name}</p>
+              <p className="text-xs font-bold text-gray-900 truncate">{displayName(user?.name)}</p>
               <p className="text-[10px] text-gray-500">Super Admin</p>
             </div>
           </div>
@@ -448,13 +453,13 @@ const SuperAdminLayout: React.FC = () => {
                       src={
                         user?.profile_photo_path 
                           ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
-                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName(user?.name))}&background=e0e7ff&color=3730a3`
                       }
                       alt=""
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <span className="hidden sm:inline">{user?.name}</span>
+                  <span className="hidden sm:inline">{displayName(user?.name)}</span>
                   <ChevronDown
                     size={16}
                     className="text-gray-400 transition-transform rotate-180"
@@ -476,13 +481,13 @@ const SuperAdminLayout: React.FC = () => {
                       src={
                         user?.profile_photo_path 
                           ? `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`
-                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || '')}&background=e0e7ff&color=3730a3`
+                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName(user?.name))}&background=e0e7ff&color=3730a3`
                       }
                       alt=""
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <span className="hidden sm:inline">{user?.name}</span>
+                  <span className="hidden sm:inline">{displayName(user?.name)}</span>
                   <ChevronDown
                     size={16}
                     className="text-gray-400 transition-transform"
@@ -501,7 +506,7 @@ const SuperAdminLayout: React.FC = () => {
                   <div className="border-b border-gray-100 px-3 py-2.5">
                     <p className="truncate text-sm font-bold text-slate-900 flex items-center gap-2">
                       <UserIcon className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
-                      {user?.name}
+                      {displayName(user?.name)}
                     </p>
                     <p className="truncate text-xs text-gray-500">{user?.email}</p>
                   </div>

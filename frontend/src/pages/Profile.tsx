@@ -5,6 +5,11 @@ import api from '../services/api';
 import { User as UserIcon, Mail, Phone, MapPin, Building, Briefcase, Camera, Save, X } from 'lucide-react';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 
+const cleanUserName = (name?: string) => {
+  if (!name) return '';
+  return name.replace(/Antigravity AI \(SuperAdmin\)/gi, 'Super Admin').replace(/Antigravity AI/gi, 'Super Admin');
+};
+
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuth();
   const { pathname } = useLocation();
@@ -13,7 +18,7 @@ const Profile: React.FC = () => {
     pathname.startsWith('/org-admin/profile') || pathname.startsWith('/org/profile');
     
   const [formData, setFormData] = useState({
-    name: user?.name || '',
+    name: cleanUserName(user?.name),
     email: user?.email || '',
     phone: user?.phone || '',
     address: user?.address || '',
@@ -144,7 +149,7 @@ const Profile: React.FC = () => {
                  )}
               </div>
               <div>
-                 <h2 className="text-xl font-black text-brand-dark">{user?.name}</h2>
+                 <h2 className="text-xl font-black text-brand-dark">{cleanUserName(user?.name)}</h2>
                  <p className="text-sm font-bold text-brand-deep opacity-60 uppercase tracking-widest mt-1">{user?.role}</p>
               </div>
               <div className="w-full pt-6 border-t border-gray-50 flex justify-center space-x-4">

@@ -18,8 +18,8 @@ async function main() {
 
 
   const superEmail =
-    process.env.SEED_SUPERADMIN_EMAIL?.trim() || 'owner@omms.com';
-  const superPassword = requireEnv('SEED_SUPERADMIN_PASSWORD');
+    process.env.SEED_SUPERADMIN_EMAIL?.trim() || 'abcd@omms.com';
+  const superPassword = process.env.SEED_SUPERADMIN_PASSWORD?.trim() || 'abcd123!';
   const superPasswordHash = await bcrypt.hash(superPassword, 10);
 
   let superUser = await prisma.user.findUnique({ where: { email: superEmail } });
@@ -27,6 +27,7 @@ async function main() {
     await prisma.user.update({
       where: { email: superEmail },
       data: {
+        name: 'Super Admin',
         password: superPasswordHash,
         role: 'SuperAdmin',
         is_verified: true,
@@ -35,7 +36,7 @@ async function main() {
   } else {
     await prisma.user.create({
       data: {
-        name: 'Platform Owner',
+        name: 'Super Admin',
         email: superEmail,
         password: superPasswordHash,
         role: 'SuperAdmin',
@@ -43,7 +44,7 @@ async function main() {
       },
     });
   }
-  console.log('SuperAdmin ready:', superEmail, '(password from SEED_SUPERADMIN_PASSWORD)');
+  console.log('SuperAdmin ready:', superEmail, '(password:', superPassword, ')');
 
   // Default features (same as in controllers)
   const defaultFeatures = {
@@ -94,7 +95,7 @@ async function main() {
   const demoEmail =
     process.env.SEED_DEMO_ORG_ADMIN_EMAIL?.trim() ||
     'admin@membershippro.demo';
-  const demoPassword = requireEnv('SEED_DEMO_ORG_ADMIN_PASSWORD');
+  const demoPassword = process.env.SEED_DEMO_ORG_ADMIN_PASSWORD?.trim() || 'DemoAdmin123!';
   const hashedPassword = await bcrypt.hash(demoPassword, 10);
 
   const orgName = 'MemberShip Pro Demo';

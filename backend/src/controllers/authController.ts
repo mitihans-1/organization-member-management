@@ -658,10 +658,29 @@ export const resetPassword = async (req: Request, res: Response) => {
 export const googleLogin = async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+
+    if (!googleClientId || googleClientId.includes('your_google_client_id_here') || googleClientId.includes('your-google-client-id')) {
+      return res.status(400).json({
+        message: 'Google Authentication is not configured. Please set a valid GOOGLE_CLIENT_ID in your backend .env file and restart the backend server.',
+      });
+    }
+
+    const client = new OAuth2Client(googleClientId);
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: googleClientId,
+      });
+    } catch (verifyError: any) {
+      console.error('Google Token Verification Error:', verifyError.message);
+      return res.status(400).json({
+        message: 'Google token verification failed. Ensure your GOOGLE_CLIENT_ID in frontend/.env and backend/.env match your Google Console credentials.',
+        error: verifyError.message,
+      });
+    }
+
     const payload = ticket.getPayload();
     if (!payload || !payload.email) return res.status(400).json({ message: 'Invalid google token payload' });
 
@@ -688,10 +707,29 @@ export const googleRegister = async (req: Request, res: Response) => {
       organization_id,
     } = req.body;
 
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+
+    if (!googleClientId || googleClientId.includes('your_google_client_id_here') || googleClientId.includes('your-google-client-id')) {
+      return res.status(400).json({
+        message: 'Google Authentication is not configured. Please set a valid GOOGLE_CLIENT_ID in your backend .env file and restart the backend server.',
+      });
+    }
+
+    const client = new OAuth2Client(googleClientId);
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: googleClientId,
+      });
+    } catch (verifyError: any) {
+      console.error('Google Token Verification Error:', verifyError.message);
+      return res.status(400).json({
+        message: 'Google token verification failed. Ensure your GOOGLE_CLIENT_ID in frontend/.env and backend/.env match your Google Console credentials.',
+        error: verifyError.message,
+      });
+    }
+
     const payload = ticket.getPayload();
     if (!payload || !payload.email) return res.status(400).json({ message: 'Invalid google token payload' });
 
