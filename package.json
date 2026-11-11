@@ -4,8 +4,9 @@
   "private": true,
   "main": "backend/dist/src/index.js",
   "scripts": {
-    "postinstall": "cd backend && npm install",
+    "postinstall": "cd backend && npm install && npm run build",
     "build": "cd backend && npm run build",
+    "prestart": "cd backend && npm run build",
     "start": "cd backend && npm start"
   },
   "dependencies": {
@@ -30,3 +31,4 @@
     "typescript": "^5.9.3"
   }
 }
+
