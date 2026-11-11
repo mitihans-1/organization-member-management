@@ -137,16 +137,16 @@ model User {
 }
 
 model OrganizationResource {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  organizationId String   @db.ObjectId
+  id             String   @id @default(cuid())
+  organizationId String
   name           String
-  description    String?
+  description    String?  @db.Text
   fileName       String
   filePath       String
   mimeType       String
   size           Int
   category       String?
-  uploadedById   String?   @db.ObjectId
+  uploadedById   String?
   uploadedByName String?
   createdAt      DateTime @default(now())
 
