@@ -236,30 +236,32 @@ export const deleteMember = async (req: any, res: Response) => {
       await prisma.payment.deleteMany({ where: { user_id: id } });
     }
     
-    // Remove user ID from event attendeesIds arrays (filtered in-memory since MongoDB/Prisma does not support pull in updateMany)
-    const eventsToUpdate = await prisma.event.findMany({
-      where: { attendeesIds: { has: id } }
-    });
-    for (const event of eventsToUpdate) {
-      await prisma.event.update({
-        where: { id: event.id },
-        data: {
-          attendeesIds: event.attendeesIds.filter(attendeeId => attendeeId !== id)
-        }
-      });
+    // Remove user ID from event attendeesIds arrays
+    const allEvents = await prisma.event.findMany({ select: { id: true, attendeesIds: true } });
+    for (const event of allEvents) {
+      const arr = Array.isArray(event.attendeesIds) ? (event.attendeesIds as string[]) : [];
+      if (arr.includes(id)) {
+        await prisma.event.update({
+          where: { id: event.id },
+          data: {
+            attendeesIds: arr.filter(attendeeId => attendeeId !== id)
+          }
+        });
+      }
     }
     
-    // Remove user ID from service subscribersIds arrays (filtered in-memory)
-    const servicesToUpdate = await prisma.service.findMany({
-      where: { subscribersIds: { has: id } }
-    });
-    for (const service of servicesToUpdate) {
-      await prisma.service.update({
-        where: { id: service.id },
-        data: {
-          subscribersIds: service.subscribersIds.filter(subId => subId !== id)
-        }
-      });
+    // Remove user ID from service subscribersIds arrays
+    const allServices = await prisma.service.findMany({ select: { id: true, subscribersIds: true } });
+    for (const service of allServices) {
+      const arr = Array.isArray(service.subscribersIds) ? (service.subscribersIds as string[]) : [];
+      if (arr.includes(id)) {
+        await prisma.service.update({
+          where: { id: service.id },
+          data: {
+            subscribersIds: arr.filter(subId => subId !== id)
+          }
+        });
+      }
     }
     
     // Now delete the user

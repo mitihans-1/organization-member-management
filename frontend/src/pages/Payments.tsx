@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../services/api';
+import api, { getAssetUrl } from '../services/api';
 import { Plan } from '../types';
 import { CheckCircle, Plus, X, Search, UploadCloud, ArrowLeft, CreditCard, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -647,7 +647,7 @@ const Payments: React.FC = () => {
                               <div className="flex gap-2 mt-2 flex-wrap">
                                 {payment.receipt_url && (
                                   <a
-                                    href={`http://localhost:5000/${payment.receipt_url.replace(/\\/g, '/')}`}
+                                    href={getAssetUrl(payment.receipt_url)}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100"

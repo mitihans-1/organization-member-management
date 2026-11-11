@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { BASE_URL, getAssetUrl } from '../services/api';
 import { User as UserIcon, Mail, Phone, MapPin, Building, Briefcase, Camera, Save, X } from 'lucide-react';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 
@@ -94,7 +94,7 @@ const Profile: React.FC = () => {
     if (photoPreview) return photoPreview;
     if (removePhoto) return `https://ui-avatars.com/api/?name=${user?.name}&background=ecf39e&color=132a13`;
     if (user?.profile_photo_path) {
-      return `http://localhost:5000/${user.profile_photo_path.replace(/\\/g, '/')}`;
+      return getAssetUrl(user.profile_photo_path);
     }
     return `https://ui-avatars.com/api/?name=${user?.name}&background=ecf39e&color=132a13`;
   };

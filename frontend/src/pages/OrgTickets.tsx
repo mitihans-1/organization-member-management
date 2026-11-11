@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, Clock, AlertTriangle, Edit2, Filter, Plus, MessageSquare, Check } from 'lucide-react';
 import { reportService } from '../services/reportService';
 import { Report } from '../types';
+import { getAssetUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OrgAdminPageHeader from '../components/org-admin/OrgAdminPageHeader';
 
@@ -94,7 +95,7 @@ const AccordionTicketCard: React.FC<{
           <p className="text-sm text-gray-600 mb-3">{ticket.description}</p>
           {ticket.attachment && (
             <a
-              href={`http://localhost:5000/${ticket.attachment}`}
+              href={getAssetUrl(ticket.attachment)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-indigo-600 hover:text-indigo-500 underline mb-3 block"

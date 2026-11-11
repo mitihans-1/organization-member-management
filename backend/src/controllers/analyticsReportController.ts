@@ -443,7 +443,7 @@ export const getOrgAnalytics = async (req: any, res: Response) => {
       });
       const eventAttendanceData = events.map(e => ({
         name: e.title.slice(0, 15),
-        attendance: e.attendeesIds.length,
+        attendance: Array.isArray(e.attendeesIds) ? (e.attendeesIds as any[]).length : 0,
         capacity: e.capacity || 100
       }));
 
@@ -508,7 +508,7 @@ export const getOrgAnalytics = async (req: any, res: Response) => {
         status: e.status || 'Upcoming',
         date: e.date.toISOString().split('T')[0],
         time: '10:00 AM',
-        attendance: e.attendeesIds.length,
+        attendance: Array.isArray(e.attendeesIds) ? (e.attendeesIds as any[]).length : 0,
         capacity: e.capacity || 100,
         location: e.location || 'Online',
         organizer: e.organizer || 'Admin'
@@ -535,10 +535,10 @@ export const getOrgAnalytics = async (req: any, res: Response) => {
         id: s.id,
         name: s.title || s.name || 'N/A',
         category: s.category || 'general',
-        requests: s.subscribersIds.length,
-        approved: Math.round(s.subscribersIds.length * 0.8),
-        rejected: Math.round(s.subscribersIds.length * 0.1),
-        pending: Math.round(s.subscribersIds.length * 0.1),
+        requests: Array.isArray(s.subscribersIds) ? (s.subscribersIds as any[]).length : 0,
+        approved: Math.round((Array.isArray(s.subscribersIds) ? (s.subscribersIds as any[]).length : 0) * 0.8),
+        rejected: Math.round((Array.isArray(s.subscribersIds) ? (s.subscribersIds as any[]).length : 0) * 0.1),
+        pending: Math.round((Array.isArray(s.subscribersIds) ? (s.subscribersIds as any[]).length : 0) * 0.1),
         status: s.status,
         lastUpdated: s.updatedAt.toISOString().split('T')[0]
       }));
@@ -718,7 +718,7 @@ export const getMemberAnalytics = async (req: any, res: Response) => {
         where: { id: userId },
         include: { attendedEvents: true }
       });
-      const eventsCount = userRec?.attendedEventsIds?.length || 0;
+      const eventsCount = Array.isArray(userRec?.attendedEventsIds) ? (userRec.attendedEventsIds as any[]).length : (userRec?.attendedEvents?.length || 0);
       
       const servicesCount = await prisma.serviceRequest?.count({
         where: { userId }

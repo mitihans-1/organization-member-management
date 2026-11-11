@@ -5,12 +5,12 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model PendingUser {
-  id                String   @id @default(cuid()) @map("_id")
+  id                String   @id @default(cuid())
   name              String
   email             String   @unique
   password          String
@@ -30,7 +30,7 @@ model PendingUser {
 }
 
 model Organization {
-  id               String                      @id @default(auto()) @map("_id") @db.ObjectId
+  id               String                      @id @default(cuid())
   name             String
   type             String
   createdAt        DateTime                    @default(now())
@@ -41,7 +41,7 @@ model Organization {
   endorsements     OrganizationEndorsement[]
   users            User[]
   customAttributes CustomAttributeDefinition[]
-  plan_id          String?                     @db.ObjectId
+  plan_id          String?                     
   plan_expiry      DateTime?
   plan             Plan?                       @relation(fields: [plan_id], references: [id])
   payment_phone    String?
@@ -49,8 +49,8 @@ model Organization {
   // Member-facing About page (set by org admin)
   aboutTitle       String?
   aboutSubtitle    String?
-  aboutMission     String?
-  aboutStory       String?
+  aboutMission     String? @db.Text
+  aboutStory       String? @db.Text
   aboutStatsJson   String? // JSON array [{label,value}]
   aboutTimelineJson String? // JSON array [{year,title,desc,image?}]
 
@@ -80,12 +80,12 @@ model Organization {
 }
 
 model User {
-  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  id                    String                 @id @default(cuid())
   name                  String
   email                 String                 @unique
   phone                 String?
   role                  String                 @default("orgAdmin")
-  organizationId        String?                @db.ObjectId
+  organizationId        String?                
   organization_name     String?
   organization_type     String?
   password              String
@@ -95,7 +95,7 @@ model User {
   sex                   String?
   join_date           DateTime?
   address               String?
-  plan_id          String?                @db.ObjectId
+  plan_id          String?                
   plan_expiry         DateTime?
   fayda_id              String?
   is_fayda_verified Boolean                @default(false)
@@ -113,11 +113,11 @@ model User {
   organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   blogs                 Blog[]                 @relation("BlogAuthor")
 
-  attendedEventsIds String[] @db.ObjectId
-  attendedEvents    Event[]  @relation("EventAttendees", fields: [attendedEventsIds], references: [id])
+  attendedEventsIds Json?
+  attendedEvents    Event[]   @relation("EventAttendees")
 
-  subscribedServicesIds String[]  @db.ObjectId
-  subscribedServices    Service[] @relation("ServiceSubscribers", fields: [subscribedServicesIds], references: [id])
+  subscribedServicesIds Json?
+  subscribedServices    Service[] @relation("ServiceSubscribers")
 
   idCards                IdCard[]
   idCardRequests         IdCardRequest[]
@@ -157,7 +157,7 @@ model OrganizationResource {
 }
 
 model SystemConfig {
-  id                  String  @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String  @id @default(cuid())
   platformName        String  @default("OMMS")
   supportEmail        String  @default("support@omms.com")
   maintenanceMode     Boolean @default(false)
@@ -182,8 +182,8 @@ model SystemConfig {
   // Platform About page (super admin)
   aboutTitle     String?
   aboutSubtitle  String?
-  aboutMission   String?
-  aboutStory     String?
+  aboutMission   String? @db.Text
+  aboutStory     String? @db.Text
   aboutStatsJson String? // JSON [{label,value}]
   aboutTimelineJson String? // JSON [{year,title,desc,image?}]
 
@@ -193,15 +193,15 @@ model SystemConfig {
 }
 
 model ContactMessage {
-  id             String   @id @default(cuid()) @map("_id")
+  id             String   @id @default(cuid())
   scope          String   // platform (→ super admin) | organization (→ org admin)
-  organizationId String?  @db.ObjectId
-  senderUserId   String?  @db.ObjectId
+  organizationId String?  
+  senderUserId   String?  
   senderRole     String?  // guest | member | orgAdmin
   name           String
   email          String
   subject        String?
-  message        String
+  message        String @db.Text
   isRead         Boolean  @default(false)
   createdAt      DateTime @default(now())
 
@@ -209,12 +209,12 @@ model ContactMessage {
 }
 
 model OrganizationEndorsement {
-  id             String   @id @default(cuid()) @map("_id")
-  organizationId String   @db.ObjectId
+  id             String   @id @default(cuid())
+  organizationId String   
   organizationName String
-  message        String
+  message        String @db.Text
   status         String   @default("pending") // pending | approved | rejected
-  submittedById  String?  @db.ObjectId
+  submittedById  String?  
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -224,7 +224,7 @@ model OrganizationEndorsement {
 }
 
 model CustomAttributeDefinition {
-  id             String                 @id @default(cuid()) @map("_id")
+  id             String                 @id @default(cuid())
   name           String
   type           String // "text", "number", "date", "boolean"
   required       Boolean                @default(false)
@@ -236,7 +236,7 @@ model CustomAttributeDefinition {
 }
 
 model MemberAttributeValue {
-  id          String                    @id @default(cuid()) @map("_id")
+  id          String                    @id @default(cuid())
   memberId    String
   attributeId String
   value       String
@@ -248,7 +248,7 @@ model MemberAttributeValue {
 }
 
 model Notification {
-  id        String   @id @default(cuid()) @map("_id")
+  id        String   @id @default(cuid())
   userId    String
   title     String
   read      Boolean  @default(false)
@@ -260,7 +260,7 @@ model Notification {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid()) @map("_id")
+  id        String   @id @default(cuid())
   email     String   @unique
   token     String
   expiresAt DateTime
@@ -270,7 +270,7 @@ model PasswordResetToken {
 }
 
 model OtpToken {
-  id        String   @id @default(cuid()) @map("_id")
+  id        String   @id @default(cuid())
   userId    String   @unique
   otp_code  String
   expiresAt DateTime
@@ -281,7 +281,7 @@ model OtpToken {
 }
 
 model Member {
-  id          String    @id @default(cuid()) @map("_id")
+  id          String    @id @default(cuid())
   name        String
   email       String    @unique
   role        String?
@@ -298,14 +298,14 @@ model Member {
 }
 
 model Plan {
-  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  id            String         @id @default(cuid())
   name          String
   price         Float
   billing_cycle String
   type          String
   max_members   Int
   duration_days Int
-  allowed_features String[] @default([]) // List of allowed features like "overview", "members", "events", etc.
+  allowed_features Json? // List of allowed features like "overview", "members", "events", etc.
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   payments      Payment[]
@@ -317,7 +317,7 @@ model Plan {
 }
 
 model Payment {
-  id               String   @id @default(cuid()) @map("_id")
+  id               String   @id @default(cuid())
   user_id          String
   plan_id          String?
   amount           Float
@@ -338,7 +338,7 @@ model Payment {
   reference_type String?
   reference_id   String?
 
-  organization_id            String?                     @db.ObjectId
+  organization_id            String?                     
   emailNotificationLogs      EmailNotificationLog[]
   invoicePayments            InvoicePayment[]
   memberSubscriptionPayments MemberSubscriptionPayment[]
@@ -349,18 +349,18 @@ model Payment {
 }
 
 model Blog {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  id        String  @id @default(cuid())
   title     String
-  content   String
+  content   String @db.Text
   image     String?
   status    String  @default("draft")
   category  String  @default("general")
   tags      String?
   readTime  Int?
-  author_id String  @db.ObjectId
+  author_id String  
   author    User    @relation("BlogAuthor", fields: [author_id], references: [id])
 
-  organizationId   String?       @db.ObjectId
+  organizationId   String?       
   isPredefined     Boolean       @default(false)
   visibility       String        @default("public") // "public" or "private"
   createdAt        DateTime      @default(now())
@@ -376,9 +376,9 @@ model Blog {
 // EVENT MODULE MODELS
 // ==========================================
 model Event {
-  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
+  id                   String        @id @default(cuid())
   title                String
-  description          String
+  description          String @db.Text
   date                 DateTime
   end_date             DateTime?
   location             String?
@@ -390,7 +390,7 @@ model Event {
   category             String        @default("general")
   virtualLink          String?
   contactEmail         String?
-  organizationId       String?       @db.ObjectId
+  organizationId       String?       
   isPredefined         Boolean       @default(false)
   visibility           String        @default("public") // "public" or "private"
   price                Float?
@@ -399,8 +399,8 @@ model Event {
   updatedAt            DateTime      @updatedAt
   organizations        Organization? @relation(fields: [organizationId], references: [id])
 
-  attendeesIds          String[]               @db.ObjectId
-  attendees             User[]                 @relation("EventAttendees", fields: [attendeesIds], references: [id])
+  attendeesIds     Json?
+  attendees         User[]    @relation("EventAttendees")
   emailNotificationLogs EmailNotificationLog[]
   eventMessages         EventMessage[]
 
@@ -408,9 +408,9 @@ model Event {
 }
 
 model EventParticipant {
-  id                 String    @id @default(cuid()) @map("_id")
-  eventId            String    @db.ObjectId
-  userId             String    @db.ObjectId
+  id                 String    @id @default(cuid())
+  eventId            String    
+  userId             String    
   registrationStatus String    @default("Pending") // Pending | Approved | Rejected | Cancelled
   registeredAt       DateTime  @default(now())
   approvedBy         String?
@@ -421,9 +421,9 @@ model EventParticipant {
 }
 
 model EventAttendance {
-  id           String    @id @default(cuid()) @map("_id")
-  eventId      String    @db.ObjectId
-  userId       String    @db.ObjectId
+  id           String    @id @default(cuid())
+  eventId      String    
+  userId       String    
   checkedInAt  DateTime?
   checkedOutAt DateTime?
   qrCode       String?
@@ -433,10 +433,10 @@ model EventAttendance {
 }
 
 model EventReport {
-  id          String   @id @default(cuid()) @map("_id")
-  eventId     String   @db.ObjectId
+  id          String   @id @default(cuid())
+  eventId     String   
   title       String
-  content     String
+  content     String @db.Text
   generatedBy String
   generatedAt DateTime @default(now())
   filePath    String?
@@ -445,8 +445,8 @@ model EventReport {
 }
 
 model EventMedia {
-  id         String   @id @default(cuid()) @map("_id")
-  eventId    String   @db.ObjectId
+  id         String   @id @default(cuid())
+  eventId    String   
   mediaType  String // image | video | document
   url        String
   caption    String?
@@ -460,13 +460,13 @@ model EventMedia {
 // EVENT DISCUSSION ROOM
 // ==========================================
 model EventMessage {
-  id             String         @id @default(cuid()) @map("_id")
-  eventId        String         @db.ObjectId
-  senderId       String         @db.ObjectId
-  content        String?
+  id             String         @id @default(cuid())
+  eventId        String         
+  senderId       String         
+  content        String? @db.Text
   attachmentUrl  String?
   attachmentType String? // image, file
-  replyToId      String?        @db.ObjectId
+  replyToId      String?        
   replyTo        EventMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replies        EventMessage[] @relation("MessageReplies")
   createdAt      DateTime       @default(now())
@@ -477,10 +477,10 @@ model EventMessage {
 }
 
 model EventAnnouncement {
-  id      String   @id @default(cuid()) @map("_id")
-  eventId String   @db.ObjectId
+  id      String   @id @default(cuid())
+  eventId String   
   title   String
-  content String
+  content String @db.Text
   sentAt  DateTime @default(now())
   sentBy  String
 
@@ -491,10 +491,10 @@ model EventAnnouncement {
 // SERVICE MODULE MODELS
 // ==========================================
 model ServiceCategory {
-  id             String   @id @default(cuid()) @map("_id")
+  id             String   @id @default(cuid())
   name           String
-  description    String?
-  organizationId String?  @db.ObjectId
+  description    String? @db.Text
+  organizationId String?  
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -502,13 +502,13 @@ model ServiceCategory {
 }
 
 model Service {
-  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  id                String        @id @default(cuid())
   name              String? // Was title before
   title             String // Keep for backward compatibility (maps to name)
   code              String? // Unique service code
-  description       String
+  description       String @db.Text
   image             String? // Keep for backward compatibility
-  categoryId        String?       @db.ObjectId
+  categoryId        String?       
   categoryName      String?       @default("general") // Keep for backward compatibility
   category          String?       @default("general") // Keep for backward compatibility (maps to categoryName)
   owner             String?
@@ -517,12 +517,12 @@ model Service {
   fee               Float?
   price             Float? // Keep for backward compatibility (maps to fee)
   duration          String? // e.g., "30 days", "per request"
-  requiredDocuments String[]      @default([])
+  requiredDocuments Json?
   eligibilityRules  String?
   slaHours          Int?
   renewalRule       String?
   contactEmail      String? // Keep for backward compatibility
-  organizationId    String?       @db.ObjectId
+  organizationId    String?       
   visibility        String        @default("public") // "public" or "private"
   payment_required  Boolean       @default(false)
   isPredefined      Boolean       @default(false) // true = global platform service, false = organization-specific
@@ -530,20 +530,20 @@ model Service {
   updatedAt         DateTime      @updatedAt
   organizations     Organization? @relation(fields: [organizationId], references: [id])
 
-  subscribersIds String[] @db.ObjectId
-  subscribers    User[]   @relation("ServiceSubscribers", fields: [subscribersIds], references: [id])
+  subscribersIds     Json?
+  subscribers         User[]    @relation("ServiceSubscribers")
 
   @@map("services")
 }
 
 model ServiceRequest {
-  id            String    @id @default(cuid()) @map("_id")
+  id            String    @id @default(cuid())
   requestNumber String    @unique // Auto-generated request number
-  serviceId     String    @db.ObjectId
-  userId        String    @db.ObjectId
+  serviceId     String    
+  userId        String    
   status        String    @default("Pending") // Pending | Under Review | Approved | Rejected | Completed
   priority      String    @default("Normal") // Low | Normal | High | Urgent
-  description   String
+  description   String @db.Text
   submittedAt   DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   assignedTo    String?
@@ -555,9 +555,9 @@ model ServiceRequest {
 }
 
 model ServiceApproval {
-  id         String    @id @default(cuid()) @map("_id")
-  requestId  String    @db.ObjectId
-  approverId String    @db.ObjectId
+  id         String    @id @default(cuid())
+  requestId  String    
+  approverId String    
   status     String // Pending | Approved | Rejected
   comments   String?
   approvedAt DateTime?
@@ -567,8 +567,8 @@ model ServiceApproval {
 }
 
 model ServiceAttachment {
-  id         String   @id @default(cuid()) @map("_id")
-  serviceId  String   @db.ObjectId
+  id         String   @id @default(cuid())
+  serviceId  String   
   name       String
   url        String
   uploadedBy String
@@ -578,8 +578,8 @@ model ServiceAttachment {
 }
 
 model ServiceRequestAttachment {
-  id         String   @id @default(cuid()) @map("_id")
-  requestId  String   @db.ObjectId
+  id         String   @id @default(cuid())
+  requestId  String   
   name       String
   url        String
   uploadedBy String
@@ -589,9 +589,9 @@ model ServiceRequestAttachment {
 }
 
 model ServiceInternalNote {
-  id        String   @id @default(cuid()) @map("_id")
-  requestId String   @db.ObjectId
-  content   String
+  id        String   @id @default(cuid())
+  requestId String   
+  content   String @db.Text
   createdBy String
   createdAt DateTime @default(now())
 
@@ -599,9 +599,9 @@ model ServiceInternalNote {
 }
 
 model ServiceFeedback {
-  id          String   @id @default(cuid()) @map("_id")
-  serviceId   String   @db.ObjectId
-  userId      String   @db.ObjectId
+  id          String   @id @default(cuid())
+  serviceId   String   
+  userId      String   
   rating      Int // 1-5
   comments    String?
   submittedAt DateTime @default(now())
@@ -613,12 +613,12 @@ model ServiceFeedback {
 // ACTIVITY HISTORY & NOTIFICATIONS
 // ==========================================
 model ActivityHistory {
-  id             String   @id @default(cuid()) @map("_id")
-  userId         String   @db.ObjectId
-  organizationId String?  @db.ObjectId
+  id             String   @id @default(cuid())
+  userId         String   
+  organizationId String?  
   type           String // event | service | member | payment | etc.
   action         String
-  details        String?
+  details        String? @db.Text
   ipAddress      String?
   userAgent      String?
   timestamp      DateTime @default(now())
@@ -627,11 +627,11 @@ model ActivityHistory {
 }
 
 model NotificationCenter {
-  id             String   @id @default(cuid()) @map("_id")
-  userId         String   @db.ObjectId
-  organizationId String?  @db.ObjectId
+  id             String   @id @default(cuid())
+  userId         String   
+  organizationId String?  
   title          String
-  content        String
+  content        String @db.Text
   type           String // info | warning | success | error
   isRead         Boolean  @default(false)
   link           String?
@@ -643,11 +643,11 @@ model NotificationCenter {
 }
 
 model ServiceApprovalAuditLog {
-  id         String   @id @default(cuid()) @map("_id")
-  requestId  String   @db.ObjectId
-  approvalId String?  @db.ObjectId
+  id         String   @id @default(cuid())
+  requestId  String   
+  approvalId String?  
   action     String
-  actionBy   String   @db.ObjectId
+  actionBy   String   
   oldStatus  String?
   newStatus  String
   comments   String?
@@ -659,14 +659,14 @@ model ServiceApprovalAuditLog {
 }
 
 model IdCard {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId                String    @db.ObjectId
-  organizationId        String    @db.ObjectId
+  id                    String    @id @default(cuid())
+  userId                String    
+  organizationId        String    
   cardNumber            String    @unique
   qrToken               String    @unique
   version               Int       @default(1)
   status                String    @default("ACTIVE")
-  generatedByOrgAdminId String?   @db.ObjectId
+  generatedByOrgAdminId String?   
   generatedAt           DateTime  @default(now())
   expiresAt             DateTime?
   printCount            Int       @default(0)
@@ -678,15 +678,15 @@ model IdCard {
 }
 
 model IdCardRequest {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId               String   @db.ObjectId
-  organizationId       String   @db.ObjectId
+  id                   String   @id @default(cuid())
+  userId               String   
+  organizationId       String   
   requestType          String
-  reason               String?
+  reason               String? @db.Text
   paymentStatus        String?
   requestStatus        String   @default("PENDING")
-  paymentId            String?  @db.ObjectId
-  approvedByOrgAdminId String?  @db.ObjectId
+  paymentId            String?  
+  approvedByOrgAdminId String?  
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -698,9 +698,9 @@ model IdCardRequest {
 }
 
 model IdCardPrintLog {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  idCardId      String   @db.ObjectId
-  printedById   String   @db.ObjectId
+  id            String   @id @default(cuid())
+  idCardId      String   
+  printedById   String   
   printedByRole String
   printedAt     DateTime @default(now())
 
@@ -708,11 +708,11 @@ model IdCardPrintLog {
 }
 
 model IdCardVerificationLog {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  idCardId           String?  @db.ObjectId
+  id                 String   @id @default(cuid())
+  idCardId           String?  
   qrTokenScanned     String
-  memberId           String?  @db.ObjectId
-  organizationId     String?  @db.ObjectId
+  memberId           String?  
+  organizationId     String?  
   scanTime           DateTime @default(now())
   verificationResult String
   deviceInfo         String?
@@ -725,17 +725,17 @@ model IdCardVerificationLog {
 }
 
 model Report {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  id             String   @id @default(cuid())
   title          String
-  description    String
+  description    String @db.Text
   status         String   @default("open") // open | in_progress | resolved
   priority       String   @default("medium") // low | medium | high
   reportType     String   @default("member_to_org") // member_to_org | org_to_superadmin
   accepted       Boolean  @default(false)
   response       String?
   attachment     String?
-  memberId       String?  @db.ObjectId
-  organizationId String   @db.ObjectId
+  memberId       String?  
+  organizationId String   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -746,19 +746,19 @@ model Report {
 }
 
 model License {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId                String    @db.ObjectId
-  organizationId        String    @db.ObjectId
+  id                    String    @id @default(cuid())
+  userId                String    
+  organizationId        String    
   licenseNumber         String    @unique
   qrToken               String    @unique
   version               Int       @default(1)
   status                String    @default("ACTIVE")
-  generatedByOrgAdminId String?   @db.ObjectId
+  generatedByOrgAdminId String?   
   generatedAt           DateTime  @default(now())
   expiresAt             DateTime?
   printCount            Int       @default(0)
   licenseType           String    @default("MEMBER")
-  details               String?
+  details               String? @db.Text
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -767,16 +767,16 @@ model License {
 }
 
 model LicenseRequest {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId               String   @db.ObjectId
-  organizationId       String   @db.ObjectId
-  licensePlanId        String?  @db.ObjectId
+  id                   String   @id @default(cuid())
+  userId               String   
+  organizationId       String   
+  licensePlanId        String?  
   requestType          String
-  reason               String?
+  reason               String? @db.Text
   paymentStatus        String?
   requestStatus        String   @default("PENDING")
-  paymentId            String?  @db.ObjectId
-  approvedByOrgAdminId String?  @db.ObjectId
+  paymentId            String?  
+  approvedByOrgAdminId String?  
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -789,9 +789,9 @@ model LicenseRequest {
 }
 
 model LicensePrintLog {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  licenseId     String   @db.ObjectId
-  printedById   String   @db.ObjectId
+  id            String   @id @default(cuid())
+  licenseId     String   
+  printedById   String   
   printedByRole String
   printedAt     DateTime @default(now())
 
@@ -799,11 +799,11 @@ model LicensePrintLog {
 }
 
 model LicenseVerificationLog {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  licenseId          String?  @db.ObjectId
+  id                 String   @id @default(cuid())
+  licenseId          String?  
   qrTokenScanned     String
-  memberId           String?  @db.ObjectId
-  organizationId     String?  @db.ObjectId
+  memberId           String?  
+  organizationId     String?  
   scanTime           DateTime @default(now())
   verificationResult String
   deviceInfo         String?
@@ -819,11 +819,11 @@ model LicenseVerificationLog {
 // CHAT SYSTEM MODELS
 // ==========================================
 model Conversation {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  id             String        @id @default(cuid())
   type           String // "member_org" | "org_superadmin"
-  participant1Id String        @db.ObjectId
-  participant2Id String        @db.ObjectId
-  organizationId String?       @db.ObjectId
+  participant1Id String        
+  participant2Id String        
+  organizationId String?       
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   messages       Message[]
@@ -835,10 +835,10 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(auto()) @map("_id") @db.ObjectId
-  conversationId String       @db.ObjectId
-  senderId       String       @db.ObjectId
-  content        String?
+  id             String       @id @default(cuid())
+  conversationId String       
+  senderId       String       
+  content        String? @db.Text
   attachmentUrl  String?
   attachmentType String? // image, file
   isRead         Boolean      @default(false)
@@ -851,9 +851,9 @@ model Message {
 }
 
 model TypingIndicator {
-  id             String   @id @default(cuid()) @map("_id")
-  conversationId String   @db.ObjectId
-  userId         String   @db.ObjectId
+  id             String   @id @default(cuid())
+  conversationId String   
+  userId         String   
   isTyping       Boolean  @default(false)
   updatedAt      DateTime @updatedAt
 
@@ -864,7 +864,7 @@ model TypingIndicator {
 // EMAIL NOTIFICATION SYSTEM
 // ==========================================
 model EmailNotificationLog {
-  id          String    @id @default(cuid()) @map("_id")
+  id          String    @id @default(cuid())
   to          String
   subject     String
   type        String // "welcome", "password_reset", "event_reminder", "payment_confirmation", "invitation"
@@ -872,11 +872,11 @@ model EmailNotificationLog {
   error       String?
   sentAt      DateTime?
   scheduledAt DateTime?
-  userId      String?   @db.ObjectId
+  userId      String?   
   user        User?     @relation(fields: [userId], references: [id])
-  eventId     String?   @db.ObjectId
+  eventId     String?   
   event       Event?    @relation(fields: [eventId], references: [id])
-  paymentId   String?   @db.ObjectId
+  paymentId   String?   
   payment     Payment?  @relation(fields: [paymentId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -889,16 +889,16 @@ model EmailNotificationLog {
 // ==========================================
 
 model MemberSubscriptionPlan {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  organizationId String   @db.ObjectId
+  id             String   @id @default(cuid())
+  organizationId String   
   name           String
-  description    String?
+  description    String? @db.Text
   price          Float
   currency       String   @default("ETB")
   billingCycle   String // "monthly", "quarterly", "annual"
   durationDays   Int
   trialDays      Int?     // Number of free trial days for new users
-  features       String[] @default([])
+  features Json?
   isActive       Boolean  @default(true)
   maxMembers     Int?
   sortOrder      Int      @default(0)
@@ -913,15 +913,15 @@ model MemberSubscriptionPlan {
 }
 
 model LicensePlan {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  organizationId String   @db.ObjectId
+  id             String   @id @default(cuid())
+  organizationId String   
   name           String
-  description    String?
+  description    String? @db.Text
   price          Float
   currency       String   @default("ETB")
   licenseType    String // "FIRST_TIME", "RENEWAL", "REPLACEMENT", "UPGRADE"
   durationDays   Int     // How long the license is valid
-  features       String[] @default([])
+  features Json?
   isActive       Boolean  @default(true)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
@@ -934,10 +934,10 @@ model LicensePlan {
 }
 
 model MemberSubscription {
-  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
-  memberId           String    @db.ObjectId
-  organizationId     String    @db.ObjectId
-  planId             String    @db.ObjectId
+  id                 String    @id @default(cuid())
+  memberId           String    
+  organizationId     String    
+  planId             String    
   status             String    @default("active") // active, paused, cancelled, expired
   startDate          DateTime
   nextBillingDate    DateTime
@@ -959,12 +959,12 @@ model MemberSubscription {
 }
 
 model Invoice {
-  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  id                 String    @id @default(cuid())
   invoiceNumber      String    @unique
-  organizationId     String    @db.ObjectId
-  memberId           String?   @db.ObjectId
-  subscriptionId     String?   @db.ObjectId
-  planId             String?   @db.ObjectId
+  organizationId     String    
+  memberId           String?   
+  subscriptionId     String?   
+  planId             String?   
   planType           String? // "organization" or "member"
   status             String    @default("draft") // draft, sent, paid, overdue, void
   subtotal           Float
@@ -986,8 +986,8 @@ model Invoice {
   organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   member                  User?                   @relation(fields: [memberId], references: [id])
   subscription            MemberSubscription?     @relation(fields: [subscriptionId], references: [id])
-  memberSubscriptionPlan  MemberSubscriptionPlan? @relation("InvoiceMemberPlan", fields: [planId], references: [id])
-  organizationPlan        Plan?                   @relation("InvoiceOrganizationPlan", fields: [planId], references: [id])
+  memberSubscriptionPlan  MemberSubscriptionPlan? @relation("InvoiceMemberPlan", fields: [planId], references: [id], map: "invoices_member_planId_fkey")
+  organizationPlan        Plan?                   @relation("InvoiceOrganizationPlan", fields: [planId], references: [id], map: "invoices_org_planId_fkey")
   items                   InvoiceItem[]
   payments                InvoicePayment[]
   reminders               InvoiceReminder[]
@@ -996,9 +996,9 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id          String @id @default(cuid()) @map("_id")
-  invoiceId   String @db.ObjectId
-  description String
+  id          String @id @default(cuid())
+  invoiceId   String 
+  description String @db.Text
   quantity    Int    @default(1)
   unitPrice   Float
   total       Float
@@ -1010,9 +1010,9 @@ model InvoiceItem {
 }
 
 model InvoicePayment {
-  id            String   @id @default(cuid()) @map("_id")
-  invoiceId     String   @db.ObjectId
-  paymentId     String?  @db.ObjectId
+  id            String   @id @default(cuid())
+  invoiceId     String   
+  paymentId     String?  
   amount        Float
   paymentMethod String?
   transactionId String?
@@ -1026,8 +1026,8 @@ model InvoicePayment {
 }
 
 model InvoiceReminder {
-  id        String   @id @default(cuid()) @map("_id")
-  invoiceId String   @db.ObjectId
+  id        String   @id @default(cuid())
+  invoiceId String   
   type      String // "before_due", "overdue_1day", "overdue_7days"
   sentAt    DateTime @default(now())
   channel   String // "email", "sms"
@@ -1039,9 +1039,9 @@ model InvoiceReminder {
 }
 
 model MemberSubscriptionPayment {
-  id             String   @id @default(cuid()) @map("_id")
-  subscriptionId String   @db.ObjectId
-  paymentId      String   @db.ObjectId
+  id             String   @id @default(cuid())
+  subscriptionId String   
+  paymentId      String   
   amount         Float
   periodStart    DateTime
   periodEnd      DateTime
@@ -1054,7 +1054,7 @@ model MemberSubscriptionPayment {
 }
 
 model InvoiceCounter {
-  id        String   @id @default(cuid()) @map("_id")
+  id        String   @id @default(cuid())
   year      Int
   sequence  Int      @default(0)
   updatedAt DateTime @updatedAt

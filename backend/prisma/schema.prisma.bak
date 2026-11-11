@@ -1,0 +1,1042 @@
+// Role values: SuperAdmin | orgAdmin | member
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model PendingUser {
+  id                String   @id @default(cuid()) @map("_id")
+  name              String
+  email             String   @unique
+  password          String
+  role              String
+  organization_name String?
+  organization_type String?
+  organization_id   String?
+  phone             String?
+  address           String?
+  sex               String?
+  join_date         DateTime?
+  otp_code          String
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@map("pending_users")
+}
+
+model Organization {
+  id               String                      @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  type             String
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  blogs            Blog[]
+  events           Event[]
+  services         Service[]
+  endorsements     OrganizationEndorsement[]
+  users            User[]
+  customAttributes CustomAttributeDefinition[]
+  plan_id          String?                     @db.ObjectId
+  plan_expiry      DateTime?
+  plan             Plan?                       @relation(fields: [plan_id], references: [id])
+  payment_phone    String?
+
+  // Member-facing About page (set by org admin)
+  aboutTitle       String?
+  aboutSubtitle    String?
+  aboutMission     String?
+  aboutStory       String?
+  aboutStatsJson   String? // JSON array [{label,value}]
+  aboutTimelineJson String? // JSON array [{year,title,desc,image?}]
+
+  // Member-facing Contact (set by org admin)
+  contactEmail           String?
+  contactPhone           String?
+  contactAddress         String?
+  contactHours           String?
+  contactFormRecipient   String? // where form submissions are sent / stored for admin
+  testimonialQuote       String? // shown on public home "Trusted by Organizations"
+
+  conversations           Conversation[]
+  idCards                 IdCard[]
+  idCardRequests          IdCardRequest[]
+  idCardVerificationLogs  IdCardVerificationLog[]
+  reports                 Report[]
+  memberSubscriptionPlans MemberSubscriptionPlan[]
+  memberSubscriptions     MemberSubscription[]
+  invoices                Invoice[]
+  licenses                License[]
+  licenseRequests         LicenseRequest[]
+  licenseVerificationLogs LicenseVerificationLog[]
+  licensePlans            LicensePlan[]
+
+  @@map("organizations")
+}
+
+model User {
+  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String
+  email                 String                 @unique
+  phone                 String?
+  role                  String                 @default("orgAdmin")
+  organizationId        String?                @db.ObjectId
+  organization_name     String?
+  organization_type     String?
+  password              String
+  profile_photo_path    String?
+  email_verified_at DateTime?
+  google_id             String?
+  sex                   String?
+  join_date           DateTime?
+  address               String?
+  plan_id          String?                @db.ObjectId
+  plan_expiry         DateTime?
+  fayda_id              String?
+  is_fayda_verified Boolean                @default(false)
+  is_verified         Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  members               Member[]
+  payments              Payment[]
+  memberSubscriptions   MemberSubscription[]
+  invoices              Invoice[]
+  notifications         Notification[]
+  otpTokens             OtpToken[]
+  customAttributeValues MemberAttributeValue[]
+  plan                  Plan?                  @relation(fields: [plan_id], references: [id])
+  organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  blogs                 Blog[]                 @relation("BlogAuthor")
+
+  attendedEventsIds String[] @db.ObjectId
+  attendedEvents    Event[]  @relation("EventAttendees", fields: [attendedEventsIds], references: [id])
+
+  subscribedServicesIds String[]  @db.ObjectId
+  subscribedServices    Service[] @relation("ServiceSubscribers", fields: [subscribedServicesIds], references: [id])
+
+  idCards                IdCard[]
+  idCardRequests         IdCardRequest[]
+  idCardVerificationLogs IdCardVerificationLog[]
+  reports                Report[]
+  licenses               License[]
+  licenseRequests        LicenseRequest[]
+  licenseVerificationLogs LicenseVerificationLog[]
+  conversations1         Conversation[]          @relation("ConversationParticipant1")
+  conversations2         Conversation[]          @relation("ConversationParticipant2")
+  sentMessages           Message[]
+  emailNotificationLogs  EmailNotificationLog[]
+  eventMessages          EventMessage[]
+
+  @@map("users")
+}
+
+model SystemConfig {
+  id                  String  @id @default(auto()) @map("_id") @db.ObjectId
+  platformName        String  @default("OMMS")
+  supportEmail        String  @default("support@omms.com")
+  maintenanceMode     Boolean @default(false)
+  telebirrPhone       String?
+  cbeBirrPhone        String?
+  paymentInstructions String?
+
+  // Contact Info for Home Page
+  contactPhone   String? @default("+251 911 234 567")
+  contactAddress String? @default("Addis Ababa, Ethiopia")
+  contactEmail   String? @default("info@omms.com")
+  contactHours   String? @default("Mon - Fri: 8:00 AM - 5:00 PM")
+
+  // Live Chat Config
+  showLiveChat Boolean @default(false)
+  liveChatUrl  String? @default("")
+
+  facebookUrl String?
+  telegramUrl String?
+  linkedinUrl String?
+
+  // Platform About page (super admin)
+  aboutTitle     String?
+  aboutSubtitle  String?
+  aboutMission   String?
+  aboutStory     String?
+  aboutStatsJson String? // JSON [{label,value}]
+  aboutTimelineJson String? // JSON [{year,title,desc,image?}]
+
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+model ContactMessage {
+  id             String   @id @default(cuid()) @map("_id")
+  scope          String   // platform (→ super admin) | organization (→ org admin)
+  organizationId String?  @db.ObjectId
+  senderUserId   String?  @db.ObjectId
+  senderRole     String?  // guest | member | orgAdmin
+  name           String
+  email          String
+  subject        String?
+  message        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@map("contact_messages")
+}
+
+model OrganizationEndorsement {
+  id             String   @id @default(cuid()) @map("_id")
+  organizationId String   @db.ObjectId
+  organizationName String
+  message        String
+  status         String   @default("pending") // pending | approved | rejected
+  submittedById  String?  @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_endorsements")
+}
+
+model CustomAttributeDefinition {
+  id             String                 @id @default(cuid()) @map("_id")
+  name           String
+  type           String // "text", "number", "date", "boolean"
+  required       Boolean                @default(false)
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  values         MemberAttributeValue[]
+
+  @@map("custom_attribute_definitions")
+}
+
+model MemberAttributeValue {
+  id          String                    @id @default(cuid()) @map("_id")
+  memberId    String
+  attributeId String
+  value       String
+  member      User                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  attribute   CustomAttributeDefinition @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, attributeId])
+  @@map("member_attribute_values")
+}
+
+model Notification {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  title     String
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid()) @map("_id")
+  email     String   @unique
+  token     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+model OtpToken {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String   @unique
+  otp_code  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("otp_tokens")
+}
+
+model Member {
+  id          String    @id @default(cuid()) @map("_id")
+  name        String
+  email       String    @unique
+  role        String?
+  status      String?
+  join_date   DateTime?
+  last_active DateTime?
+  photo       String?
+  user_id     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [user_id], references: [id])
+
+  @@map("members")
+}
+
+model Plan {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  price         Float
+  billing_cycle String
+  type          String
+  max_members   Int
+  duration_days Int
+  allowed_features String[] @default([]) // List of allowed features like "overview", "members", "events", etc.
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  payments      Payment[]
+  users         User[]
+  organizations Organization[]
+  invoices      Invoice[]      @relation("InvoiceOrganizationPlan")
+
+  @@map("plans")
+}
+
+model Payment {
+  id               String   @id @default(cuid()) @map("_id")
+  user_id          String
+  plan_id          String?
+  amount           Float
+  payment_method   String
+  status           String
+  transaction_id   String?
+  receipt_url      String?
+  rejection_reason String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  plan             Plan?    @relation(fields: [plan_id], references: [id])
+  user             User     @relation(fields: [user_id], references: [id])
+
+  payer_type     String?
+  payer_id       String?
+  payee_type     String?
+  payee_id       String?
+  reference_type String?
+  reference_id   String?
+
+  organization_id            String?                     @db.ObjectId
+  emailNotificationLogs      EmailNotificationLog[]
+  invoicePayments            InvoicePayment[]
+  memberSubscriptionPayments MemberSubscriptionPayment[]
+  idCardRequests             IdCardRequest[]
+  licenseRequests          LicenseRequest[]
+
+  @@map("payments")
+}
+
+model Blog {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  content   String
+  image     String?
+  status    String  @default("draft")
+  category  String  @default("general")
+  tags      String?
+  readTime  Int?
+  author_id String  @db.ObjectId
+  author    User    @relation("BlogAuthor", fields: [author_id], references: [id])
+
+  organizationId   String?       @db.ObjectId
+  isPredefined     Boolean       @default(false)
+  visibility       String        @default("public") // "public" or "private"
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  organizations    Organization? @relation(fields: [organizationId], references: [id])
+  price            Float?
+  payment_required Boolean       @default(false)
+
+  @@map("blogs")
+}
+
+// ==========================================
+// EVENT MODULE MODELS
+// ==========================================
+model Event {
+  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
+  title                String
+  description          String
+  date                 DateTime
+  end_date             DateTime?
+  location             String?
+  image                String? // Keep for backward compatibility
+  organizer            String?
+  capacity             Int?
+  registrationDeadline DateTime?
+  status               String        @default("Draft") // Draft | Upcoming | Ongoing | Completed | Cancelled
+  category             String        @default("general")
+  virtualLink          String?
+  contactEmail         String?
+  organizationId       String?       @db.ObjectId
+  isPredefined         Boolean       @default(false)
+  visibility           String        @default("public") // "public" or "private"
+  price                Float?
+  payment_required     Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  organizations        Organization? @relation(fields: [organizationId], references: [id])
+
+  attendeesIds          String[]               @db.ObjectId
+  attendees             User[]                 @relation("EventAttendees", fields: [attendeesIds], references: [id])
+  emailNotificationLogs EmailNotificationLog[]
+  eventMessages         EventMessage[]
+
+  @@map("events")
+}
+
+model EventParticipant {
+  id                 String    @id @default(cuid()) @map("_id")
+  eventId            String    @db.ObjectId
+  userId             String    @db.ObjectId
+  registrationStatus String    @default("Pending") // Pending | Approved | Rejected | Cancelled
+  registeredAt       DateTime  @default(now())
+  approvedBy         String?
+  approvedAt         DateTime?
+  notes              String?
+
+  @@map("event_participants")
+}
+
+model EventAttendance {
+  id           String    @id @default(cuid()) @map("_id")
+  eventId      String    @db.ObjectId
+  userId       String    @db.ObjectId
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+  qrCode       String?
+  checkedInBy  String?
+
+  @@map("event_attendances")
+}
+
+model EventReport {
+  id          String   @id @default(cuid()) @map("_id")
+  eventId     String   @db.ObjectId
+  title       String
+  content     String
+  generatedBy String
+  generatedAt DateTime @default(now())
+  filePath    String?
+
+  @@map("event_reports")
+}
+
+model EventMedia {
+  id         String   @id @default(cuid()) @map("_id")
+  eventId    String   @db.ObjectId
+  mediaType  String // image | video | document
+  url        String
+  caption    String?
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+
+  @@map("event_media")
+}
+
+// ==========================================
+// EVENT DISCUSSION ROOM
+// ==========================================
+model EventMessage {
+  id             String         @id @default(cuid()) @map("_id")
+  eventId        String         @db.ObjectId
+  senderId       String         @db.ObjectId
+  content        String?
+  attachmentUrl  String?
+  attachmentType String? // image, file
+  replyToId      String?        @db.ObjectId
+  replyTo        EventMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies        EventMessage[] @relation("MessageReplies")
+  createdAt      DateTime       @default(now())
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sender         User           @relation(fields: [senderId], references: [id])
+
+  @@map("event_messages")
+}
+
+model EventAnnouncement {
+  id      String   @id @default(cuid()) @map("_id")
+  eventId String   @db.ObjectId
+  title   String
+  content String
+  sentAt  DateTime @default(now())
+  sentBy  String
+
+  @@map("event_announcements")
+}
+
+// ==========================================
+// SERVICE MODULE MODELS
+// ==========================================
+model ServiceCategory {
+  id             String   @id @default(cuid()) @map("_id")
+  name           String
+  description    String?
+  organizationId String?  @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("service_categories")
+}
+
+model Service {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  name              String? // Was title before
+  title             String // Keep for backward compatibility (maps to name)
+  code              String? // Unique service code
+  description       String
+  image             String? // Keep for backward compatibility
+  categoryId        String?       @db.ObjectId
+  categoryName      String?       @default("general") // Keep for backward compatibility
+  category          String?       @default("general") // Keep for backward compatibility (maps to categoryName)
+  owner             String?
+  department        String?
+  status            String        @default("Active") // Active | Suspended | Archived | Under Maintenance
+  fee               Float?
+  price             Float? // Keep for backward compatibility (maps to fee)
+  duration          String? // e.g., "30 days", "per request"
+  requiredDocuments String[]      @default([])
+  eligibilityRules  String?
+  slaHours          Int?
+  renewalRule       String?
+  contactEmail      String? // Keep for backward compatibility
+  organizationId    String?       @db.ObjectId
+  visibility        String        @default("public") // "public" or "private"
+  payment_required  Boolean       @default(false)
+  isPredefined      Boolean       @default(false) // true = global platform service, false = organization-specific
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  organizations     Organization? @relation(fields: [organizationId], references: [id])
+
+  subscribersIds String[] @db.ObjectId
+  subscribers    User[]   @relation("ServiceSubscribers", fields: [subscribersIds], references: [id])
+
+  @@map("services")
+}
+
+model ServiceRequest {
+  id            String    @id @default(cuid()) @map("_id")
+  requestNumber String    @unique // Auto-generated request number
+  serviceId     String    @db.ObjectId
+  userId        String    @db.ObjectId
+  status        String    @default("Pending") // Pending | Under Review | Approved | Rejected | Completed
+  priority      String    @default("Normal") // Low | Normal | High | Urgent
+  description   String
+  submittedAt   DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  assignedTo    String?
+  assignedAt    DateTime?
+  completedAt   DateTime?
+  dueDate       DateTime?
+
+  @@map("service_requests")
+}
+
+model ServiceApproval {
+  id         String    @id @default(cuid()) @map("_id")
+  requestId  String    @db.ObjectId
+  approverId String    @db.ObjectId
+  status     String // Pending | Approved | Rejected
+  comments   String?
+  approvedAt DateTime?
+  level      Int // Approval level (1, 2, 3, etc.)
+
+  @@map("service_approvals")
+}
+
+model ServiceAttachment {
+  id         String   @id @default(cuid()) @map("_id")
+  serviceId  String   @db.ObjectId
+  name       String
+  url        String
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+
+  @@map("service_attachments")
+}
+
+model ServiceRequestAttachment {
+  id         String   @id @default(cuid()) @map("_id")
+  requestId  String   @db.ObjectId
+  name       String
+  url        String
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+
+  @@map("service_request_attachments")
+}
+
+model ServiceInternalNote {
+  id        String   @id @default(cuid()) @map("_id")
+  requestId String   @db.ObjectId
+  content   String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@map("service_internal_notes")
+}
+
+model ServiceFeedback {
+  id          String   @id @default(cuid()) @map("_id")
+  serviceId   String   @db.ObjectId
+  userId      String   @db.ObjectId
+  rating      Int // 1-5
+  comments    String?
+  submittedAt DateTime @default(now())
+
+  @@map("service_feedbacks")
+}
+
+// ==========================================
+// ACTIVITY HISTORY & NOTIFICATIONS
+// ==========================================
+model ActivityHistory {
+  id             String   @id @default(cuid()) @map("_id")
+  userId         String   @db.ObjectId
+  organizationId String?  @db.ObjectId
+  type           String // event | service | member | payment | etc.
+  action         String
+  details        String?
+  ipAddress      String?
+  userAgent      String?
+  timestamp      DateTime @default(now())
+
+  @@map("activity_history")
+}
+
+model NotificationCenter {
+  id             String   @id @default(cuid()) @map("_id")
+  userId         String   @db.ObjectId
+  organizationId String?  @db.ObjectId
+  title          String
+  content        String
+  type           String // info | warning | success | error
+  isRead         Boolean  @default(false)
+  link           String?
+  relatedId      String? // eventId, serviceId, requestId, etc.
+  relatedType    String?
+  createdAt      DateTime @default(now())
+
+  @@map("notification_center")
+}
+
+model ServiceApprovalAuditLog {
+  id         String   @id @default(cuid()) @map("_id")
+  requestId  String   @db.ObjectId
+  approvalId String?  @db.ObjectId
+  action     String
+  actionBy   String   @db.ObjectId
+  oldStatus  String?
+  newStatus  String
+  comments   String?
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+
+  @@map("service_approval_audit_logs")
+}
+
+model IdCard {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String    @db.ObjectId
+  organizationId        String    @db.ObjectId
+  cardNumber            String    @unique
+  qrToken               String    @unique
+  version               Int       @default(1)
+  status                String    @default("ACTIVE")
+  generatedByOrgAdminId String?   @db.ObjectId
+  generatedAt           DateTime  @default(now())
+  expiresAt             DateTime?
+  printCount            Int       @default(0)
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("id_cards")
+}
+
+model IdCardRequest {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String   @db.ObjectId
+  organizationId       String   @db.ObjectId
+  requestType          String
+  reason               String?
+  paymentStatus        String?
+  requestStatus        String   @default("PENDING")
+  paymentId            String?  @db.ObjectId
+  approvedByOrgAdminId String?  @db.ObjectId
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  payment      Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@map("id_card_requests")
+}
+
+model IdCardPrintLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  idCardId      String   @db.ObjectId
+  printedById   String   @db.ObjectId
+  printedByRole String
+  printedAt     DateTime @default(now())
+
+  @@map("id_card_print_logs")
+}
+
+model IdCardVerificationLog {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  idCardId           String?  @db.ObjectId
+  qrTokenScanned     String
+  memberId           String?  @db.ObjectId
+  organizationId     String?  @db.ObjectId
+  scanTime           DateTime @default(now())
+  verificationResult String
+  deviceInfo         String?
+  ipAddress          String?
+
+  member       User?         @relation(fields: [memberId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("id_card_verification_logs")
+}
+
+model Report {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  description    String
+  status         String   @default("open") // open | in_progress | resolved
+  priority       String   @default("medium") // low | medium | high
+  reportType     String   @default("member_to_org") // member_to_org | org_to_superadmin
+  accepted       Boolean  @default(false)
+  response       String?
+  attachment     String?
+  memberId       String?  @db.ObjectId
+  organizationId String   @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  member       User?         @relation(fields: [memberId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("reports")
+}
+
+model License {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String    @db.ObjectId
+  organizationId        String    @db.ObjectId
+  licenseNumber         String    @unique
+  qrToken               String    @unique
+  version               Int       @default(1)
+  status                String    @default("ACTIVE")
+  generatedByOrgAdminId String?   @db.ObjectId
+  generatedAt           DateTime  @default(now())
+  expiresAt             DateTime?
+  printCount            Int       @default(0)
+  licenseType           String    @default("MEMBER")
+  details               String?
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("licenses")
+}
+
+model LicenseRequest {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String   @db.ObjectId
+  organizationId       String   @db.ObjectId
+  licensePlanId        String?  @db.ObjectId
+  requestType          String
+  reason               String?
+  paymentStatus        String?
+  requestStatus        String   @default("PENDING")
+  paymentId            String?  @db.ObjectId
+  approvedByOrgAdminId String?  @db.ObjectId
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  licensePlan  LicensePlan? @relation(fields: [licensePlanId], references: [id])
+  payment      Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@map("license_requests")
+}
+
+model LicensePrintLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  licenseId     String   @db.ObjectId
+  printedById   String   @db.ObjectId
+  printedByRole String
+  printedAt     DateTime @default(now())
+
+  @@map("license_print_logs")
+}
+
+model LicenseVerificationLog {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  licenseId          String?  @db.ObjectId
+  qrTokenScanned     String
+  memberId           String?  @db.ObjectId
+  organizationId     String?  @db.ObjectId
+  scanTime           DateTime @default(now())
+  verificationResult String
+  deviceInfo         String?
+  ipAddress          String?
+
+  member       User?         @relation(fields: [memberId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("license_verification_logs")
+}
+
+// ==========================================
+// CHAT SYSTEM MODELS
+// ==========================================
+model Conversation {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  type           String // "member_org" | "org_superadmin"
+  participant1Id String        @db.ObjectId
+  participant2Id String        @db.ObjectId
+  organizationId String?       @db.ObjectId
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  messages       Message[]
+  participant1   User          @relation("ConversationParticipant1", fields: [participant1Id], references: [id])
+  participant2   User          @relation("ConversationParticipant2", fields: [participant2Id], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  senderId       String       @db.ObjectId
+  content        String?
+  attachmentUrl  String?
+  attachmentType String? // image, file
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model TypingIndicator {
+  id             String   @id @default(cuid()) @map("_id")
+  conversationId String   @db.ObjectId
+  userId         String   @db.ObjectId
+  isTyping       Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  @@map("typing_indicators")
+}
+
+// ==========================================
+// EMAIL NOTIFICATION SYSTEM
+// ==========================================
+model EmailNotificationLog {
+  id          String    @id @default(cuid()) @map("_id")
+  to          String
+  subject     String
+  type        String // "welcome", "password_reset", "event_reminder", "payment_confirmation", "invitation"
+  status      String    @default("pending") // "pending", "sent", "failed"
+  error       String?
+  sentAt      DateTime?
+  scheduledAt DateTime?
+  userId      String?   @db.ObjectId
+  user        User?     @relation(fields: [userId], references: [id])
+  eventId     String?   @db.ObjectId
+  event       Event?    @relation(fields: [eventId], references: [id])
+  paymentId   String?   @db.ObjectId
+  payment     Payment?  @relation(fields: [paymentId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("email_notification_logs")
+}
+
+// ==========================================
+// MEMBER SUBSCRIPTION & INVOICING SYSTEM
+// ==========================================
+
+model MemberSubscriptionPlan {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  name           String
+  description    String?
+  price          Float
+  currency       String   @default("ETB")
+  billingCycle   String // "monthly", "quarterly", "annual"
+  durationDays   Int
+  trialDays      Int?     // Number of free trial days for new users
+  features       String[] @default([])
+  isActive       Boolean  @default(true)
+  maxMembers     Int?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptions MemberSubscription[]
+  invoices      Invoice[]            @relation("InvoiceMemberPlan")
+
+  @@map("member_subscription_plans")
+}
+
+model LicensePlan {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  name           String
+  description    String?
+  price          Float
+  currency       String   @default("ETB")
+  licenseType    String // "FIRST_TIME", "RENEWAL", "REPLACEMENT", "UPGRADE"
+  durationDays   Int     // How long the license is valid
+  features       String[] @default([])
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  licenseRequests LicenseRequest[]
+
+  @@map("license_plans")
+}
+
+model MemberSubscription {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  memberId           String    @db.ObjectId
+  organizationId     String    @db.ObjectId
+  planId             String    @db.ObjectId
+  status             String    @default("active") // active, paused, cancelled, expired
+  startDate          DateTime
+  nextBillingDate    DateTime
+  endDate            DateTime?
+  cancellationDate   DateTime?
+  cancellationReason String?
+  autoRenew          Boolean   @default(true)
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  member       User                        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         MemberSubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+  payments     MemberSubscriptionPayment[]
+
+  @@map("member_subscriptions")
+}
+
+model Invoice {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  invoiceNumber      String    @unique
+  organizationId     String    @db.ObjectId
+  memberId           String?   @db.ObjectId
+  subscriptionId     String?   @db.ObjectId
+  planId             String?   @db.ObjectId
+  planType           String? // "organization" or "member"
+  status             String    @default("draft") // draft, sent, paid, overdue, void
+  subtotal           Float
+  tax                Float     @default(0)
+  discount           Float     @default(0)
+  total              Float
+  currency           String    @default("ETB")
+  dueDate            DateTime
+  paidAt             DateTime?
+  notes              String?
+  pdfUrl             String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  sentAt             DateTime?
+  billingPeriodStart DateTime?
+  billingPeriodEnd   DateTime?
+  isRecurring        Boolean   @default(false)
+
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  member                  User?                   @relation(fields: [memberId], references: [id])
+  subscription            MemberSubscription?     @relation(fields: [subscriptionId], references: [id])
+  memberSubscriptionPlan  MemberSubscriptionPlan? @relation("InvoiceMemberPlan", fields: [planId], references: [id])
+  organizationPlan        Plan?                   @relation("InvoiceOrganizationPlan", fields: [planId], references: [id])
+  items                   InvoiceItem[]
+  payments                InvoicePayment[]
+  reminders               InvoiceReminder[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String @id @default(cuid()) @map("_id")
+  invoiceId   String @db.ObjectId
+  description String
+  quantity    Int    @default(1)
+  unitPrice   Float
+  total       Float
+  sortOrder   Int    @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id            String   @id @default(cuid()) @map("_id")
+  invoiceId     String   @db.ObjectId
+  paymentId     String?  @db.ObjectId
+  amount        Float
+  paymentMethod String?
+  transactionId String?
+  paidAt        DateTime @default(now())
+  notes         String?
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@map("invoice_payments")
+}
+
+model InvoiceReminder {
+  id        String   @id @default(cuid()) @map("_id")
+  invoiceId String   @db.ObjectId
+  type      String // "before_due", "overdue_1day", "overdue_7days"
+  sentAt    DateTime @default(now())
+  channel   String // "email", "sms"
+  status    String   @default("sent") // sent, failed
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_reminders")
+}
+
+model MemberSubscriptionPayment {
+  id             String   @id @default(cuid()) @map("_id")
+  subscriptionId String   @db.ObjectId
+  paymentId      String   @db.ObjectId
+  amount         Float
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         String   @default("completed")
+
+  subscription MemberSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payment      Payment            @relation(fields: [paymentId], references: [id])
+
+  @@map("member_subscription_payments")
+}
+
+model InvoiceCounter {
+  id        String   @id @default(cuid()) @map("_id")
+  year      Int
+  sequence  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([year])
+  @@map("invoice_counters")
+}

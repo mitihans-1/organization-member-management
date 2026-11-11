@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Paperclip, MessageSquare, Check, CheckCheck, User, ChevronLeft, Plus } from 'lucide-react';
-import api from '../services/api';
+import api, { BASE_URL, getAssetUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { io, Socket } from 'socket.io-client';
 
@@ -116,7 +116,7 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const newSocket = io('http://localhost:5000');
+      const newSocket = io(BASE_URL);
       newSocket.emit('join', user.id);
       setSocket(newSocket);
 
@@ -402,13 +402,13 @@ const ChatPage: React.FC = () => {
                         <div className="mb-2">
                           {msg.attachmentType?.startsWith('image') ? (
                             <img
-                              src={`http://localhost:5000/${msg.attachmentUrl}`}
+                              src={getAssetUrl(msg.attachmentUrl)}
                               alt="Attachment"
                               className="rounded-xl max-w-full"
                             />
                           ) : (
                             <a
-                              href={`http://localhost:5000/${msg.attachmentUrl}`}
+                              href={getAssetUrl(msg.attachmentUrl)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`underline ${isCurrentUser ? 'text-indigo-600' : 'text-indigo-100'}`}

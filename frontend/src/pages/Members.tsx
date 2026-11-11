@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../services/api';
+import api, { getAssetUrl } from '../services/api';
 import { User, CustomAttributeDefinition, MemberAttributeValue } from '../types';
 import {
   Plus,
@@ -498,7 +498,7 @@ const Members: React.FC = () => {
                       <img
                         src={
                           member.profile_photo_path 
-                            ? `http://localhost:5000/${member.profile_photo_path.replace(/\\/g, '/')}`
+                            ? getAssetUrl(member.profile_photo_path)
                             : `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=e0e7ff&color=3730a3`
                         }
                         alt=""

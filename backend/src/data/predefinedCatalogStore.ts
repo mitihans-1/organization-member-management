@@ -210,8 +210,8 @@ export function listPlatformBlogs(): PlatformBlogRecord[] {
   return [...platformBlogs];
 }
 
-function newObjectId(): string {
-  return crypto.randomBytes(12).toString('hex');
+function generateUniqueId(): string {
+  return crypto.randomUUID();
 }
 
 export function createPlatformService(
@@ -220,7 +220,7 @@ export function createPlatformService(
   const now = new Date();
   const price = data.price ?? null;
   const item: PlatformServiceRecord = {
-    id: newObjectId(),
+    id: generateUniqueId(),
     title: data.title,
     name: data.title,
     code: data.code ?? null,
@@ -284,7 +284,7 @@ export function createPlatformEvent(
 ): PlatformEventRecord {
   const now = new Date();
   const item: PlatformEventRecord = {
-    id: newObjectId(),
+    id: generateUniqueId(),
     title: data.title,
     description: data.description,
     date: data.date,
@@ -332,7 +332,7 @@ export function createPlatformBlog(
 ): PlatformBlogRecord {
   const now = new Date();
   const item: PlatformBlogRecord = {
-    id: newObjectId(),
+    id: generateUniqueId(),
     title: data.title,
     content: data.content,
     image: data.image ?? null,
@@ -371,15 +371,17 @@ export function deletePlatformBlog(id: string): boolean {
 }
 
 export async function countPlatformServiceSubscribers(serviceId: string): Promise<number> {
-  return prisma.user.count({
-    where: { subscribedServicesIds: { has: serviceId } },
+  const users = await prisma.user.findMany({
+    select: { subscribedServicesIds: true },
   });
+  return users.filter(u => Array.isArray(u.subscribedServicesIds) && (u.subscribedServicesIds as string[]).includes(serviceId)).length;
 }
 
 export async function countPlatformEventAttendees(eventId: string): Promise<number> {
-  return prisma.user.count({
-    where: { attendedEventsIds: { has: eventId } },
+  const users = await prisma.user.findMany({
+    select: { attendedEventsIds: true },
   });
+  return users.filter(u => Array.isArray(u.attendedEventsIds) && (u.attendedEventsIds as string[]).includes(eventId)).length;
 }
 
 export async function getPlatformAuthor() {
@@ -444,7 +446,8 @@ export async function userSubscribedToPlatformService(
     where: { id: userId },
     select: { subscribedServicesIds: true },
   });
-  return user?.subscribedServicesIds.includes(serviceId) ?? false;
+  const list = Array.isArray(user?.subscribedServicesIds) ? (user.subscribedServicesIds as string[]) : [];
+  return list.includes(serviceId);
 }
 
 export async function userRegisteredForPlatformEvent(
@@ -455,7 +458,8 @@ export async function userRegisteredForPlatformEvent(
     where: { id: userId },
     select: { attendedEventsIds: true },
   });
-  return user?.attendedEventsIds.includes(eventId) ?? false;
+  const list = Array.isArray(user?.attendedEventsIds) ? (user.attendedEventsIds as string[]) : [];
+  return list.includes(eventId);
 }
 
 export async function subscribeUserToPlatformService(
@@ -465,9 +469,14 @@ export async function subscribeUserToPlatformService(
   if (await userSubscribedToPlatformService(userId, serviceId)) {
     throw new Error('ALREADY_SUBSCRIBED');
   }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscribedServicesIds: true },
+  });
+  const current = Array.isArray(user?.subscribedServicesIds) ? (user.subscribedServicesIds as string[]) : [];
   await prisma.user.update({
     where: { id: userId },
-    data: { subscribedServicesIds: { push: serviceId } },
+    data: { subscribedServicesIds: [...current, serviceId] },
   });
 }
 
@@ -478,8 +487,13 @@ export async function registerUserForPlatformEvent(
   if (await userRegisteredForPlatformEvent(userId, eventId)) {
     throw new Error('ALREADY_REGISTERED');
   }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { attendedEventsIds: true },
+  });
+  const current = Array.isArray(user?.attendedEventsIds) ? (user.attendedEventsIds as string[]) : [];
   await prisma.user.update({
     where: { id: userId },
-    data: { attendedEventsIds: { push: eventId } },
+    data: { attendedEventsIds: [...current, eventId] },
   });
 }
