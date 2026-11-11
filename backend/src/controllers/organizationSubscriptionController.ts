@@ -94,8 +94,8 @@ export const assignOrganizationPlan = async (req: any, res: Response) => {
       if (isObjectId) {
         plan = await prisma.plan.findUnique({ where: { id: planId } });
       } else if (typeof planId === 'string') {
-        // try matching by name case-insensitively
-        plan = await prisma.plan.findFirst({ where: { name: { equals: planId, mode: 'insensitive' } } });
+        // try matching by name (MySQL string equals is case-insensitive by default)
+        plan = await prisma.plan.findFirst({ where: { name: { equals: planId } } });
       }
     } catch (err) {
       console.error('Error finding plan with planId:', planId, err);
