@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-if (!process.env.DATABASE_URL && process.env.MYSQL_ADDON_URI) {
+if ((!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('${')) && process.env.MYSQL_ADDON_URI) {
   process.env.DATABASE_URL = process.env.MYSQL_ADDON_URI;
 }
 import { PrismaClient } from '@prisma/client';
