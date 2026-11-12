@@ -31,3 +31,4 @@ try {
   console.error('Database deployment failed:', err);
   process.exit(1);
 }
+
