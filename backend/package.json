@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "main": "dist/src/index.js",
   "scripts": {
-    "prestart": "npm run build",
-    "start": "node dist/src/index.js",
+    "prestart": "export DATABASE_URL=\"${DATABASE_URL:-$MYSQL_ADDON_URI}\" && npm run build",
+    "start": "export DATABASE_URL=\"${DATABASE_URL:-$MYSQL_ADDON_URI}\" && node dist/src/index.js",
     "dev": "nodemon src/index.ts",
-    "build": "prisma generate && prisma db push --accept-data-loss && tsc && node dist/prisma/seed.js",
+    "build": "export DATABASE_URL=\"${DATABASE_URL:-$MYSQL_ADDON_URI}\" && prisma generate && prisma db push --accept-data-loss && tsc && node dist/prisma/seed.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts"

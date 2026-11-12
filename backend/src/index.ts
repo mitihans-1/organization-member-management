@@ -1,4 +1,8 @@
 import 'dotenv/config';
+
+if (!process.env.DATABASE_URL && process.env.MYSQL_ADDON_URI) {
+  process.env.DATABASE_URL = process.env.MYSQL_ADDON_URI;
+}
 import express from 'express';
 import cors from 'cors';
 import http from 'http';

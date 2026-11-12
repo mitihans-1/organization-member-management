@@ -1,4 +1,8 @@
 import 'dotenv/config';
+
+if (!process.env.DATABASE_URL && process.env.MYSQL_ADDON_URI) {
+  process.env.DATABASE_URL = process.env.MYSQL_ADDON_URI;
+}
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
