@@ -25,7 +25,7 @@ try {
 
   console.log('Seeding initial data...');
   const seedPath = path.join(__dirname, '../dist/prisma/seed.js');
-  require(seedPath);
+  execSync(`node "${seedPath}"`, { stdio: 'inherit', env: process.env });
   console.log('Database preparation complete!');
 } catch (err) {
   console.error('Database deployment failed:', err);

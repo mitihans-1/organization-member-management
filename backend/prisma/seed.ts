@@ -22,8 +22,8 @@ async function main() {
 
 
   const superEmail =
-    process.env.SEED_SUPERADMIN_EMAIL?.trim() || 'abcd@omms.com';
-  const superPassword = process.env.SEED_SUPERADMIN_PASSWORD?.trim() || 'abcd123!';
+    process.env.SEED_SUPERADMIN_EMAIL?.trim() || 'lalisaatamsgeen@gmail.com';
+  const superPassword = process.env.SEED_SUPERADMIN_PASSWORD?.trim() || 'OwnerDev123!';
   const superPasswordHash = await bcrypt.hash(superPassword, 10);
 
   let superUser = await prisma.user.findUnique({ where: { email: superEmail } });
@@ -49,6 +49,33 @@ async function main() {
     });
   }
   console.log('SuperAdmin ready:', superEmail, '(password:', superPassword, ')');
+
+  // Also ensure fallback abcd@omms.com exists
+  const fallbackEmail = 'abcd@omms.com';
+  const fallbackPassword = 'abcd123!';
+  const fallbackHash = await bcrypt.hash(fallbackPassword, 10);
+  const fallbackUser = await prisma.user.findUnique({ where: { email: fallbackEmail } });
+  if (!fallbackUser) {
+    await prisma.user.create({
+      data: {
+        name: 'Super Admin Backup',
+        email: fallbackEmail,
+        password: fallbackHash,
+        role: 'SuperAdmin',
+        is_verified: true,
+      },
+    });
+  } else {
+    await prisma.user.update({
+      where: { email: fallbackEmail },
+      data: {
+        password: fallbackHash,
+        role: 'SuperAdmin',
+        is_verified: true,
+      },
+    });
+  }
+  console.log('Backup SuperAdmin ready:', fallbackEmail, '(password:', fallbackPassword, ')');
 
   // Default features (same as in controllers)
   const defaultFeatures = {
